@@ -10,19 +10,19 @@ export default function RulesModal({ onClose }: RulesModalProps) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="rules-modal-title"
     >
       <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
+        initial={{ opacity: 0, scale: 0.9, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9 }}
-        transition={{ duration: 0.2 }}
-        className="flex max-h-[80vh] w-full max-w-2xl flex-col rounded-lg bg-card-green p-8 shadow-2xl"
+        transition={{ type: 'spring', stiffness: 320, damping: 26 }}
+        className="flex max-h-[80vh] w-full max-w-2xl flex-col rounded-2xl border border-white/10 bg-card-green-dark/90 p-8 shadow-2xl backdrop-blur-xl"
       >
-        <h2 id="rules-modal-title" className="mb-4 text-2xl font-bold text-card-gold">
+        <h2 id="rules-modal-title" className="mb-4 font-display text-2xl text-card-gold">
           Como Jogar Buraco
         </h2>
         <div className="space-y-4 overflow-y-auto pr-2 text-sm text-gray-200">
@@ -59,7 +59,7 @@ export default function RulesModal({ onClose }: RulesModalProps) {
         <button
           type="button"
           onClick={onClose}
-          className="mt-6 min-h-[44px] w-full rounded-lg bg-card-gold px-4 py-2 font-bold text-black transition-colors hover:bg-yellow-400"
+          className="mt-6 min-h-[44px] w-full rounded-xl bg-gradient-to-b from-card-gold-light to-card-gold px-4 py-2 font-bold text-black shadow-lg shadow-black/30 transition-colors hover:from-card-gold hover:to-card-gold-dark"
         >
           Fechar
         </button>

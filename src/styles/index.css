@@ -1,10 +1,25 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
 
 @theme {
-  --color-card-green: #0d3b1f;
+  /* Felt / table tones */
+  --color-card-green: #0f5132;
+  --color-card-green-light: #146b41;
+  --color-card-green-dark: #0a2e1e;
+  --color-felt-edge: #071f15;
+
+  /* Casino gold */
   --color-card-gold: #d4af37;
+  --color-card-gold-light: #f1d580;
+  --color-card-gold-dark: #a3801f;
+
+  /* Suit colors — traditional 2-color deck: hearts/diamonds red, clubs/spades black */
+  --color-suit-hearts: #d4143c;
+  --color-suit-diamonds: #d4143c;
+  --color-suit-clubs: #16161a;
+  --color-suit-spades: #16161a;
+
+  /* Display font for titles */
+  --font-display: 'Righteous', 'Segoe UI', sans-serif;
 }
 
 * {
@@ -19,4 +34,51 @@ body {
 
 html, body, #root {
   height: 100%;
+}
+
+/* Thin, gold-tinted scrollbars for horizontally-scrolling card rows */
+.scrollbar-gold {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(212, 175, 55, 0.6) transparent;
+}
+
+.scrollbar-gold::-webkit-scrollbar {
+  height: 8px;
+}
+
+.scrollbar-gold::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-gold::-webkit-scrollbar-thumb {
+  background-color: rgba(212, 175, 55, 0.5);
+  border-radius: 9999px;
+}
+
+.scrollbar-gold::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(212, 175, 55, 0.8);
+}
+
+/* Diagonal card-back patterns — one color per physical deck (Buraco is
+ * played with 2 merged decks + wilds), so the draw pile can show both. */
+.card-back-pattern-blue {
+  background-image: repeating-linear-gradient(
+      45deg,
+      rgba(255, 215, 120, 0.35) 0px,
+      rgba(255, 215, 120, 0.35) 3px,
+      transparent 3px,
+      transparent 10px
+    ),
+    linear-gradient(135deg, #1d4ed8 0%, #1e3a8a 100%);
+}
+
+.card-back-pattern-red {
+  background-image: repeating-linear-gradient(
+      45deg,
+      rgba(255, 215, 120, 0.35) 0px,
+      rgba(255, 215, 120, 0.35) 3px,
+      transparent 3px,
+      transparent 10px
+    ),
+    linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%);
 }

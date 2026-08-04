@@ -115,7 +115,7 @@ describe('useGameStore', () => {
     expect(player.hand.isEmpty()).toBe(true)
     expect(state.game!.state.status).toBe('finished')
     expect(state.game!.state.winner).toBeDefined()
-    expect(state.gameLog.some(l => l.toLowerCase().includes('game over'))).toBe(true)
+    expect(state.gameLog.some(l => l.toLowerCase().includes('fim de jogo'))).toBe(true)
   })
 
   test('toggleCardSelection adds and removes indices; clearSelection empties it', () => {

@@ -91,25 +91,31 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
     // Stays in 'play' phase: the human may play more canastas or discard.
   }
 
+  const recentLog = gameLog.slice(-5)
+
   return (
-    <div className="flex flex-col gap-6 pb-28">
+    <div className="flex flex-col gap-4 pb-32">
       <GameHeader />
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <GameBoard />
         </div>
-        <div className="space-y-2">
-          <h3 className="text-lg font-bold text-card-gold">Log</h3>
-          <div className="max-h-48 space-y-2 overflow-y-auto rounded-lg bg-white/10 p-4 text-sm">
-            {gameLog.map((entry, i) => (
-              <div key={i} className="text-gray-200">
-                {entry}
-              </div>
-            ))}
+        <div className="space-y-2 rounded-2xl border border-white/10 bg-black/20 p-4 shadow-lg backdrop-blur-sm">
+          <h3 className="font-display text-base text-card-gold">Registro</h3>
+          <div className="max-h-40 space-y-1.5 overflow-y-auto text-xs text-gray-300 sm:text-sm">
+            {recentLog.length === 0 ? (
+              <p className="text-gray-500">Nenhuma ação ainda.</p>
+            ) : (
+              recentLog.map((entry, i) => (
+                <div key={i} className="border-b border-white/5 pb-1.5 last:border-0 last:pb-0">
+                  {entry}
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>
-      <PlayerHand />
+      <PlayerHand phase={phase} />
       <ActionPanel
         phase={phase}
         onDraw={handleDraw}

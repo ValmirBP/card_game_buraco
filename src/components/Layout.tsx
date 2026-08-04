@@ -6,8 +6,8 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   return (
-    <div className="w-full min-h-screen bg-gradient-to-br from-card-green to-green-900 text-white">
-      <div className="max-w-7xl mx-auto px-4 py-6">{children}</div>
+    <div className="relative min-h-screen w-full overflow-x-hidden bg-card-green text-white">
+      <div className="relative z-10 mx-auto max-w-7xl px-4 py-6">{children}</div>
     </div>
   )
 }

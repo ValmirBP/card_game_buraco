@@ -46,11 +46,17 @@ export interface GameStore {
   resetGame: () => void
 }
 
+const DIFFICULTY_LABEL: Record<string, string> = {
+  easy: 'fácil',
+  medium: 'médio',
+  hard: 'difícil',
+}
+
 function appendGameOverLog(game: Game, log: string[]): void {
   if (!game.isGameOver()) return
   game.finish()
-  const winnerName = game.state.winner?.name ?? 'unknown'
-  log.push(`Game over — ${winnerName} venceu.`)
+  const winnerName = game.state.winner?.name ?? 'desconhecido'
+  log.push(`Fim de jogo — ${winnerName} venceu.`)
 }
 
 /** Fallback discard used whenever the AI's move can't be honored as-is:
@@ -87,7 +93,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       game,
       version: get().version + 1,
       selectedCardIndices: [],
-      gameLog: [`Game started: ${playerName} vs Bot (${aiDifficulty}).`],
+      gameLog: [`Partida iniciada: ${playerName} vs Bot (${DIFFICULTY_LABEL[aiDifficulty] ?? aiDifficulty}).`],
     })
   },
 
@@ -99,7 +105,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const card = game.draw()
     if (!card) {
       set({
-        gameLog: [...gameLog, 'The deck is empty.'],
+        gameLog: [...gameLog, 'O monte acabou.'],
         version: get().version + 1,
       })
       return
@@ -107,7 +113,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     player.hand.addCard(card)
     set({
-      gameLog: [...gameLog, `${player.name} drew a card.`],
+      gameLog: [...gameLog, `${player.name} comprou uma carta.`],
       version: get().version + 1,
     })
   },
@@ -120,7 +126,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const success = game.discard(cardIndex)
     if (!success) return
 
-    const log = [...gameLog, `${player.name} discarded a card.`]
+    const log = [...gameLog, `${player.name} descartou uma carta.`]
     game.endTurn()
     appendGameOverLog(game, log)
 
@@ -147,7 +153,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!success) return
 
     set({
-      gameLog: [...gameLog, `${player.name} played a canasta!`],
+      gameLog: [...gameLog, `${player.name} baixou uma canastra!`],
       selectedCardIndices: [],
       version: get().version + 1,
     })
@@ -163,9 +169,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const drawnCard = game.draw()
     if (drawnCard) {
       aiPlayer.hand.addCard(drawnCard)
-      log.push(`${aiPlayer.name} drew a card.`)
+      log.push(`${aiPlayer.name} comprou uma carta.`)
     } else {
-      log.push('The deck is empty.')
+      log.push('O monte acabou.')
     }
 
     let discarded = false
@@ -182,13 +188,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
       if (move && move.type === 'play_canasta' && move.cards) {
         const played = game.playCanasta(move.cards)
         if (!played) break // avoid an infinite loop on a move the engine rejects
-        log.push(`${aiPlayer.name} played a canasta!`)
+        log.push(`${aiPlayer.name} baixou uma canastra!`)
         continue
       }
 
       if (move && move.type === 'discard' && move.cardIndex !== undefined) {
         discarded = game.discard(move.cardIndex)
-        if (discarded) log.push(`${aiPlayer.name} discarded a card.`)
+        if (discarded) log.push(`${aiPlayer.name} descartou uma carta.`)
       }
       break
     }
@@ -198,7 +204,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // turn by discarding its least valuable card.
     if (!discarded) {
       discarded = discardLowestValueCard(game, aiPlayer)
-      if (discarded) log.push(`${aiPlayer.name} discarded a card.`)
+      if (discarded) log.push(`${aiPlayer.name} descartou uma carta.`)
     }
 
     game.endTurn()
