@@ -1,5 +1,5 @@
 import { Card } from './card'
-import { isValidCanasta, canastaPoints } from './utils'
+import { isValidCanasta, canastaPoints, scoreCard } from './utils'
 
 export class Canasta {
   readonly cards: Card[]
@@ -19,18 +19,10 @@ export class Canasta {
     // Pontuação é: valor das cartas + bônus canasta
     let score = 0
     for (const card of this.cards) {
-      score += this.cardValue(card)
+      score += scoreCard(card.rank)
     }
     score += this.points
     return score
-  }
-
-  private cardValue(card: Card): number {
-    if (card.rank === 'A') return 15
-    if (card.rank === 'K' || card.rank === 'Q' || card.rank === 'J') return 10
-    if (card.rank === '2') return 20
-    const num = parseInt(card.rank, 10)
-    return isNaN(num) ? 0 : num
   }
 
   clone(): Canasta {
