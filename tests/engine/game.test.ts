@@ -137,6 +137,74 @@ describe('Game', () => {
     expect(game.state.winner).toBe(p2)
   })
 
+  // Regras de pontuação final: penalidade de mão e bônus de fechamento.
+  // Ao finalizar, cada jogador subtrai do score a soma dos valores das
+  // cartas que restaram na mão (scoreCard). Se algum jogador fechou (mão
+  // vazia no momento do finish), esse jogador ganha +100. No máximo um
+  // jogador pode estar com a mão vazia; se nenhum estiver (fim por deck
+  // vazio, "buraco"), ninguém recebe o bônus.
+  describe('finish - hand penalty and closing bonus', () => {
+    test('subtracts sum of remaining hand card values from score', () => {
+      const p1 = new HumanPlayer('Alice', [new Card('hearts', 'A', false), new Card('hearts', 'K', false)])
+      const p2 = new AIPlayer('Bot', 'easy', [new Card('clubs', '9', false)])
+      p1.score = 100
+      const game = new Game([p1, p2])
+      game.finish()
+      // A=15, K=10 -> 25
+      expect(p1.score).toBe(75)
+    })
+
+    test('player who closed (empty hand) gets +100 bonus, opponent only penalized', () => {
+      const p1 = new HumanPlayer('Alice', []) // fechou
+      const p2 = new AIPlayer('Bot', 'easy', [new Card('clubs', '9', false)])
+      p1.score = 100
+      p2.score = 50
+      const game = new Game([p1, p2])
+      game.finish()
+      expect(p1.score).toBe(200) // 100 - 0 + 100
+      expect(p2.score).toBe(41) // 50 - 9
+    })
+
+    test('game ends by empty deck with both players holding cards: both penalized, nobody gets bonus', () => {
+      const p1 = new HumanPlayer('Alice', [new Card('hearts', 'A', false)])
+      const p2 = new AIPlayer('Bot', 'easy', [new Card('clubs', '9', false)])
+      p1.score = 100
+      p2.score = 50
+      const game = new Game([p1, p2])
+      game.finish()
+      expect(p1.score).toBe(85) // 100 - 15, no bonus
+      expect(p2.score).toBe(41) // 50 - 9, no bonus
+    })
+
+    test('finish is idempotent: calling twice does not double-apply penalty/bonus', () => {
+      const p1 = new HumanPlayer('Alice', [new Card('hearts', 'A', false)])
+      const p2 = new AIPlayer('Bot', 'easy', [])
+      p1.score = 100
+      p2.score = 50
+      const game = new Game([p1, p2])
+      game.finish()
+      const p1AfterFirst = p1.score
+      const p2AfterFirst = p2.score
+      game.finish()
+      expect(p1.score).toBe(p1AfterFirst)
+      expect(p2.score).toBe(p2AfterFirst)
+    })
+
+    test('winner is calculated after adjustments, not raw score', () => {
+      // p1: score 100, 30 pts left in hand -> 70
+      // p2: score 90, empty hand -> 90 + 100 = 190
+      const p1 = new HumanPlayer('Alice', [new Card('hearts', 'K', false), new Card('hearts', 'K', false), new Card('hearts', '10', false)])
+      const p2 = new AIPlayer('Bot', 'easy', [])
+      p1.score = 100
+      p2.score = 90
+      const game = new Game([p1, p2])
+      game.finish()
+      expect(p1.score).toBe(70)
+      expect(p2.score).toBe(190)
+      expect(game.state.winner).toBe(p2)
+    })
+  })
+
   test('getGameState returns the current state', () => {
     const p1 = new HumanPlayer('Alice')
     const p2 = new AIPlayer('Bot', 'easy')

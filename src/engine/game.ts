@@ -2,7 +2,7 @@ import { Player, PlayerMove } from './player'
 import { Card, createDeck } from './card'
 import { Canasta } from './canasta'
 import { GameState, createGameState } from './gameState'
-import { isValidCanasta } from './utils'
+import { isValidCanasta, scoreCard } from './utils'
 
 export class Game {
   state: GameState
@@ -136,8 +136,29 @@ export class Game {
     return someHandEmpty || deckEmpty
   }
 
+  /**
+   * Finalizes the game: applies the hand penalty and closing bonus to each
+   * player's score, then determines the winner from the adjusted scores.
+   * Idempotent - calling finish() again after the game is already
+   * 'finished' is a no-op, so scores are never adjusted twice.
+   */
   finish(): void {
+    if (this.state.status === 'finished') return
+
     this.state.status = 'finished'
+
+    const closer = this.state.players.find(p => p.hand.isEmpty())
+
+    for (const player of this.state.players) {
+      const handPenalty = player.hand
+        .getCards()
+        .reduce((sum, card) => sum + scoreCard(card.rank), 0)
+      player.score -= handPenalty
+      if (player === closer) {
+        player.score += 100
+      }
+    }
+
     const winner = this.calculateWinner()
     this.state.winner = winner
   }
