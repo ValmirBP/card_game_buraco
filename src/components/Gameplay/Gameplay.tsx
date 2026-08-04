@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useGameStore } from '../../store/gameStore'
 import GameHeader from './GameHeader'
 import GameBoard from './GameBoard'
@@ -28,28 +28,36 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
   // turn, so Gameplay is the source of truth for it.
   const [phase, setPhase] = useState<TurnPhase>('draw')
 
-  // Tracks which `version` we've already scheduled (or run) an AI turn for,
-  // so the AI-turn effect below never double-schedules `aiTurn()` for the
-  // same turn (e.g. due to an extra effect run in React StrictMode).
-  const scheduledAiVersionRef = useRef<number | null>(null)
-
   // Schedule the AI's turn with a short "thinking" delay whenever it
   // becomes the AI's turn (currentPlayerIndex === 1) and the game is still
   // playing. Cleans up its timeout on every re-run/unmount so a turn is
   // never executed twice.
+  //
+  // No ref-based "already scheduled" guard here on purpose: under
+  // React.StrictMode (or any remount that happens to land mid-AI-turn), a
+  // ref survives the mount/unmount/remount cycle but the timeout it guarded
+  // does not — the cleanup clears the pending setTimeout, the ref still
+  // says "already scheduled for this version", and the effect never
+  // reschedules, so the AI turn silently never runs. Depending only on
+  // `[version, game?.state.currentPlayerIndex, game?.state.status]` sidesteps
+  // that: the effect naturally fires once whenever those values settle into
+  // "AI's turn", schedules exactly one timeout, and cleans it up correctly
+  // on every re-run. Once `aiTurn()` actually executes it increments
+  // `version` and flips `currentPlayerIndex` back to 0, so this effect
+  // re-runs, the "is it the AI's turn" condition becomes false, and nothing
+  // reschedules — that state transition is what guarantees a single fire,
+  // not a ref.
   useEffect(() => {
     if (!game) return
     if (game.state.status !== 'playing') return
     if (game.state.currentPlayerIndex !== 1) return
-    if (scheduledAiVersionRef.current === version) return
 
-    scheduledAiVersionRef.current = version
     const timeoutId = setTimeout(() => {
       useGameStore.getState().aiTurn()
     }, AI_THINK_DELAY_MS)
 
     return () => clearTimeout(timeoutId)
-  }, [version, game])
+  }, [version, game?.state.currentPlayerIndex, game?.state.status])
 
   // Detect game over (the store already calls game.finish() internally via
   // appendGameOverLog when a discard/aiTurn ends the game) and notify the
