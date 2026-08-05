@@ -274,6 +274,80 @@ describe('Part A: 2-do-mesmo-naipe como curinga nao suja', () => {
   })
 })
 
+describe('Bug 2: regra do 9 estendida - considera a posicao que o curinga representa, nao so cartas reais', () => {
+  test('[6♠,2♠,8♠] -> 2♠ representa 7, max rank 8 -> LIMPA (caso 1)', () => {
+    const cards = [real('6', 'spades'), two('spades'), real('8', 'spades')]
+    const analysis = analyzeMeld(cards)
+    expect(analysis).not.toBeNull()
+    expect(analysis!.isClean).toBe(true)
+  })
+
+  test('[6♠,2♠,8♠] + 7♠ -> layout [2(=5),6,7,8], max rank 8 -> LIMPA (caso 2)', () => {
+    const cards = [real('6', 'spades'), two('spades'), real('7', 'spades'), real('8', 'spades')]
+    const analysis = analyzeMeld(cards)
+    expect(analysis).not.toBeNull()
+    expect(analysis!.isClean).toBe(true)
+    expect(analysis!.layout.map(l => l.representsValue)).toEqual([5, 6, 7, 8])
+  })
+
+  test('[2(=5),6♠,7♠,8♠] + 9♠ -> alcanca rank 9 -> SUJA (caso 3)', () => {
+    const cards = [
+      real('6', 'spades'),
+      two('spades'),
+      real('7', 'spades'),
+      real('8', 'spades'),
+      real('9', 'spades'),
+    ]
+    const analysis = analyzeMeld(cards)
+    expect(analysis).not.toBeNull()
+    expect(analysis!.isClean).toBe(false)
+  })
+
+  test('[8♠,2♠,10♠,J♠] -> 2♠ representa 9 (sem 9 real na mao) -> SUJA (caso 4, o bug reportado)', () => {
+    const cards = [real('8', 'spades'), two('spades'), real('10', 'spades'), real('J', 'spades')]
+    const analysis = analyzeMeld(cards)
+    expect(analysis).not.toBeNull()
+    expect(analysis!.isClean).toBe(false)
+  })
+
+  test('2 natural (posicao 2, sequencia ace-low) -> LIMPA, regra do 9-por-curinga nao se aplica (caso 5)', () => {
+    const cards = [
+      real('A', 'spades'),
+      two('spades'),
+      real('3', 'spades'),
+      real('4', 'spades'),
+      real('5', 'spades'),
+      real('6', 'spades'),
+      real('7', 'spades'),
+      real('8', 'spades'),
+    ]
+    const analysis = analyzeMeld(cards)
+    expect(analysis).not.toBeNull()
+    expect(analysis!.isClean).toBe(true)
+  })
+
+  test('sequencia so com cartas reais alcancando 9+ (sem curinga) permanece LIMPA (caso 6)', () => {
+    const cards = ['7', '8', '9', '10', 'J', 'Q', 'K'].map(r => real(r as Rank, 'spades'))
+    const analysis = analyzeMeld(cards)
+    expect(analysis).not.toBeNull()
+    expect(analysis!.isClean).toBe(true)
+  })
+
+  test('joker sempre suja, independente de posicao (caso 7)', () => {
+    const cards = [real('6', 'spades'), joker(), real('8', 'spades')]
+    const analysis = analyzeMeld(cards)
+    expect(analysis).not.toBeNull()
+    expect(analysis!.isClean).toBe(false)
+  })
+
+  test('2 de naipe diferente sempre suja, independente de posicao (caso 7)', () => {
+    const cards = [real('8', 'spades'), two('hearts'), real('10', 'spades'), real('J', 'spades')]
+    const analysis = analyzeMeld(cards)
+    expect(analysis).not.toBeNull()
+    expect(analysis!.isClean).toBe(false)
+  })
+})
+
 describe('Part B: layout / resolveMeldLayout - curinga desliza para a menor posicao', () => {
   test('[6♠,2♠,8♠] -> 2♠ representa o 7 (unico gap)', () => {
     const cards = [real('6', 'spades'), two('spades'), real('8', 'spades')]

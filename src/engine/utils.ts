@@ -327,9 +327,21 @@ function analyzeSequence(others: Card[], twos: Card[], jokers: Card[]): MeldAnal
     // Restricted to ace-LOW numbering only: allowing this under ace-HIGH
     // would reintroduce "dar a volta" (e.g. K,A,2 wrapping the 2 around
     // from the top of the sequence back past the Ace), which is illegal.
+    //
+    // Regra do 9 (Bug 2 fix): the meld stays clean only while the ENTIRE
+    // sequence - real cards AND the slot the curinga itself occupies - tops
+    // out at rank 8. If either a real card of rank >=9 is present, OR the
+    // curinga's own computed position (computeWildValue) is >=9 (e.g.
+    // 8,2,10,J: the 2 fills the gap at 9, with no real 9 card at all), the
+    // meld goes dirty. This must look at the resolved wild position, not
+    // just scan for a literal '9' rank among the real cards.
     if (genericWildCount === 0 && trySequenceWithAceMode(others, 1, 'low')) {
-      const hasReal9 = others.some(c => c.rank === '9')
-      return buildSequenceAnalysis(others, natural2, 'low', !hasReal9)
+      const realValues = others
+        .map(c => sequenceRankValue(c.rank, 'low'))
+        .sort((a, b) => a - b)
+      const wildValue = computeWildValue(realValues, 'low')
+      const maxValue = Math.max(...realValues, wildValue)
+      return buildSequenceAnalysis(others, natural2, 'low', maxValue < 9)
     }
 
     return null
