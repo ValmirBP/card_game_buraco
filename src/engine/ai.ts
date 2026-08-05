@@ -60,7 +60,15 @@ export class AIPlayer implements Player {
     // basicas do Buraco ("podem e devem"): se houver extend_meld ou
     // play_canasta disponivel, joga um deles (sorteando entre si). O
     // "facil" continua fraco no resto (descartes aleatorios, sem memoria).
-    const meldMoves = moves.filter(m => m.type === 'extend_meld' || m.type === 'play_canasta')
+    // Part C: enquanto o time ainda nao tem uma canastra limpa (7+, sem
+    // curinga), prioriza os jogos naturais (sem curinga) dentre esses -
+    // preferNaturalMelds ja faz fallback para o conjunto completo se nenhum
+    // deles for natural, entao isso nunca trava a IA.
+    const ownTeam = this.getOwnTeam(gameState)
+    const meldMoves = this.preferNaturalMelds(
+      moves.filter(m => m.type === 'extend_meld' || m.type === 'play_canasta'),
+      ownTeam
+    )
     if (meldMoves.length > 0) {
       return meldMoves[Math.floor(Math.random() * meldMoves.length)]
     }
@@ -79,15 +87,24 @@ export class AIPlayer implements Player {
 
     // extend_meld >= play_canasta > discard.
     const moves = this.getValidMoves(gameState)
+    const ownTeam = this.getOwnTeam(gameState)
 
-    // Prioridade 1: estender jogo existente do time
-    const extendMoves = moves.filter(m => m.type === 'extend_meld')
+    // Prioridade 1: estender jogo existente do time. Part C: enquanto o
+    // time nao tem canastra limpa, prioriza extensoes sem curinga.
+    const extendMoves = this.preferNaturalMelds(
+      moves.filter(m => m.type === 'extend_meld'),
+      ownTeam
+    )
     if (extendMoves.length > 0) {
       return extendMoves[Math.floor(Math.random() * extendMoves.length)]
     }
 
-    // Prioridade 2: jogar canastas
-    const canastaMoves = moves.filter(m => m.type === 'play_canasta')
+    // Prioridade 2: jogar canastas. Mesma logica de preferencia por jogos
+    // naturais enquanto nao ha canastra limpa na mesa.
+    const canastaMoves = this.preferNaturalMelds(
+      moves.filter(m => m.type === 'play_canasta'),
+      ownTeam
+    )
     if (canastaMoves.length > 0) {
       return canastaMoves[Math.floor(Math.random() * canastaMoves.length)]
     }
@@ -123,19 +140,28 @@ export class AIPlayer implements Player {
     }
 
     const moves = this.getValidMoves(gameState)
+    const ownTeam = this.getOwnTeam(gameState)
 
     // extend_meld >= play_canasta > discard.
 
     // Prioridade 1: estender o jogo existente do time (deterministico, o de
-    // menor meldIndex primeiro)
-    const extendMoves = moves.filter(m => m.type === 'extend_meld')
+    // menor meldIndex primeiro). Part C: prioriza extensoes sem curinga
+    // enquanto o time nao tem canastra limpa.
+    const extendMoves = this.preferNaturalMelds(
+      moves.filter(m => m.type === 'extend_meld'),
+      ownTeam
+    )
     if (extendMoves.length > 0) {
       const sorted = [...extendMoves].sort((a, b) => (a.meldIndex ?? 0) - (b.meldIndex ?? 0))
       return sorted[0]
     }
 
-    // Prioridade 2: jogar a maior canasta possivel (deterministico)
-    const canastaMoves = moves.filter(m => m.type === 'play_canasta')
+    // Prioridade 2: jogar a maior canasta possivel (deterministico). Mesma
+    // preferencia por jogos naturais enquanto nao ha canastra limpa.
+    const canastaMoves = this.preferNaturalMelds(
+      moves.filter(m => m.type === 'play_canasta'),
+      ownTeam
+    )
     if (canastaMoves.length > 0) {
       const sorted = [...canastaMoves].sort((a, b) => (b.cards?.length ?? 0) - (a.cards?.length ?? 0))
       return sorted[0]
@@ -235,6 +261,13 @@ export class AIPlayer implements Player {
    * canExtendMeld. Not exhaustive (doesn't try multi-card extensions), but
    * sufficient to find legal, non-harmful extensions - this AI only needs
    * to never propose an illegal move, not to play optimally.
+   *
+   * Part C guardrail (all difficulties): never proposes an extension that
+   * would turn one of the team's already-clean canastras (7+ cards, no
+   * curinga) into a dirty one. Checked by actually building the extended
+   * Canasta and reading its `isClean` flag (ground truth per utils.analyzeMeld
+   * - e.g. catches a same-suit '2' dirtying via "regra do 9", not just a
+   * literal joker), rather than assuming only isWild cards can dirty a meld.
    */
   private findExtendMeldMoves(ownTeam: Team): PlayerMove[] {
     const moves: PlayerMove[] = []
@@ -242,13 +275,84 @@ export class AIPlayer implements Player {
 
     ownTeam.melds.forEach((meld, meldIndex) => {
       for (const card of cards) {
-        if (canExtendMeld(meld.cards, [card])) {
-          moves.push({ type: 'extend_meld', meldIndex, cards: [card] })
-        }
+        if (!canExtendMeld(meld.cards, [card])) continue
+        if (this.wouldDirtyCleanCanastra(meld, [card])) continue
+        moves.push({ type: 'extend_meld', meldIndex, cards: [card] })
       }
     })
 
     return moves
+  }
+
+  /**
+   * True if `meld` is currently a clean canastra (7+ cards, no curinga) AND
+   * extending it with `added` would make the result dirty. Used as the Part
+   * C guardrail in findExtendMeldMoves - the AI must never propose sujar an
+   * existing clean canastra of its own team.
+   */
+  private wouldDirtyCleanCanastra(meld: Canasta, added: Card[]): boolean {
+    if (!meld.isCanastra || !meld.isClean) return false
+    try {
+      return !meld.withExtraCards(added).isClean
+    } catch {
+      // Extension turned out invalid after all (shouldn't happen since the
+      // caller already checked canExtendMeld) - not this guardrail's concern.
+      return false
+    }
+  }
+
+  /** Whether the team already has at least one clean canastra (7+ cards, no curinga) on the table. */
+  private teamHasCleanCanastra(team: Team): boolean {
+    return team.melds.some(m => m.isCanastra && m.isClean)
+  }
+
+  /**
+   * True if playing `move` (a play_canasta or extend_meld) would result in a
+   * dirty (curinga-using) meld for the team - i.e. a brand-new canasta built
+   * with a curinga, or an extension that uses one. Ground-truth check via
+   * Canasta/withExtraCards (not just Card.isWild) so it also catches a
+   * natural '2' acting as curinga (e.g. "regra do 9").
+   */
+  private isDirtyMeldMove(move: PlayerMove, ownTeam: Team | undefined): boolean {
+    if (!move.cards || move.cards.length === 0) return false
+
+    if (move.type === 'play_canasta') {
+      try {
+        return !new Canasta(move.cards).isClean
+      } catch {
+        return false
+      }
+    }
+
+    if (move.type === 'extend_meld' && ownTeam) {
+      const meld = ownTeam.melds[move.meldIndex ?? -1]
+      if (!meld) return false
+      try {
+        return !meld.withExtraCards(move.cards).isClean
+      } catch {
+        return false
+      }
+    }
+
+    return false
+  }
+
+  /**
+   * Part C: while the team doesn't yet have any clean canastra (7+, no
+   * curinga) on the table, prefer meld moves (extend_meld/play_canasta)
+   * that don't use a curinga at all - avoid needlessly sujar-ing a jogo
+   * before locking in at least one clean canastra. Once the team already
+   * has a clean canastra, this is a no-op. Never removes every option: if
+   * ALL candidate moves would be dirty, they're all kept unfiltered - this
+   * prioritizes clean plays, it doesn't forbid dirty ones forever (e.g. the
+   * AI shouldn't get stuck holding cards when a dirty play is the only
+   * progress available).
+   */
+  private preferNaturalMelds(moves: PlayerMove[], ownTeam: Team | undefined): PlayerMove[] {
+    if (moves.length === 0 || !ownTeam) return moves
+    if (this.teamHasCleanCanastra(ownTeam)) return moves
+    const natural = moves.filter(m => !this.isDirtyMeldMove(m, ownTeam))
+    return natural.length > 0 ? natural : moves
   }
 
   /**

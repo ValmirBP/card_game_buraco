@@ -1,5 +1,6 @@
 import { AIPlayer, GameStateForAI } from '../../src/engine/ai'
 import { Card, createDeck } from '../../src/engine/card'
+import { Canasta } from '../../src/engine/canasta'
 import { Team } from '../../src/engine/gameState'
 
 function makeTeams(): Team[] {
@@ -7,6 +8,18 @@ function makeTeams(): Team[] {
     { id: 'A', seats: [0, 2], melds: [], score: 0, hasTakenMorto: false },
     { id: 'B', seats: [1, 3], melds: [], score: 0, hasTakenMorto: false },
   ]
+}
+
+function cleanCanastra(suit: 'hearts' | 'diamonds' | 'clubs' | 'spades' = 'hearts'): Canasta {
+  return new Canasta([
+    new Card(suit, '5', false),
+    new Card(suit, '6', false),
+    new Card(suit, '7', false),
+    new Card(suit, '8', false),
+    new Card(suit, '9', false),
+    new Card(suit, '10', false),
+    new Card(suit, 'J', false),
+  ])
 }
 
 function makeGameState(
@@ -324,6 +337,69 @@ describe('AIPlayer', () => {
       const gameState = makeGameState(ai, { teams })
       const move = ai.playTurn(gameState)
       expect(move.type).toBe('extend_meld')
+    })
+  })
+
+  describe('Part C: prioriza garantir uma canastra limpa antes de sujar', () => {
+    test('com canastra limpa ja na mesa, pode propor um jogo sujo (curinga) para uma segunda sequencia', () => {
+      const wild = new Card('hearts', '2', true)
+      const cards = [new Card('spades', '9', false), new Card('spades', 'J', false), wild]
+      const ai = new AIPlayer('Bot', 'hard', cards)
+      const teams = makeTeams()
+      teams[0].melds = [cleanCanastra('hearts')] // time ja tem canastra limpa
+      const gameState = makeGameState(ai, { teams })
+
+      const moves = ai.getValidMoves(gameState)
+      const dirtyMove = moves.find(
+        m => m.type === 'play_canasta' && m.cards!.some(c => c.isWild)
+      )
+      expect(dirtyMove).toBeDefined()
+
+      const move = ai.playTurn(gameState)
+      expect(move.type).toBe('play_canasta')
+      expect(move.cards!.some(c => c.isWild)).toBe(true)
+    })
+
+    test('sem canastra limpa, com opcao limpa e opcao suja disponiveis, escolhe a limpa', () => {
+      const wild = new Card('hearts', '2', true)
+      const cards = [
+        // opcao limpa: 5,6,7 de copas (sem curinga)
+        new Card('hearts', '5', false),
+        new Card('hearts', '6', false),
+        new Card('hearts', '7', false),
+        // opcao suja: 9, J de espadas + curinga preenchendo o 10
+        new Card('spades', '9', false),
+        new Card('spades', 'J', false),
+        wild,
+      ]
+      const ai = new AIPlayer('Bot', 'hard', cards)
+      const teams = makeTeams() // nenhum time tem canastra limpa ainda
+      const gameState = makeGameState(ai, { teams })
+
+      const move = ai.playTurn(gameState)
+      expect(move.type).toBe('play_canasta')
+      expect(move.cards!.some(c => c.isWild)).toBe(false)
+      const ranks = move.cards!.map(c => c.toString()).sort()
+      expect(ranks).toEqual(['5H', '6H', '7H'])
+    })
+
+    test('guardrail: nunca propoe extend_meld que suje uma canastra limpa existente (mesmo no hard)', () => {
+      const wild = new Card('hearts', '2', true)
+      const ai = new AIPlayer('Bot', 'hard', [wild])
+      const teams = makeTeams()
+      teams[0].melds = [cleanCanastra('hearts')] // limpa, 7 cartas, sem lacunas
+      const gameState = makeGameState(ai, { teams })
+
+      const moves = ai.getValidMoves(gameState)
+      const dirtiesExisting = moves.some(
+        m => m.type === 'extend_meld' && m.meldIndex === 0 && m.cards!.some(c => c.isWild)
+      )
+      expect(dirtiesExisting).toBe(false)
+
+      // Sem outra jogada de mesa disponivel, a IA nao deve travar: cai para
+      // draw/discard normalmente.
+      const move = ai.playTurn(gameState)
+      expect(['draw', 'discard']).toContain(move.type)
     })
   })
 
