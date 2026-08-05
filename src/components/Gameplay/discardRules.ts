@@ -3,22 +3,40 @@ import { Card } from '../../engine/card'
 import { canExtendMeld, isValidCanasta } from '../../engine/utils'
 
 /**
- * Best-effort check for whether "Pegar descarte" should be enabled: the
- * engine's takeDiscardPile() is a raw mechanism with no rule enforcement (see
- * Game.takeDiscardPile doc comment), so the UI is responsible for only
- * offering the action when the traditional Buraco condition holds — the top
- * discard card can be used immediately, either to extend one of the current
- * player's TEAM melds, or to form a brand-new valid meld together with 2+
- * cards already in the current player's hand (including an ace-trio, since
- * isValidCanasta accepts that too).
+ * Whether "Pegar descarte" should be enabled.
  *
- * This is intentionally best-effort: it searches pairs/triples of
- * same-suit-or-wild-or-ace hand cards combined with the top card rather than
- * every possible subset, which is enough to catch the realistic cases (a
- * meld needs at most 1 wild and the ace-trio exception only cares about rank)
- * without a combinatorial blow-up over an 11-22 card hand.
+ * HISTORY / DIAGNOSIS: this used to be a strict best-effort check (see
+ * `canFormNewMeldWithTopStrict` below, kept for reference) that only enabled
+ * the button when it could prove the top discard card immediately extends a
+ * team meld or forms a brand-new valid meld with 2+ cards already in hand.
+ * In practice that combinatorial proof rarely succeeds early in a hand (most
+ * hands don't yet hold 2 matching cards for whatever happens to be on top of
+ * the discard pile), so the button appeared "broken" — disabled almost every
+ * turn even though taking the discard pile is a perfectly legal and often
+ * useful move (you get every card in the pile, not just the top one, then
+ * have the rest of your turn to use it).
+ *
+ * Fix: simplify to the reliable rule the user asked for — enable whenever
+ * there is at least one card in the discard pile. The traditional-Buraco
+ * "you must be able to use the top card" constraint is surfaced as a
+ * reminder message in the UI (see ActionPanel) instead of a hard gate, since
+ * the engine's takeDiscardPile() itself enforces no such rule (see
+ * Game.takeDiscardPile doc comment) and a hard gate that's frequently wrong
+ * is worse than a soft reminder.
  */
 export function canTakeDiscardPile(game: Game): boolean {
+  return game.state.discardPile.length > 0
+}
+
+/**
+ * Best-effort strict check kept for reference/potential future use: true if
+ * the top discard card can be used immediately (extends a team meld, or
+ * forms a new valid meld with 2+ hand cards). Not used to gate the button
+ * anymore (see canTakeDiscardPile doc comment) — exposed so the UI can show
+ * the "lembre-se: você deve usar a carta do topo" reminder only when it's
+ * NOT obviously satisfiable, without re-blocking the action.
+ */
+export function canUseTopDiscardCard(game: Game): boolean {
   const { discardPile } = game.state
   if (discardPile.length === 0) return false
 

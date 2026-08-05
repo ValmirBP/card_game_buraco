@@ -3,7 +3,7 @@ import { useGameStore } from '../../store/gameStore'
 import GameBoard from './GameBoard'
 import PlayerHand from './PlayerHand'
 import ActionPanel from './ActionPanel'
-import { canTakeDiscardPile } from './discardRules'
+import { canTakeDiscardPile, canUseTopDiscardCard } from './discardRules'
 
 export type TurnPhase = 'draw' | 'play'
 
@@ -75,6 +75,15 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game, version])
 
+  // Best-effort reminder only (does not gate the button — see
+  // discardRules.ts): true when we can't already prove the top discard card
+  // is immediately usable, so the player remembers they must use it.
+  const showTopCardReminder = useMemo(() => {
+    if (!game || !canTakeDiscard) return false
+    return !canUseTopDiscardCard(game)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game, version, canTakeDiscard])
+
   if (!game) return null
 
   const handleDraw = () => {
@@ -129,6 +138,7 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
       <ActionPanel
         phase={phase}
         canTakeDiscard={canTakeDiscard}
+        showTopCardReminder={showTopCardReminder}
         onDraw={handleDraw}
         onTakeDiscard={handleTakeDiscard}
         onDiscard={handleDiscard}
