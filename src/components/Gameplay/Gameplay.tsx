@@ -107,9 +107,10 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
     if (fromRect && toRect && drawnCard) {
       const id = Date.now()
       setDrawAnim({ id, fromRect, toRect, card: drawnCard })
+      // Deve acompanhar TOTAL_S do DrawAnimation (~2.15s) + pequena folga.
       window.setTimeout(() => {
         setDrawAnim(current => (current?.id === id ? null : current))
-      }, 850)
+      }, 2250)
     }
   }
 
