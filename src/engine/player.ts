@@ -3,10 +3,10 @@ import { Hand } from './hand'
 import { Canasta } from './canasta'
 
 export type PlayerMove = {
-  type: 'draw' | 'play_canasta' | 'discard'
+  type: 'draw' | 'play_canasta' | 'discard' | 'take_discard' | 'extend_meld'
   cardIndex?: number
-  canastIndex?: number
-  cards?: Card[] // Para play_canasta, quais cartas formar
+  meldIndex?: number // para extend_meld: índice do meld do time a estender
+  cards?: Card[] // Para play_canasta/extend_meld, quais cartas usar
 }
 
 export interface Player {

@@ -2,284 +2,471 @@ import { Game } from '../../src/engine/game'
 import { HumanPlayer } from '../../src/engine/player'
 import { AIPlayer } from '../../src/engine/ai'
 import { Card } from '../../src/engine/card'
+import { Player } from '../../src/engine/player'
+
+function makeFourPlayers(): Player[] {
+  return [
+    new HumanPlayer('You'), // seat 0, Team A
+    new AIPlayer('Bot1', 'easy'), // seat 1, Team B
+    new AIPlayer('Bot2', 'easy'), // seat 2, Team A (partner)
+    new AIPlayer('Bot3', 'easy'), // seat 3, Team B
+  ]
+}
 
 describe('Game', () => {
-  test('creates game with 2 players', () => {
-    const p1 = new HumanPlayer('Alice')
-    const p2 = new AIPlayer('Bot', 'easy')
-    const game = new Game([p1, p2])
-    expect(game.state.players.length).toBe(2)
+  test('creates game with exactly 4 players', () => {
+    const game = new Game(makeFourPlayers())
+    expect(game.state.players.length).toBe(4)
+    expect(game.state.teams.length).toBe(2)
   })
 
   test('throws error with invalid player count', () => {
     const p1 = new HumanPlayer('Alice')
     expect(() => new Game([p1])).toThrow()
+    expect(() => new Game([p1, p1, p1])).toThrow()
+    expect(() => new Game([p1, p1, p1, p1, p1])).toThrow()
   })
 
-  test('setup deals 14 cards to each player', () => {
-    const p1 = new HumanPlayer('Alice')
-    const p2 = new AIPlayer('Bot', 'easy')
-    const game = new Game([p1, p2])
-    game.setup()
-    expect(p1.hand.getSize()).toBe(14)
-    expect(p2.hand.getSize()).toBe(14)
-    expect(game.state.status).toBe('playing')
+  test('teams are seeded with correct seats', () => {
+    const game = new Game(makeFourPlayers())
+    const teamA = game.state.teams.find(t => t.id === 'A')!
+    const teamB = game.state.teams.find(t => t.id === 'B')!
+    expect(teamA.seats).toEqual([0, 2])
+    expect(teamB.seats).toEqual([1, 3])
+    expect(teamA.hasTakenMorto).toBe(false)
+    expect(teamB.hasTakenMorto).toBe(false)
   })
 
-  test('draw returns a card from deck', () => {
-    const p1 = new HumanPlayer('Alice')
-    const p2 = new AIPlayer('Bot', 'easy')
-    const game = new Game([p1, p2])
+  describe('setup', () => {
+    test('deals 11 cards to each of the 4 players', () => {
+      const game = new Game(makeFourPlayers())
+      game.setup()
+      for (const p of game.state.players) {
+        expect(p.hand.getSize()).toBe(11)
+      }
+      expect(game.state.status).toBe('playing')
+    })
+
+    test('reserves 2 mortos of 11 cards each', () => {
+      const game = new Game(makeFourPlayers())
+      game.setup()
+      expect(game.state.mortos.length).toBe(2)
+      expect(game.state.mortos[0].length).toBe(11)
+      expect(game.state.mortos[1].length).toBe(11)
+    })
+
+    test('flips 1 card to the discard pile', () => {
+      const game = new Game(makeFourPlayers())
+      game.setup()
+      expect(game.state.discardPile.length).toBe(1)
+    })
+
+    test('remaining deck (baço) has 41 cards: 108 - 44 - 22 - 1', () => {
+      const game = new Game(makeFourPlayers())
+      game.setup()
+      expect(game.state.deck.length).toBe(41)
+    })
+  })
+
+  test('drawFromDeck returns a card from deck', () => {
+    const game = new Game(makeFourPlayers())
     game.setup()
     const deckSize = game.state.deck.length
-    const card = game.draw()
+    const card = game.drawFromDeck()
     expect(card).not.toBeNull()
     expect(game.state.deck.length).toBe(deckSize - 1)
   })
 
-  test('discard removes card from hand', () => {
-    const p1 = new HumanPlayer('Alice', [new Card('hearts', '5', false)])
-    const p2 = new AIPlayer('Bot', 'easy', [new Card('diamonds', '6', false)])
-    const game = new Game([p1, p2])
-    const success = game.discard(0)
-    expect(success).toBe(true)
-    expect(p1.hand.getSize()).toBe(0)
-    expect(game.state.discardPile.length).toBe(1)
+  test('drawFromDeck returns null when deck is empty', () => {
+    const game = new Game(makeFourPlayers())
+    game.setup()
+    while (game.drawFromDeck() !== null) {
+      // drain
+    }
+    expect(game.drawFromDeck()).toBeNull()
   })
 
-  test('endTurn cycles to next player', () => {
-    const p1 = new HumanPlayer('Alice')
-    const p2 = new AIPlayer('Bot', 'easy')
-    const game = new Game([p1, p2])
+  describe('discard', () => {
+    test('removes card from current player hand and adds to discard pile', () => {
+      const players = makeFourPlayers()
+      players[0].hand.addCard(new Card('hearts', '5', false))
+      const game = new Game(players)
+      const success = game.discard(0)
+      expect(success).toBe(true)
+      expect(players[0].hand.getSize()).toBe(0)
+      expect(game.state.discardPile.length).toBe(1)
+    })
+
+    test('returns false for out-of-range index', () => {
+      const game = new Game(makeFourPlayers())
+      expect(game.discard(0)).toBe(false)
+    })
+  })
+
+  describe('takeDiscardPile', () => {
+    test('returns and empties the discard pile', () => {
+      const game = new Game(makeFourPlayers())
+      game.state.discardPile.push(new Card('hearts', '5', false), new Card('clubs', '9', false))
+      const taken = game.takeDiscardPile()
+      expect(taken).toHaveLength(2)
+      expect(game.state.discardPile).toHaveLength(0)
+    })
+
+    test('returns null when discard pile is empty', () => {
+      const game = new Game(makeFourPlayers())
+      expect(game.takeDiscardPile()).toBeNull()
+    })
+  })
+
+  test('endTurn cycles 0 -> 1 -> 2 -> 3 -> 0', () => {
+    const game = new Game(makeFourPlayers())
     expect(game.state.currentPlayerIndex).toBe(0)
     game.endTurn()
     expect(game.state.currentPlayerIndex).toBe(1)
+    game.endTurn()
+    expect(game.state.currentPlayerIndex).toBe(2)
+    game.endTurn()
+    expect(game.state.currentPlayerIndex).toBe(3)
     game.endTurn()
     expect(game.state.currentPlayerIndex).toBe(0)
   })
 
   test('getCurrentPlayer returns active player', () => {
-    const p1 = new HumanPlayer('Alice')
-    const p2 = new AIPlayer('Bot', 'easy')
-    const game = new Game([p1, p2])
-    expect(game.getCurrentPlayer().name).toBe('Alice')
+    const game = new Game(makeFourPlayers())
+    expect(game.getCurrentPlayer().name).toBe('You')
+    game.endTurn()
+    expect(game.getCurrentPlayer().name).toBe('Bot1')
   })
 
-  test('getValidMoves includes draw and a discard move per card in hand', () => {
-    const p1 = new HumanPlayer('Alice', [new Card('hearts', '5', false), new Card('clubs', '9', false)])
-    const p2 = new AIPlayer('Bot', 'easy')
-    const game = new Game([p1, p2])
-    const moves = game.getValidMoves()
-    expect(moves.some(m => m.type === 'draw')).toBe(true)
-    expect(moves.filter(m => m.type === 'discard').length).toBe(2)
+  test('getTeamOfCurrentPlayer returns the current player\'s team', () => {
+    const game = new Game(makeFourPlayers())
+    expect(game.getTeamOfCurrentPlayer().id).toBe('A')
+    game.endTurn()
+    expect(game.getTeamOfCurrentPlayer().id).toBe('B')
+    game.endTurn()
+    expect(game.getTeamOfCurrentPlayer().id).toBe('A')
   })
 
-  // NOTE: deviation from the plan. The plan's original test constructed a
-  // player with an empty hand and asserted isGameOver() === true *before*
-  // calling setup(). But isGameOver() also treats an empty deck as "game
-  // over", and before setup() the deck is always empty (deck is only filled
-  // by setup()) — so that test passed for the wrong reason and could not
-  // distinguish "empty hand" from "empty deck". It also meant isGameOver()
-  // was true during the 'setup' status, which is not meaningful.
-  //
-  // Fixed contract: isGameOver() returns true only when status === 'playing'
-  // AND (some player's hand is empty OR the deck is empty). The tests below
-  // set up the game first, then explicitly drive each condition.
-  describe('isGameOver', () => {
-    test('returns false before setup even if a player hand is empty', () => {
-      const p1 = new HumanPlayer('Alice')
-      const p2 = new AIPlayer('Bot', 'easy', [new Card('diamonds', '6', false)])
-      const game = new Game([p1, p2])
-      expect(game.state.status).toBe('setup')
-      expect(game.isGameOver()).toBe(false)
-    })
-
-    test('returns false right after setup', () => {
-      const p1 = new HumanPlayer('Alice')
-      const p2 = new AIPlayer('Bot', 'easy')
-      const game = new Game([p1, p2])
-      game.setup()
-      expect(game.isGameOver()).toBe(false)
-    })
-
-    test('returns true when a player hand becomes empty during play', () => {
-      const p1 = new HumanPlayer('Alice')
-      const p2 = new AIPlayer('Bot', 'easy')
-      const game = new Game([p1, p2])
-      game.setup()
-      while (!p1.hand.isEmpty()) {
-        p1.hand.removeCard(0)
-      }
-      expect(game.isGameOver()).toBe(true)
-    })
-
-    test('returns true when the deck becomes empty during play', () => {
-      const p1 = new HumanPlayer('Alice')
-      const p2 = new AIPlayer('Bot', 'easy')
-      const game = new Game([p1, p2])
-      game.setup()
-      while (game.draw() !== null) {
-        // drain the deck
-      }
-      expect(game.state.deck.length).toBe(0)
-      expect(game.isGameOver()).toBe(true)
-    })
-  })
-
-  test('finish sets status to finished and picks the highest-score player as winner', () => {
-    const p1 = new HumanPlayer('Alice')
-    const p2 = new AIPlayer('Bot', 'easy')
-    const game = new Game([p1, p2])
-    game.setup()
-    p2.score = 500
-    game.finish()
-    expect(game.state.status).toBe('finished')
-    expect(game.state.winner).toBe(p2)
-  })
-
-  // Regras de pontuação final: penalidade de mão e bônus de fechamento.
-  // Ao finalizar, cada jogador subtrai do score a soma dos valores das
-  // cartas que restaram na mão (scoreCard). Se algum jogador fechou (mão
-  // vazia no momento do finish), esse jogador ganha +100. No máximo um
-  // jogador pode estar com a mão vazia; se nenhum estiver (fim por deck
-  // vazio, "buraco"), ninguém recebe o bônus.
-  describe('finish - hand penalty and closing bonus', () => {
-    test('subtracts sum of remaining hand card values from score', () => {
-      const p1 = new HumanPlayer('Alice', [new Card('hearts', 'A', false), new Card('hearts', 'K', false)])
-      const p2 = new AIPlayer('Bot', 'easy', [new Card('clubs', '9', false)])
-      p1.score = 100
-      const game = new Game([p1, p2])
-      game.finish()
-      // A=15, K=10 -> 25
-      expect(p1.score).toBe(75)
-    })
-
-    test('player who closed (empty hand) gets +100 bonus, opponent only penalized', () => {
-      const p1 = new HumanPlayer('Alice', []) // fechou
-      const p2 = new AIPlayer('Bot', 'easy', [new Card('clubs', '9', false)])
-      p1.score = 100
-      p2.score = 50
-      const game = new Game([p1, p2])
-      game.finish()
-      expect(p1.score).toBe(200) // 100 - 0 + 100
-      expect(p2.score).toBe(41) // 50 - 9
-    })
-
-    test('game ends by empty deck with both players holding cards: both penalized, nobody gets bonus', () => {
-      const p1 = new HumanPlayer('Alice', [new Card('hearts', 'A', false)])
-      const p2 = new AIPlayer('Bot', 'easy', [new Card('clubs', '9', false)])
-      p1.score = 100
-      p2.score = 50
-      const game = new Game([p1, p2])
-      game.finish()
-      expect(p1.score).toBe(85) // 100 - 15, no bonus
-      expect(p2.score).toBe(41) // 50 - 9, no bonus
-    })
-
-    test('finish is idempotent: calling twice does not double-apply penalty/bonus', () => {
-      const p1 = new HumanPlayer('Alice', [new Card('hearts', 'A', false)])
-      const p2 = new AIPlayer('Bot', 'easy', [])
-      p1.score = 100
-      p2.score = 50
-      const game = new Game([p1, p2])
-      game.finish()
-      const p1AfterFirst = p1.score
-      const p2AfterFirst = p2.score
-      game.finish()
-      expect(p1.score).toBe(p1AfterFirst)
-      expect(p2.score).toBe(p2AfterFirst)
-    })
-
-    test('winner is calculated after adjustments, not raw score', () => {
-      // p1: score 100, 30 pts left in hand -> 70
-      // p2: score 90, empty hand -> 90 + 100 = 190
-      const p1 = new HumanPlayer('Alice', [new Card('hearts', 'K', false), new Card('hearts', 'K', false), new Card('hearts', '10', false)])
-      const p2 = new AIPlayer('Bot', 'easy', [])
-      p1.score = 100
-      p2.score = 90
-      const game = new Game([p1, p2])
-      game.finish()
-      expect(p1.score).toBe(70)
-      expect(p2.score).toBe(190)
-      expect(game.state.winner).toBe(p2)
-    })
-  })
-
-  test('getGameState returns the current state', () => {
-    const p1 = new HumanPlayer('Alice')
-    const p2 = new AIPlayer('Bot', 'easy')
-    const game = new Game([p1, p2])
-    expect(game.getGameState()).toBe(game.state)
-  })
-
-  test('clone produces an independent game with equivalent state', () => {
-    const p1 = new HumanPlayer('Alice')
-    const p2 = new AIPlayer('Bot', 'easy')
-    const game = new Game([p1, p2])
-    game.setup()
-    const clone = game.clone()
-
-    expect(clone).not.toBe(game)
-    expect(clone.state.players[0].hand.getSize()).toBe(game.state.players[0].hand.getSize())
-    expect(clone.state.deck.length).toBe(game.state.deck.length)
-
-    // Mutating the clone's deck must not affect the original
-    clone.state.deck.pop()
-    expect(clone.state.deck.length).not.toBe(game.state.deck.length)
-  })
-
-  // NOTE: deviation from the plan. The plan's playCanasta() only pushed the
-  // Canasta into state.melds; it never removed the played cards from the
-  // player's hand and never called player.addCanasta(), so the player's
-  // score never increased. Fixed contract: playCanasta() validates the
-  // cards, builds the Canasta, adds it to the current player's meld entry,
-  // removes exactly those cards from the current player's hand, and calls
-  // player.addCanasta(canasta) so the score is credited exactly once.
   describe('playCanasta', () => {
-    test('valid canasta removes the cards from hand, adds to melds, and increases score', () => {
+    test('valid canasta removes cards from hand, adds to team melds, credits team score', () => {
       const canastaCards = [
         new Card('hearts', '5', false),
         new Card('hearts', '6', false),
         new Card('hearts', '7', false),
       ]
       const keeper = new Card('clubs', 'K', false)
-      const p1 = new HumanPlayer('Alice', [...canastaCards, keeper])
-      const p2 = new AIPlayer('Bot', 'easy')
-      const game = new Game([p1, p2])
+      const players = makeFourPlayers()
+      players[0].hand.addCard(canastaCards[0])
+      players[0].hand.addCard(canastaCards[1])
+      players[0].hand.addCard(canastaCards[2])
+      players[0].hand.addCard(keeper)
+      const game = new Game(players)
 
-      expect(p1.score).toBe(0)
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      expect(teamA.score).toBe(0)
 
       const success = game.playCanasta(canastaCards)
-
       expect(success).toBe(true)
 
-      // Hand loses exactly the played cards
-      expect(p1.hand.getSize()).toBe(1)
-      expect(p1.hand.getCards()[0].equals(keeper)).toBe(true)
+      expect(players[0].hand.getSize()).toBe(1)
+      expect(players[0].hand.getCards()[0].equals(keeper)).toBe(true)
 
-      // Meld gains the canasta
-      const melds = game.state.melds.get('Alice')
-      expect(melds).toHaveLength(1)
-      expect(melds![0].cards).toHaveLength(3)
+      expect(teamA.melds).toHaveLength(1)
+      expect(teamA.melds[0].cards).toHaveLength(3)
+      expect(teamA.score).toBe(teamA.melds[0].getScore())
+    })
 
-      // Score increases exactly once (addCanasta also pushes into player.canastas)
-      expect(p1.canastas).toHaveLength(1)
-      expect(p1.score).toBe(melds![0].getScore())
+    test('a partner (seat 2) can play into the same team melds as seat 0', () => {
+      const players = makeFourPlayers()
+      const cards = [
+        new Card('spades', '4', false),
+        new Card('spades', '5', false),
+        new Card('spades', '6', false),
+      ]
+      players[2].hand.addCard(cards[0])
+      players[2].hand.addCard(cards[1])
+      players[2].hand.addCard(cards[2])
+      const game = new Game(players)
+      game.endTurn() // -> seat 1
+      game.endTurn() // -> seat 2 (Team A partner)
+      expect(game.getCurrentPlayer().name).toBe('Bot2')
+
+      const success = game.playCanasta(cards)
+      expect(success).toBe(true)
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      expect(teamA.melds).toHaveLength(1)
     })
 
     test('returns false and has no side effects for invalid cards', () => {
       const invalidCards = [new Card('hearts', '5', false), new Card('diamonds', '6', false)]
-      const p1 = new HumanPlayer('Alice', [...invalidCards])
-      const p2 = new AIPlayer('Bot', 'easy')
-      const game = new Game([p1, p2])
+      const players = makeFourPlayers()
+      players[0].hand.addCard(invalidCards[0])
+      players[0].hand.addCard(invalidCards[1])
+      const game = new Game(players)
 
       const success = game.playCanasta(invalidCards)
+      expect(success).toBe(false)
+      expect(players[0].hand.getSize()).toBe(2)
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      expect(teamA.melds).toHaveLength(0)
+      expect(teamA.score).toBe(0)
+    })
+  })
+
+  describe('extendMeld', () => {
+    test('adds a card from hand to an existing team meld and adjusts score', () => {
+      const players = makeFourPlayers()
+      const game = new Game(players)
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+
+      // seed an existing meld directly on the team (as if played earlier)
+      players[0].hand.addCard(new Card('hearts', '5', false))
+      players[0].hand.addCard(new Card('hearts', '6', false))
+      players[0].hand.addCard(new Card('hearts', '7', false))
+      game.playCanasta(players[0].hand.getCards())
+
+      const scoreBeforeExtend = teamA.score
+
+      players[0].hand.addCard(new Card('hearts', '8', false))
+      const success = game.extendMeld(0, [new Card('hearts', '8', false)])
+
+      expect(success).toBe(true)
+      expect(teamA.melds[0].cards).toHaveLength(4)
+      expect(players[0].hand.getSize()).toBe(0)
+      expect(teamA.score).toBeGreaterThan(scoreBeforeExtend)
+    })
+
+    test('returns false for invalid meld index', () => {
+      const game = new Game(makeFourPlayers())
+      expect(game.extendMeld(0, [new Card('hearts', '8', false)])).toBe(false)
+    })
+
+    test('returns false and has no side effects when the extension is invalid', () => {
+      const players = makeFourPlayers()
+      const game = new Game(players)
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      players[0].hand.addCard(new Card('hearts', '5', false))
+      players[0].hand.addCard(new Card('hearts', '6', false))
+      players[0].hand.addCard(new Card('hearts', '7', false))
+      game.playCanasta(players[0].hand.getCards())
+
+      players[0].hand.addCard(new Card('diamonds', '8', false))
+      const success = game.extendMeld(0, [new Card('diamonds', '8', false)])
 
       expect(success).toBe(false)
-      expect(p1.hand.getSize()).toBe(2)
-      expect(game.state.melds.get('Alice')).toEqual([])
-      expect(p1.score).toBe(0)
-      expect(p1.canastas).toHaveLength(0)
+      expect(teamA.melds[0].cards).toHaveLength(3)
+      expect(players[0].hand.getSize()).toBe(1)
     })
+
+    test('partner can extend a meld played by the other partner', () => {
+      const players = makeFourPlayers()
+      const game = new Game(players)
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      players[0].hand.addCard(new Card('hearts', '5', false))
+      players[0].hand.addCard(new Card('hearts', '6', false))
+      players[0].hand.addCard(new Card('hearts', '7', false))
+      game.playCanasta(players[0].hand.getCards())
+
+      game.endTurn()
+      game.endTurn() // seat 2, Team A partner
+      players[2].hand.addCard(new Card('hearts', '8', false))
+      const success = game.extendMeld(0, [new Card('hearts', '8', false)])
+      expect(success).toBe(true)
+      expect(teamA.melds[0].cards).toHaveLength(4)
+    })
+  })
+
+  describe('morto (pickUpMorto)', () => {
+    test('pickUpMorto gives current player 11 new cards and marks team.hasTakenMorto', () => {
+      const players = makeFourPlayers()
+      const game = new Game(players)
+      game.state.mortos = [
+        Array.from({ length: 11 }, () => new Card('hearts', '3', false)),
+        Array.from({ length: 11 }, () => new Card('clubs', '4', false)),
+      ]
+      const success = game.pickUpMorto()
+      expect(success).toBe(true)
+      expect(players[0].hand.getSize()).toBe(11)
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      expect(teamA.hasTakenMorto).toBe(true)
+      expect(game.state.mortos.length).toBe(1)
+    })
+
+    test('pickUpMorto fails if team already took a morto', () => {
+      const players = makeFourPlayers()
+      const game = new Game(players)
+      game.state.mortos = [Array.from({ length: 11 }, () => new Card('hearts', '3', false))]
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      teamA.hasTakenMorto = true
+      expect(game.pickUpMorto()).toBe(false)
+    })
+
+    test('pickUpMorto fails if no mortos remain', () => {
+      const game = new Game(makeFourPlayers())
+      game.state.mortos = []
+      expect(game.pickUpMorto()).toBe(false)
+    })
+
+    test('discarding down to an empty hand auto picks up a morto when team has not taken one', () => {
+      const players = makeFourPlayers()
+      players[0].hand.addCard(new Card('hearts', '5', false))
+      const game = new Game(players)
+      game.state.mortos = [
+        Array.from({ length: 11 }, () => new Card('hearts', '3', false)),
+        Array.from({ length: 11 }, () => new Card('clubs', '4', false)),
+      ]
+      game.discard(0)
+      expect(players[0].hand.getSize()).toBe(11)
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      expect(teamA.hasTakenMorto).toBe(true)
+    })
+  })
+
+  describe('canClose', () => {
+    test('team cannot close before taking a morto', () => {
+      const game = new Game(makeFourPlayers())
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      expect(game.canClose(teamA)).toBe(false)
+    })
+
+    test('team can close after taking a morto', () => {
+      const game = new Game(makeFourPlayers())
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      teamA.hasTakenMorto = true
+      expect(game.canClose(teamA)).toBe(true)
+    })
+  })
+
+  describe('isGameOver', () => {
+    test('returns false before setup', () => {
+      const game = new Game(makeFourPlayers())
+      expect(game.isGameOver()).toBe(false)
+    })
+
+    test('returns false right after setup', () => {
+      const game = new Game(makeFourPlayers())
+      game.setup()
+      expect(game.isGameOver()).toBe(false)
+    })
+
+    test('returns true when deck is empty during play', () => {
+      const game = new Game(makeFourPlayers())
+      game.setup()
+      while (game.drawFromDeck() !== null) {
+        // drain
+      }
+      expect(game.isGameOver()).toBe(true)
+    })
+
+    test('returns true when a player hand is empty and their team has taken the morto (batida)', () => {
+      const players = makeFourPlayers()
+      const game = new Game(players)
+      game.setup()
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      teamA.hasTakenMorto = true
+      while (!players[0].hand.isEmpty()) {
+        players[0].hand.removeCard(0)
+      }
+      expect(game.isGameOver()).toBe(true)
+    })
+
+    test('returns false when a player hand is empty but their team has NOT taken the morto yet', () => {
+      const players = makeFourPlayers()
+      const game = new Game(players)
+      game.setup()
+      while (!players[0].hand.isEmpty()) {
+        players[0].hand.removeCard(0)
+      }
+      expect(game.isGameOver()).toBe(false)
+    })
+  })
+
+  describe('finish - team scoring', () => {
+    test('subtracts sum of remaining hand values (both partners) from team score', () => {
+      const players = makeFourPlayers()
+      players[0].hand.addCard(new Card('hearts', 'A', false)) // 15
+      players[0].hand.addCard(new Card('hearts', 'K', false)) // 10
+      players[2].hand.addCard(new Card('clubs', '9', false)) // 9
+      const game = new Game(players)
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      teamA.score = 100
+      game.finish()
+      // 100 - (15+10+9) = 66
+      expect(teamA.score).toBe(66)
+    })
+
+    test('team that closed (a player emptied hand with morto taken) gets +100 bonus', () => {
+      const players = makeFourPlayers()
+      // seat 0 hand empty, team A has taken morto -> team A closed
+      players[1].hand.addCard(new Card('clubs', '9', false))
+      const game = new Game(players)
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      const teamB = game.state.teams.find(t => t.id === 'B')!
+      teamA.hasTakenMorto = true
+      teamA.score = 100
+      teamB.score = 50
+      game.finish()
+      expect(teamA.score).toBe(200) // 100 - 0 + 100
+      expect(teamB.score).toBe(41) // 50 - 9, no bonus
+    })
+
+    test('winnerTeam is set to the team with the higher adjusted score', () => {
+      const players = makeFourPlayers()
+      players[1].hand.addCard(new Card('clubs', '9', false))
+      const game = new Game(players)
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      const teamB = game.state.teams.find(t => t.id === 'B')!
+      teamA.hasTakenMorto = true
+      teamA.score = 100
+      teamB.score = 50
+      game.finish()
+      expect(game.state.winnerTeam).toBe('A')
+      expect(game.state.status).toBe('finished')
+    })
+
+    test('finish is idempotent', () => {
+      const players = makeFourPlayers()
+      players[0].hand.addCard(new Card('hearts', 'A', false))
+      const game = new Game(players)
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      teamA.score = 100
+      game.finish()
+      const scoreAfterFirst = teamA.score
+      game.finish()
+      expect(teamA.score).toBe(scoreAfterFirst)
+    })
+
+    test('no bonus applied when game ends by empty deck (buraco), nobody closed', () => {
+      const players = makeFourPlayers()
+      players[0].hand.addCard(new Card('hearts', 'A', false))
+      players[1].hand.addCard(new Card('clubs', '9', false))
+      const game = new Game(players)
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      const teamB = game.state.teams.find(t => t.id === 'B')!
+      teamA.score = 100
+      teamB.score = 50
+      game.finish()
+      expect(teamA.score).toBe(85) // 100 - 15
+      expect(teamB.score).toBe(41) // 50 - 9
+    })
+  })
+
+  test('getGameState returns the current state', () => {
+    const game = new Game(makeFourPlayers())
+    expect(game.getGameState()).toBe(game.state)
+  })
+
+  test('clone produces an independent game with equivalent state', () => {
+    const game = new Game(makeFourPlayers())
+    game.setup()
+    const clone = game.clone()
+
+    expect(clone).not.toBe(game)
+    expect(clone.state.players[0].hand.getSize()).toBe(game.state.players[0].hand.getSize())
+    expect(clone.state.deck.length).toBe(game.state.deck.length)
+    expect(clone.state.teams.length).toBe(2)
+
+    clone.state.deck.pop()
+    expect(clone.state.deck.length).not.toBe(game.state.deck.length)
   })
 })

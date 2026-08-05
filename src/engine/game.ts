@@ -1,37 +1,84 @@
 import { Player, PlayerMove } from './player'
 import { Card, createDeck } from './card'
 import { Canasta } from './canasta'
-import { GameState, createGameState } from './gameState'
-import { isValidCanasta, scoreCard } from './utils'
+import { GameState, Team, TeamId, createGameState, teamOfSeat } from './gameState'
+import { isValidCanasta, canExtendMeld, scoreCard } from './utils'
+
+const HAND_SIZE = 11
+const MORTO_SIZE = 11
+const MORTO_COUNT = 2
 
 export class Game {
   state: GameState
-  private HAND_SIZE = 14
 
   constructor(players: Player[]) {
-    if (players.length < 2 || players.length > 4) {
-      throw new Error('Game requires 2-4 players')
+    if (players.length !== 4) {
+      throw new Error('Game requires exactly 4 players')
     }
     this.state = createGameState(players)
   }
 
+  /**
+   * Deals 11 cards to each of the 4 players, reserves 2 mortos of 11 cards
+   * each, flips 1 card to the discard pile, and leaves the rest as the baço.
+   * Count check: 4*11 (hands) + 2*11 (mortos) + 1 (discard) = 67 cards used
+   * immediately out of 108, leaving 41 in the deck.
+   */
   setup(): void {
-    // Deal initial cards
     this.state.deck = createDeck()
+
     for (let p = 0; p < this.state.players.length; p++) {
-      for (let i = 0; i < this.HAND_SIZE; i++) {
+      for (let i = 0; i < HAND_SIZE; i++) {
         const card = this.state.deck.pop()!
         this.state.players[p].hand.addCard(card)
       }
     }
+
+    this.state.mortos = []
+    for (let m = 0; m < MORTO_COUNT; m++) {
+      const morto: Card[] = []
+      for (let i = 0; i < MORTO_SIZE; i++) {
+        morto.push(this.state.deck.pop()!)
+      }
+      this.state.mortos.push(morto)
+    }
+
+    const topCard = this.state.deck.pop()
+    if (topCard) {
+      this.state.discardPile.push(topCard)
+    }
+
     this.state.status = 'playing'
   }
 
-  draw(): Card | null {
+  drawFromDeck(): Card | null {
     if (this.state.deck.length === 0) {
-      return null // Buraco (morte)
+      return null
     }
     return this.state.deck.pop()!
+  }
+
+  /**
+   * Takes the entire discard pile, returning it (or null if the pile is
+   * empty) and clearing it from state. This is a mechanism only: the
+   * traditional Buraco condition ("can only take the pile if the top card is
+   * immediately used in a meld") is NOT enforced here. Enforcing it inside
+   * this method would require either a transactional "take + must-meld-or-
+   * rollback" API, or forcing the caller to pass the intended meld/extend
+   * cards up front - both add complexity the engine doesn't need yet. The
+   * decision: expose the raw mechanism, and let the caller (UI flow or
+   * AIPlayer decision logic) verify - e.g. via isValidCanasta/canExtendMeld
+   * against the top card - that the pile can legally be used before calling
+   * this method. This mirrors how discard()/playCanasta() already leave
+   * ordering/turn-flow decisions to the caller.
+   */
+  takeDiscardPile(): Card[] | null {
+    if (this.state.discardPile.length === 0) {
+      return null
+    }
+    const cards = [...this.state.discardPile]
+    this.state.discardPile = []
+    return cards
   }
 
   discard(cardIndex: number): boolean {
@@ -39,19 +86,15 @@ export class Game {
     const card = player.hand.removeCard(cardIndex)
     if (!card) return false
     this.state.discardPile.push(card)
+    this.maybeAutoPickUpMorto()
     return true
   }
 
   /**
-   * Validates and plays a canasta for the current player.
-   *
-   * Deviation from the plan: the plan's implementation only pushed the new
-   * Canasta into state.melds and never touched the player's hand or score.
-   * This version also removes exactly the played cards from the current
-   * player's hand and calls player.addCanasta(canasta), which is the single
-   * place that credits the score (state.melds itself carries no score, so
-   * there is no double counting). Returns false with no side effects if the
-   * cards don't form a valid canasta.
+   * Validates and plays a canasta for the current player's team. Melds
+   * belong to the team (shared by both partners), not the individual
+   * player. Returns false with no side effects if the cards don't form a
+   * valid meld or aren't actually in the current player's hand.
    */
   playCanasta(cards: Card[]): boolean {
     if (!isValidCanasta(cards)) {
@@ -66,40 +109,114 @@ export class Game {
     }
 
     const player = this.getCurrentPlayer()
+    const indicesToRemove = this.findCardIndices(player, cards)
+    if (indicesToRemove === null) return false
+
+    for (const idx of indicesToRemove) {
+      player.hand.removeCard(idx)
+    }
+
+    const team = this.getTeamOfCurrentPlayer()
+    team.melds.push(canasta)
+    team.score += canasta.getScore()
+
+    this.maybeAutoPickUpMorto()
+    return true
+  }
+
+  /**
+   * Adds `cards` from the current player's hand to an existing meld
+   * (identified by index) belonging to the current player's team. Any
+   * partner may extend any of their team's melds. Revalidates via
+   * canExtendMeld; returns false with no side effects if the meld doesn't
+   * exist, the extension is invalid, or the cards aren't in hand.
+   */
+  extendMeld(meldIndex: number, cards: Card[]): boolean {
+    const team = this.getTeamOfCurrentPlayer()
+    const meld = team.melds[meldIndex]
+    if (!meld) return false
+    if (!canExtendMeld(meld.cards, cards)) return false
+
+    const player = this.getCurrentPlayer()
+    const indicesToRemove = this.findCardIndices(player, cards)
+    if (indicesToRemove === null) return false
+
+    for (const idx of indicesToRemove) {
+      player.hand.removeCard(idx)
+    }
+
+    const oldScore = meld.getScore()
+    const extended = meld.withExtraCards(cards)
+    team.melds[meldIndex] = extended
+    team.score += extended.getScore() - oldScore
+
+    this.maybeAutoPickUpMorto()
+    return true
+  }
+
+  /**
+   * Finds the hand indices matching `cards` (by reference, falling back to
+   * value equality), each used at most once. Returns null if any card isn't
+   * found, so the caller can abort with no side effects. Indices are
+   * returned sorted descending so removing them in order is index-stable.
+   */
+  private findCardIndices(player: Player, cards: Card[]): number[] | null {
     const handCards = player.hand.getCards()
     const used = new Array(handCards.length).fill(false)
-    const indicesToRemove: number[] = []
+    const indices: number[] = []
 
     for (const card of cards) {
       let idx = handCards.findIndex((c, i) => !used[i] && c === card)
       if (idx === -1) {
         idx = handCards.findIndex((c, i) => !used[i] && c.equals(card))
       }
-      if (idx === -1) {
-        // Card isn't actually in the player's hand: abort with no side effects.
-        return false
-      }
+      if (idx === -1) return null
       used[idx] = true
-      indicesToRemove.push(idx)
+      indices.push(idx)
     }
 
-    // Remove highest indices first so earlier indices stay valid.
-    indicesToRemove.sort((a, b) => b - a)
-    for (const idx of indicesToRemove) {
-      player.hand.removeCard(idx)
+    indices.sort((a, b) => b - a)
+    return indices
+  }
+
+  /**
+   * If the current player's hand is empty and their team hasn't taken a
+   * morto yet, automatically gives them a morto as a fresh hand. Called
+   * after discard/playCanasta/extendMeld, any of which can empty the hand.
+   */
+  private maybeAutoPickUpMorto(): void {
+    const player = this.getCurrentPlayer()
+    if (!player.hand.isEmpty()) return
+    const team = this.getTeamOfCurrentPlayer()
+    if (team.hasTakenMorto) return
+    if (this.state.mortos.length === 0) return
+    this.pickUpMorto()
+  }
+
+  /**
+   * Gives the current player a morto (11 cards) as their new hand and marks
+   * their team as having taken the morto. Returns false if the team already
+   * took a morto or none remain.
+   */
+  pickUpMorto(): boolean {
+    const team = this.getTeamOfCurrentPlayer()
+    if (team.hasTakenMorto) return false
+    if (this.state.mortos.length === 0) return false
+
+    const morto = this.state.mortos.shift()!
+    const player = this.getCurrentPlayer()
+    for (const card of morto) {
+      player.hand.addCard(card)
     }
-
-    const playerName = player.name
-    const playerCanastas = this.state.melds.get(playerName) || []
-    playerCanastas.push(canasta)
-    this.state.melds.set(playerName, playerCanastas)
-
-    // Player (the interface) doesn't declare addCanasta, though both
-    // HumanPlayer and AIPlayer implement it — narrow via unknown rather than
-    // editing player.ts, which belongs to Task 3.
-    ;(player as unknown as { addCanasta(c: Canasta): void }).addCanasta(canasta)
-
+    team.hasTakenMorto = true
     return true
+  }
+
+  /**
+   * A team may only close (bater) the round once it has taken its morto.
+   */
+  canClose(team: Team): boolean {
+    return team.hasTakenMorto
   }
 
   endTurn(): void {
@@ -110,69 +227,72 @@ export class Game {
     return this.state.players[this.state.currentPlayerIndex]
   }
 
+  getTeamOfCurrentPlayer(): Team {
+    return teamOfSeat(this.state, this.state.currentPlayerIndex)
+  }
+
   getValidMoves(): PlayerMove[] {
-    // Simplificado: sempre pode comprar ou descartar
     const moves: PlayerMove[] = [{ type: 'draw' }]
     const hand = this.getCurrentPlayer().hand.getCards()
     for (let i = 0; i < hand.length; i++) {
       moves.push({ type: 'discard', cardIndex: i })
     }
+    if (this.state.discardPile.length > 0) {
+      moves.push({ type: 'take_discard' })
+    }
     return moves
   }
 
   /**
-   * Deviation from the plan: the plan checked
-   * `this.getCurrentPlayer().hand.isEmpty() || this.state.deck.length === 0`
-   * unconditionally. Before setup() runs, the deck is always empty (it's
-   * only populated by setup()), so the plan's corresponding test asserted
-   * isGameOver() === true on a freshly constructed game — passing for the
-   * wrong reason and unable to distinguish "hand empty" from "deck empty".
-   * Fixed contract: only meaningful once the game is actually 'playing'.
+   * A round is over once status is 'playing' AND either:
+   *  - a team has "batido" (a player's hand is empty AND their team has
+   *    already taken the morto), or
+   *  - the deck (baço) is empty.
    */
   isGameOver(): boolean {
     if (this.state.status !== 'playing') return false
-    const someHandEmpty = this.state.players.some(p => p.hand.isEmpty())
+
     const deckEmpty = this.state.deck.length === 0
-    return someHandEmpty || deckEmpty
+    const someoneClosed = this.state.players.some((p, seat) => {
+      if (!p.hand.isEmpty()) return false
+      return teamOfSeat(this.state, seat).hasTakenMorto
+    })
+
+    return someoneClosed || deckEmpty
   }
 
   /**
-   * Finalizes the game: applies the hand penalty and closing bonus to each
-   * player's score, then determines the winner from the adjusted scores.
-   * Idempotent - calling finish() again after the game is already
-   * 'finished' is a no-op, so scores are never adjusted twice.
+   * Finalizes the round: each team's score is reduced by the sum of the
+   * remaining hand card values across BOTH partners, and the team that
+   * closed (a player emptied their hand while their team had already taken
+   * the morto) gets a +100 bonus. winnerTeam is set to whichever team has
+   * the higher adjusted score. Idempotent - calling finish() again after
+   * the round is already 'finished' is a no-op.
    */
   finish(): void {
     if (this.state.status === 'finished') return
-
     this.state.status = 'finished'
 
-    const closer = this.state.players.find(p => p.hand.isEmpty())
-
-    for (const player of this.state.players) {
-      const handPenalty = player.hand
-        .getCards()
-        .reduce((sum, card) => sum + scoreCard(card.rank), 0)
-      player.score -= handPenalty
-      if (player === closer) {
-        player.score += 100
+    let closerTeamId: TeamId | null = null
+    this.state.players.forEach((p, seat) => {
+      if (p.hand.isEmpty() && teamOfSeat(this.state, seat).hasTakenMorto) {
+        closerTeamId = teamOfSeat(this.state, seat).id
       }
+    })
+
+    this.state.players.forEach((p, seat) => {
+      const handPenalty = p.hand.getCards().reduce((sum, card) => sum + scoreCard(card.rank), 0)
+      const team = teamOfSeat(this.state, seat)
+      team.score -= handPenalty
+    })
+
+    if (closerTeamId) {
+      const team = this.state.teams.find(t => t.id === closerTeamId)!
+      team.score += 100
     }
 
-    const winner = this.calculateWinner()
-    this.state.winner = winner
-  }
-
-  private calculateWinner(): Player {
-    let maxScore = -Infinity
-    let winner = this.state.players[0]
-    for (const player of this.state.players) {
-      if (player.score > maxScore) {
-        maxScore = player.score
-        winner = player
-      }
-    }
-    return winner
+    const winner = this.state.teams.reduce((best, t) => (t.score > best.score ? t : best), this.state.teams[0])
+    this.state.winnerTeam = winner.id
   }
 
   getGameState(): GameState {
@@ -180,22 +300,22 @@ export class Game {
   }
 
   clone(): Game {
-    // Same rationale as addCanasta above: Player doesn't declare clone().
-    const clonedPlayers = this.state.players.map(p =>
-      (p as unknown as { clone(): Player }).clone()
-    )
+    // Player doesn't declare clone() in its interface, though both
+    // HumanPlayer and AIPlayer implement it - narrow via unknown rather than
+    // editing player.ts, which is out of scope here.
+    const clonedPlayers = this.state.players.map(p => (p as unknown as { clone(): Player }).clone())
     const game = new Game(clonedPlayers)
     game.state = {
       ...this.state,
       players: clonedPlayers,
+      teams: this.state.teams.map(t => ({
+        ...t,
+        seats: [...t.seats],
+        melds: t.melds.map(c => c.clone()),
+      })),
       deck: [...this.state.deck],
       discardPile: [...this.state.discardPile],
-      melds: new Map(
-        Array.from(this.state.melds.entries()).map(([name, canastas]) => [
-          name,
-          canastas.map(c => c.clone()),
-        ])
-      ),
+      mortos: this.state.mortos.map(m => [...m]),
     }
     return game
   }
