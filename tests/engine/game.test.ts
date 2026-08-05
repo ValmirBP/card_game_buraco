@@ -435,6 +435,32 @@ describe('Game', () => {
       ]
       expect(game.canClose(teamA)).toBe(true)
     })
+
+    test('sem pegar o morto: pode bater se não há mais mortos na mesa (viraram monte), mas não se ainda houver morto disponível', () => {
+      const cleanCanastra = () =>
+        new Canasta([
+          new Card('hearts', '5', false),
+          new Card('hearts', '6', false),
+          new Card('hearts', '7', false),
+          new Card('hearts', '8', false),
+          new Card('hearts', '9', false),
+          new Card('hearts', '10', false),
+          new Card('hearts', 'J', false),
+        ])
+
+      const game = new Game(makeFourPlayers())
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      teamA.hasTakenMorto = false
+      teamA.melds = [cleanCanastra()]
+
+      // Ainda existe um morto na mesa -> não pode bater sem pegá-lo.
+      game.state.mortos = [[new Card('clubs', '4', false)]]
+      expect(game.canClose(teamA)).toBe(false)
+
+      // Mortos esgotados (ex.: viraram monte) -> exigência do morto é liberada.
+      game.state.mortos = []
+      expect(game.canClose(teamA)).toBe(true)
+    })
   })
 
   describe('isGameOver', () => {

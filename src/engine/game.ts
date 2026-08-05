@@ -219,12 +219,17 @@ export class Game {
   }
 
   /**
-   * A team may only close (bater) the round once it has taken its morto AND
-   * has at least one clean canastra (7+ cards, no curinga at all - a
-   * natural 2 in its own position doesn't count against this).
+   * A team may only close (bater) the round when:
+   *  1. it has at least one clean canastra (7+ cards, no curinga - a
+   *     natural 2 in its own position doesn't count against this), AND
+   *  2. the morto requirement is satisfied: the team took a morto, OR
+   *     there is no morto left on the table (e.g. it became the new deck
+   *     after the stock ran out), so taking one is no longer possible.
+   * (Hand emptiness is the trigger checked by the caller.)
    */
   canClose(team: Team): boolean {
-    return team.hasTakenMorto && team.melds.some(m => m.isCanastra && m.isClean)
+    const mortoSatisfied = team.hasTakenMorto || this.state.mortos.length === 0
+    return mortoSatisfied && team.melds.some(m => m.isCanastra && m.isClean)
   }
 
   endTurn(): void {
