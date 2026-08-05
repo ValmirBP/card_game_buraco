@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useGameStore } from '../../store/gameStore'
-import GameHeader from './GameHeader'
 import GameBoard from './GameBoard'
 import PlayerHand from './PlayerHand'
 import ActionPanel from './ActionPanel'
+import { canTakeDiscardPile } from './discardRules'
 
 export type TurnPhase = 'draw' | 'play'
 
@@ -11,7 +11,7 @@ interface GameplayProps {
   onGameEnd: () => void
 }
 
-const AI_THINK_DELAY_MS = 900
+const AI_THINK_DELAY_MS = 800
 
 export default function Gameplay({ onGameEnd }: GameplayProps) {
   // `version` MUST be selected alongside `game`: `game` is a mutable engine
@@ -28,10 +28,11 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
   // turn, so Gameplay is the source of truth for it.
   const [phase, setPhase] = useState<TurnPhase>('draw')
 
-  // Schedule the AI's turn with a short "thinking" delay whenever it
-  // becomes the AI's turn (currentPlayerIndex === 1) and the game is still
-  // playing. Cleans up its timeout on every re-run/unmount so a turn is
-  // never executed twice.
+  // Schedule one AI seat's turn whenever it becomes an AI's turn
+  // (currentPlayerIndex !== 0) and the game is still playing. The effect
+  // re-fires after every aiTurn() call (version bumps, currentPlayerIndex
+  // advances 1 -> 2 -> 3 -> 0), running exactly one seat's turn per firing
+  // until control returns to the human.
   //
   // No ref-based "already scheduled" guard here on purpose: under
   // React.StrictMode (or any remount that happens to land mid-AI-turn), a
@@ -41,16 +42,12 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
   // reschedules, so the AI turn silently never runs. Depending only on
   // `[version, game?.state.currentPlayerIndex, game?.state.status]` sidesteps
   // that: the effect naturally fires once whenever those values settle into
-  // "AI's turn", schedules exactly one timeout, and cleans it up correctly
-  // on every re-run. Once `aiTurn()` actually executes it increments
-  // `version` and flips `currentPlayerIndex` back to 0, so this effect
-  // re-runs, the "is it the AI's turn" condition becomes false, and nothing
-  // reschedules — that state transition is what guarantees a single fire,
-  // not a ref.
+  // "an AI's turn", schedules exactly one timeout, and cleans it up
+  // correctly on every re-run.
   useEffect(() => {
     if (!game) return
     if (game.state.status !== 'playing') return
-    if (game.state.currentPlayerIndex !== 1) return
+    if (game.state.currentPlayerIndex === 0) return
 
     const timeoutId = setTimeout(() => {
       useGameStore.getState().aiTurn()
@@ -59,8 +56,8 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
     return () => clearTimeout(timeoutId)
   }, [version, game?.state.currentPlayerIndex, game?.state.status])
 
-  // Detect game over (the store already calls game.finish() internally via
-  // appendGameOverLog when a discard/aiTurn ends the game) and notify the
+  // Detect game over (the store already calls game.finish() internally when
+  // a discard/aiTurn/playCanasta/extendMeld ends the game) and notify the
   // parent screen.
   useEffect(() => {
     if (!game) return
@@ -69,10 +66,24 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
     }
   }, [version, game, onGameEnd])
 
+  const canTakeDiscard = useMemo(() => {
+    if (!game) return false
+    if (game.state.status !== 'playing' || game.state.currentPlayerIndex !== 0) return false
+    return canTakeDiscardPile(game)
+    // Re-derive whenever the game mutates (version) — hand/discard/melds can
+    // all change what's takeable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game, version])
+
   if (!game) return null
 
   const handleDraw = () => {
-    useGameStore.getState().draw()
+    useGameStore.getState().drawFromDeck()
+    setPhase('play')
+  }
+
+  const handleTakeDiscard = () => {
+    useGameStore.getState().takeDiscardPile()
     setPhase('play')
   }
 
@@ -80,7 +91,7 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
     const { selectedCardIndices } = useGameStore.getState()
     if (selectedCardIndices.length !== 1) return
     useGameStore.getState().discard(selectedCardIndices[0])
-    // Turn moves to the AI; reset phase so it's ready for the next human turn.
+    // Turn moves on; reset phase so it's ready for the next human turn.
     setPhase('draw')
   }
 
@@ -95,10 +106,9 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
 
   return (
     <div className="flex flex-col gap-4 pb-32">
-      <GameHeader />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <GameBoard />
+          <GameBoard phase={phase} />
         </div>
         <div className="space-y-2 rounded-2xl border border-white/10 bg-black/20 p-4 shadow-lg backdrop-blur-sm">
           <h3 className="font-display text-base text-card-gold">Registro</h3>
@@ -118,7 +128,9 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
       <PlayerHand phase={phase} />
       <ActionPanel
         phase={phase}
+        canTakeDiscard={canTakeDiscard}
         onDraw={handleDraw}
+        onTakeDiscard={handleTakeDiscard}
         onDiscard={handleDiscard}
         onPlayCanasta={handlePlayCanasta}
       />
