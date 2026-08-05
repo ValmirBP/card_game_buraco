@@ -403,6 +403,53 @@ describe('AIPlayer', () => {
     })
   })
 
+  describe('Bug 1: gate duro - nao propoe jogo sujo enquanto o time nao tem canastra limpa fechada', () => {
+    test('sem canastra limpa fechada, unica opcao de mesa e suja (8-2-10-J) -> nao aparece em getValidMoves e a IA nao baixa', () => {
+      const twoOfSpades = new Card('spades', '2', false) // 2 do mesmo naipe, curinga fora de posicao (representa 9)
+      const cards = [
+        new Card('spades', '8', false),
+        twoOfSpades,
+        new Card('spades', '10', false),
+        new Card('spades', 'J', false),
+      ]
+      const ai = new AIPlayer('Bot', 'hard', cards)
+      const teams = makeTeams() // nenhum time tem canastra limpa fechada
+      const gameState = makeGameState(ai, { teams })
+
+      const moves = ai.getValidMoves(gameState)
+      const dirtyTableMoves = moves.filter(
+        m => m.type === 'play_canasta' || m.type === 'extend_meld'
+      )
+      expect(dirtyTableMoves).toHaveLength(0)
+
+      const move = ai.playTurn(gameState)
+      expect(['draw', 'discard']).toContain(move.type)
+    })
+
+    test('com canastra limpa fechada, a jogada suja (8-2-10-J) fica disponivel e pode ser baixada', () => {
+      const twoOfSpades = new Card('diamonds', '2', false) // 2 do mesmo naipe do jogo sujo, diamonds
+      const cards = [
+        new Card('diamonds', '8', false),
+        twoOfSpades,
+        new Card('diamonds', '10', false),
+        new Card('diamonds', 'J', false),
+      ]
+      const ai = new AIPlayer('Bot', 'hard', cards)
+      const teams = makeTeams()
+      teams[0].melds = [cleanCanastra('hearts')] // time ja tem canastra limpa fechada
+      const gameState = makeGameState(ai, { teams })
+
+      const moves = ai.getValidMoves(gameState)
+      const dirtyTableMoves = moves.filter(
+        m => m.type === 'play_canasta' && m.cards!.length === 4
+      )
+      expect(dirtyTableMoves.length).toBeGreaterThan(0)
+
+      const move = ai.playTurn(gameState)
+      expect(move.type).toBe('play_canasta')
+    })
+  })
+
   test('clone copies hand, score, canastas and difficulty', () => {
     const ai = new AIPlayer('Bot', 'hard', [new Card('hearts', '5', false)])
     ai.score = 42

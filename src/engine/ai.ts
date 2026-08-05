@@ -252,7 +252,26 @@ export class AIPlayer implements Player {
       moves.push({ type: 'discard', cardIndex: i })
     }
 
-    return moves
+    return this.hardGateDirtyMoves(moves, ownTeam)
+  }
+
+  /**
+   * Bug 1 - gate duro (todas as dificuldades): enquanto o time nao tiver ao
+   * menos uma canastra LIMPA FECHADA na mesa (7+, sem curinga), a IA nunca
+   * PROPOE (nem em getValidMoves) um play_canasta ou extend_meld que
+   * resultaria num meld sujo (isClean=false, ground-truth via Canasta -
+   * pega tambem o caso do 2-mesmo-naipe que virou sujo pela regra do 9).
+   * Nao afeta draw/take_discard/discard - a IA nunca fica travada, so
+   * comprar/descartar continuam sempre disponiveis. Uma vez que o time tem
+   * uma canastra limpa fechada, este gate vira no-op (moves e devolvido sem
+   * alteracao) e jogos sujos passam a ser propostos normalmente.
+   */
+  private hardGateDirtyMoves(moves: PlayerMove[], ownTeam: Team | undefined): PlayerMove[] {
+    if (!ownTeam || this.teamHasCleanCanastra(ownTeam)) return moves
+    return moves.filter(m => {
+      if (m.type !== 'play_canasta' && m.type !== 'extend_meld') return true
+      return !this.isDirtyMeldMove(m, ownTeam)
+    })
   }
 
   /**
