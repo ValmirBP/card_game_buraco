@@ -55,7 +55,10 @@ export default function PlayerHand({ phase }: PlayerHandProps) {
         <h3 className="font-display text-lg text-card-gold">Sua Mão</h3>
         {hint && <span className="text-xs text-gray-300 sm:text-sm">{hint}</span>}
       </div>
-      <div className="scrollbar-gold flex -space-x-8 overflow-x-auto px-1 pb-6 pt-4 sm:-space-x-10">
+      <div
+        id="player-hand-anchor"
+        className="scrollbar-gold flex -space-x-8 overflow-x-auto px-1 pb-6 pt-4 sm:-space-x-10"
+      >
         {orderedHand(hand).map(({ card, index }, position) => (
           <div
             key={`${card.suit}-${card.rank}-${index}`}

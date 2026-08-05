@@ -3,6 +3,7 @@ import { useGameStore } from '../../store/gameStore'
 import GameBoard from './GameBoard'
 import PlayerHand from './PlayerHand'
 import ActionPanel from './ActionPanel'
+import DrawAnimation, { type DrawAnimState } from './DrawAnimation'
 import { canTakeDiscardPile, canUseTopDiscardCard } from './discardRules'
 
 export type TurnPhase = 'draw' | 'play'
@@ -27,6 +28,10 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
   // engine/store don't enforce a "draw then play" phase within a human
   // turn, so Gameplay is the source of truth for it.
   const [phase, setPhase] = useState<TurnPhase>('draw')
+
+  // Ghost-card overlay for the draw animation (see DrawAnimation.tsx). Local
+  // UI-only state — never touches game state, purely decorative.
+  const [drawAnim, setDrawAnim] = useState<DrawAnimState | null>(null)
 
   // Schedule one AI seat's turn whenever it becomes an AI's turn
   // (currentPlayerIndex !== 0) and the game is still playing. The effect
@@ -87,8 +92,24 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
   if (!game) return null
 
   const handleDraw = () => {
+    const deckEl = document.getElementById('deck-pile')
+    const handEl = document.getElementById('player-hand-anchor')
+    const fromRect = deckEl?.getBoundingClientRect()
+
     useGameStore.getState().drawFromDeck()
     setPhase('play')
+
+    const toRect = handEl?.getBoundingClientRect()
+    const hand = useGameStore.getState().game?.state.players[0].hand.getCards()
+    const drawnCard = hand && hand.length > 0 ? hand[hand.length - 1] : undefined
+
+    if (fromRect && toRect && drawnCard) {
+      const id = Date.now()
+      setDrawAnim({ id, fromRect, toRect, card: drawnCard })
+      window.setTimeout(() => {
+        setDrawAnim(current => (current?.id === id ? null : current))
+      }, 850)
+    }
   }
 
   const handleTakeDiscard = () => {
@@ -134,6 +155,7 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
           </div>
         </div>
       </div>
+      <DrawAnimation anim={drawAnim} />
       <PlayerHand phase={phase} />
       <ActionPanel
         phase={phase}

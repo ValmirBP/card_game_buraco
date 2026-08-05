@@ -108,7 +108,7 @@ export default function GameBoard({ phase }: GameBoardProps) {
                 Monte
               </span>
               {deck.length > 0 ? (
-                <div className="relative">
+                <div id="deck-pile" className="relative">
                   <div className="absolute left-1.5 top-1.5 -z-10">
                     <CardBack variant="red" />
                   </div>
@@ -182,8 +182,8 @@ export default function GameBoard({ phase }: GameBoardProps) {
                       animate={{
                         opacity: 1,
                         scale: 1,
-                        x: i * 8,
-                        y: i * 8,
+                        x: i * 14 - 7,
+                        y: i * 14 - 7,
                       }}
                       exit={{ opacity: 0, scale: 0.7 }}
                       style={{ zIndex: mortos.length - i }}
@@ -191,7 +191,11 @@ export default function GameBoard({ phase }: GameBoardProps) {
                     >
                       <div className="relative scale-75 sm:scale-90">
                         <CardBack variant={i === 0 ? 'blue' : 'red'} />
-                        <span className="absolute -right-3 -top-3 flex h-6 min-w-6 items-center justify-center rounded-full bg-card-gold px-1.5 text-[10px] font-bold text-black shadow">
+                        <span
+                          className={`absolute flex h-6 min-w-6 items-center justify-center rounded-full bg-card-gold px-1.5 text-[10px] font-bold text-black shadow ${
+                            i === 0 ? '-right-3 -top-3' : '-bottom-3 -left-3'
+                          }`}
+                        >
                           {morto.length}
                         </span>
                       </div>
