@@ -47,27 +47,39 @@ export class AIPlayer implements Player {
   }
 
   private decideEasy(gameState: GameStateForAI): PlayerMove {
-    // Aleatorio entre movimentos validos
+    // Se o topo do descarte e util, 50% de chance de pegar a mesa antes de
+    // sortear entre os demais movimentos validos.
+    if (this.isDiscardPileUseful(gameState) && Math.random() < 0.5) {
+      return { type: 'take_discard' }
+    }
+
+    // Aleatorio entre movimentos validos (inclui extend_meld no pool)
     const moves = this.getValidMoves(gameState)
     if (moves.length === 0) return { type: 'draw' }
     return moves[Math.floor(Math.random() * moves.length)]
   }
 
   private decideMedium(gameState: GameStateForAI): PlayerMove {
-    // Prefere jogar canastas, depois estender jogos do time, depois evita
-    // descartar cartas perigosas.
-    const moves = this.getValidMoves(gameState)
-
-    // Prioridade 1: jogar canastas
-    const canastaMoves = moves.filter(m => m.type === 'play_canasta')
-    if (canastaMoves.length > 0) {
-      return canastaMoves[Math.floor(Math.random() * canastaMoves.length)]
+    // Prioridade 0: compra da mesa - pega o descarte sempre que o topo for
+    // util (estende meld do time ou forma jogo novo com cartas da mao).
+    // So faz sentido ANTES de comprar do monte nesse turno.
+    if (this.isDiscardPileUseful(gameState)) {
+      return { type: 'take_discard' }
     }
 
-    // Prioridade 2: estender jogo existente do time
+    // extend_meld >= play_canasta > discard.
+    const moves = this.getValidMoves(gameState)
+
+    // Prioridade 1: estender jogo existente do time
     const extendMoves = moves.filter(m => m.type === 'extend_meld')
     if (extendMoves.length > 0) {
       return extendMoves[Math.floor(Math.random() * extendMoves.length)]
+    }
+
+    // Prioridade 2: jogar canastas
+    const canastaMoves = moves.filter(m => m.type === 'play_canasta')
+    if (canastaMoves.length > 0) {
+      return canastaMoves[Math.floor(Math.random() * canastaMoves.length)]
     }
 
     // Prioridade 3: descartar carta "segura" (rank baixo)
@@ -92,20 +104,30 @@ export class AIPlayer implements Player {
       this.discardedCards.add(card.toString())
     })
 
-    const moves = this.getValidMoves(gameState)
-
-    // Prioridade 1: jogar a maior canasta possivel (deterministico)
-    const canastaMoves = moves.filter(m => m.type === 'play_canasta')
-    if (canastaMoves.length > 0) {
-      const sorted = [...canastaMoves].sort((a, b) => (b.cards?.length ?? 0) - (a.cards?.length ?? 0))
-      return sorted[0]
+    // Prioridade 0: compra da mesa - pega sempre que o topo for util. Uma
+    // pilha grande (>=4 cartas) com topo util e especialmente valiosa (tira
+    // cartas de circulacao do adversario), mas a decisao de pegar e a mesma:
+    // sempre que util, o hard pega.
+    if (this.isDiscardPileUseful(gameState)) {
+      return { type: 'take_discard' }
     }
 
-    // Prioridade 2: estender o jogo existente do time (deterministico, o de
+    const moves = this.getValidMoves(gameState)
+
+    // extend_meld >= play_canasta > discard.
+
+    // Prioridade 1: estender o jogo existente do time (deterministico, o de
     // menor meldIndex primeiro)
     const extendMoves = moves.filter(m => m.type === 'extend_meld')
     if (extendMoves.length > 0) {
       const sorted = [...extendMoves].sort((a, b) => (a.meldIndex ?? 0) - (b.meldIndex ?? 0))
+      return sorted[0]
+    }
+
+    // Prioridade 2: jogar a maior canasta possivel (deterministico)
+    const canastaMoves = moves.filter(m => m.type === 'play_canasta')
+    if (canastaMoves.length > 0) {
+      const sorted = [...canastaMoves].sort((a, b) => (b.cards?.length ?? 0) - (a.cards?.length ?? 0))
       return sorted[0]
     }
 
@@ -127,6 +149,33 @@ export class AIPlayer implements Player {
     }
 
     return { type: 'draw' }
+  }
+
+  /**
+   * Whether the top of the discard pile is worth taking: it either extends
+   * one of the AI's own team's melds (canExtendMeld), or combines with 2+
+   * cards already in hand to form a brand-new valid meld (same-suit run,
+   * or an ace paired up towards a trio). Only meaningful BEFORE drawing
+   * from the deck this turn - playTurn may return take_discard as the
+   * first action of a turn; once the deck has been drawn from, taking the
+   * pile no longer applies for this turn.
+   */
+  private isDiscardPileUseful(gameState: GameStateForAI): boolean {
+    if (gameState.discardPile.length === 0) return false
+    const top = gameState.discardPile[gameState.discardPile.length - 1]
+
+    const ownTeam = this.getOwnTeam(gameState)
+    if (ownTeam && ownTeam.melds.some(meld => canExtendMeld(meld.cards, [top]))) {
+      return true
+    }
+
+    const cards = this.hand.getCards()
+    for (let i = 0; i < cards.length; i++) {
+      for (let j = i + 1; j < cards.length; j++) {
+        if (isValidCanasta([cards[i], cards[j], top])) return true
+      }
+    }
+    return false
   }
 
   /**
@@ -154,7 +203,14 @@ export class AIPlayer implements Player {
       moves.push(...this.findExtendMeldMoves(ownTeam))
     }
 
-    // Move 4: descartar (qualquer carta)
+    // Move 4: comprar a mesa (take_discard) - so faz sentido antes de
+    // comprar do monte; util quando o topo estende um meld do time ou
+    // forma um jogo novo com 2+ cartas da mao.
+    if (this.isDiscardPileUseful(gameState)) {
+      moves.push({ type: 'take_discard' })
+    }
+
+    // Move 5: descartar (qualquer carta)
     const myCards = this.hand.getCards()
     for (let i = 0; i < myCards.length; i++) {
       moves.push({ type: 'discard', cardIndex: i })

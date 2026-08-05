@@ -210,6 +210,123 @@ describe('AIPlayer', () => {
     expect(ai.score).toBeGreaterThan(0)
   })
 
+  describe('Part C: compra da mesa (take_discard)', () => {
+    test('getValidMoves includes take_discard when the top of the pile extends a team meld', () => {
+      const ai = new AIPlayer('Bot', 'medium', [new Card('clubs', 'K', false)])
+      const { Canasta } = require('../../src/engine/canasta')
+      const existingMeld = new Canasta([
+        new Card('hearts', '5', false),
+        new Card('hearts', '6', false),
+        new Card('hearts', '7', false),
+      ])
+      const teams = makeTeams()
+      teams[0].melds = [existingMeld]
+      const gameState = makeGameState(ai, { teams, discardPile: [new Card('hearts', '8', false)] })
+      const moves = ai.getValidMoves(gameState)
+      expect(moves.some(m => m.type === 'take_discard')).toBe(true)
+    })
+
+    test('getValidMoves includes take_discard when the top card forms a new meld with 2+ hand cards', () => {
+      const ai = new AIPlayer('Bot', 'medium', [
+        new Card('hearts', '5', false),
+        new Card('hearts', '6', false),
+      ])
+      const gameState = makeGameState(ai, { discardPile: [new Card('hearts', '7', false)] })
+      const moves = ai.getValidMoves(gameState)
+      expect(moves.some(m => m.type === 'take_discard')).toBe(true)
+    })
+
+    test('getValidMoves does NOT include take_discard when the top card is useless', () => {
+      const ai = new AIPlayer('Bot', 'medium', [new Card('clubs', 'K', false)])
+      const gameState = makeGameState(ai, { discardPile: [new Card('hearts', '3', false)] })
+      const moves = ai.getValidMoves(gameState)
+      expect(moves.some(m => m.type === 'take_discard')).toBe(false)
+    })
+
+    test('medium AI takes the discard pile whenever the top card is useful', () => {
+      const ai = new AIPlayer('Bot', 'medium', [
+        new Card('hearts', '5', false),
+        new Card('hearts', '6', false),
+      ])
+      const gameState = makeGameState(ai, { discardPile: [new Card('hearts', '7', false)] })
+      const move = ai.playTurn(gameState)
+      expect(move.type).toBe('take_discard')
+    })
+
+    test('hard AI takes the discard pile whenever the top card is useful', () => {
+      const ai = new AIPlayer('Bot', 'hard', [
+        new Card('hearts', '5', false),
+        new Card('hearts', '6', false),
+      ])
+      const gameState = makeGameState(ai, { discardPile: [new Card('hearts', '7', false)] })
+      const move = ai.playTurn(gameState)
+      expect(move.type).toBe('take_discard')
+    })
+
+    test('easy AI sometimes takes the useful discard pile (50% chance)', () => {
+      const ai = new AIPlayer('Bot', 'easy', [
+        new Card('hearts', '5', false),
+        new Card('hearts', '6', false),
+      ])
+      const gameState = makeGameState(ai, { discardPile: [new Card('hearts', '7', false)] })
+
+      const spy = jest.spyOn(Math, 'random').mockReturnValue(0.1)
+      expect(ai.playTurn(gameState).type).toBe('take_discard')
+      spy.mockReturnValue(0.9)
+      expect(ai.playTurn(gameState).type).not.toBe('take_discard')
+      spy.mockRestore()
+    })
+
+    test('medium AI never proposes take_discard when the pile is empty', () => {
+      const ai = new AIPlayer('Bot', 'medium', [new Card('hearts', '5', false)])
+      const gameState = makeGameState(ai, { discardPile: [] })
+      const move = ai.playTurn(gameState)
+      expect(move.type).not.toBe('take_discard')
+    })
+  })
+
+  describe('Part C: extend_meld priorizado sobre play_canasta', () => {
+    test('medium AI prefers extend_meld over play_canasta when both are available', () => {
+      const ai = new AIPlayer('Bot', 'medium', [
+        new Card('hearts', '8', false), // extends existing meld
+        new Card('spades', '4', false),
+        new Card('spades', '5', false),
+        new Card('spades', '6', false), // forms a brand-new canasta
+      ])
+      const { Canasta } = require('../../src/engine/canasta')
+      const existingMeld = new Canasta([
+        new Card('hearts', '5', false),
+        new Card('hearts', '6', false),
+        new Card('hearts', '7', false),
+      ])
+      const teams = makeTeams()
+      teams[0].melds = [existingMeld]
+      const gameState = makeGameState(ai, { teams })
+      const move = ai.playTurn(gameState)
+      expect(move.type).toBe('extend_meld')
+    })
+
+    test('hard AI prefers extend_meld over play_canasta when both are available', () => {
+      const ai = new AIPlayer('Bot', 'hard', [
+        new Card('hearts', '8', false),
+        new Card('spades', '4', false),
+        new Card('spades', '5', false),
+        new Card('spades', '6', false),
+      ])
+      const { Canasta } = require('../../src/engine/canasta')
+      const existingMeld = new Canasta([
+        new Card('hearts', '5', false),
+        new Card('hearts', '6', false),
+        new Card('hearts', '7', false),
+      ])
+      const teams = makeTeams()
+      teams[0].melds = [existingMeld]
+      const gameState = makeGameState(ai, { teams })
+      const move = ai.playTurn(gameState)
+      expect(move.type).toBe('extend_meld')
+    })
+  })
+
   test('clone copies hand, score, canastas and difficulty', () => {
     const ai = new AIPlayer('Bot', 'hard', [new Card('hearts', '5', false)])
     ai.score = 42
