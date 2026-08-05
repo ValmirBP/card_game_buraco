@@ -1,10 +1,13 @@
 import { motion } from 'framer-motion'
 import { useGameStore } from '../../store/gameStore'
+import type { TeamId } from '../../engine/gameState'
 
 interface ResultProps {
   onBackToMenu: () => void
   onPlayAgain: () => void
 }
+
+const TEAM_LABEL: Record<TeamId, string> = { A: 'Nós', B: 'Eles' }
 
 export default function Result({ onBackToMenu, onPlayAgain }: ResultProps) {
   // `version` selected alongside `game` per the store's reactivity contract
@@ -14,10 +17,17 @@ export default function Result({ onBackToMenu, onPlayAgain }: ResultProps) {
 
   if (!game) return null
 
-  const winner = game.state.winner
-  // players[0] is always the human (see gameStore.initGame: new Game([human, ai])).
-  const humanWon = winner === game.state.players[0]
-  const sortedPlayers = [...game.state.players].sort((a, b) => b.score - a.score)
+  const { teams, players, winnerTeam } = game.state
+  // Team A is always seats [0, 2] = the human + their AI partner ("Nós").
+  const humanTeamWon = winnerTeam === 'A'
+  const sortedTeams = [...teams].sort((a, b) => b.score - a.score)
+
+  const seatsOfTeam = (id: TeamId) =>
+    teams
+      .find(t => t.id === id)!
+      .seats.map(seat => players[seat]?.name)
+      .filter(Boolean)
+      .join(' e ')
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-8 px-4 py-10 text-center">
@@ -27,21 +37,22 @@ export default function Result({ onBackToMenu, onPlayAgain }: ResultProps) {
         transition={{ type: 'spring', stiffness: 260, damping: 20 }}
       >
         <h1 className="font-display text-4xl text-card-gold drop-shadow-[0_2px_10px_rgba(212,175,55,0.5)] sm:text-6xl">
-          {humanWon ? '🎉 Você Venceu!' : 'Fim de Jogo'}
+          {humanTeamWon ? '🎉 Vocês venceram!' : 'A dupla adversária venceu'}
         </h1>
-        {winner && (
+        {winnerTeam && (
           <p className="mt-3 text-lg text-gray-200 sm:text-xl">
-            {winner.name} venceu com {winner.score} pontos!
+            {TEAM_LABEL[winnerTeam]} ({seatsOfTeam(winnerTeam)}) venceu com{' '}
+            {teams.find(t => t.id === winnerTeam)!.score} pontos!
           </p>
         )}
       </motion.div>
 
       <div className="flex w-full max-w-md flex-col gap-4">
-        {sortedPlayers.map((p, i) => {
-          const isWinner = winner ? p === winner : false
+        {sortedTeams.map((team, i) => {
+          const isWinner = winnerTeam === team.id
           return (
             <motion.div
-              key={p.name}
+              key={team.id}
               initial={{ opacity: 0, x: -24 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.15 + i * 0.1 }}
@@ -54,14 +65,17 @@ export default function Result({ onBackToMenu, onPlayAgain }: ResultProps) {
               <div className="flex items-center gap-3">
                 {isWinner && <span className="text-2xl">🏆</span>}
                 <div className="text-left">
-                  <div className="font-bold text-white">{p.name}</div>
+                  <div className="font-bold text-white">
+                    {TEAM_LABEL[team.id]} · {seatsOfTeam(team.id)}
+                  </div>
                   <div className="text-xs text-gray-300">
-                    {p.canastas.length} canastra{p.canastas.length === 1 ? '' : 's'}
+                    {team.melds.length} canastra{team.melds.length === 1 ? '' : 's'}
+                    {team.hasTakenMorto ? ' · pegou o morto' : ' · não pegou o morto'}
                   </div>
                 </div>
               </div>
               <div className={`text-2xl font-bold ${isWinner ? 'text-card-gold' : 'text-gray-200'}`}>
-                {p.score}
+                {team.score}
               </div>
             </motion.div>
           )
