@@ -2,7 +2,7 @@ import { Player, PlayerMove } from './player'
 import { Card, createDeck } from './card'
 import { Canasta } from './canasta'
 import { GameState, Team, TeamId, createGameState, teamOfSeat } from './gameState'
-import { isValidCanasta, canExtendMeld, scoreCard } from './utils'
+import { isValidCanasta, canExtendMeld, scoreCardValue } from './utils'
 
 const HAND_SIZE = 11
 const MORTO_SIZE = 11
@@ -278,11 +278,16 @@ export class Game {
 
   /**
    * Finalizes the round: each team's score is reduced by the sum of the
-   * remaining hand card values across BOTH partners, and the team that
-   * closed (a player emptied their hand while their team had already taken
-   * the morto) gets a +100 bonus. winnerTeam is set to whichever team has
-   * the higher adjusted score. Idempotent - calling finish() again after
-   * the round is already 'finished' is a no-op.
+   * remaining hand card values across BOTH partners (using scoreCardValue,
+   * which correctly values jokers at 20 - unlike the rank-only scoreCard),
+   * and the team that closed (a player emptied their hand while their team
+   * had already taken the morto) gets a +100 bonus. Additionally, any team
+   * that never took a morto (team.hasTakenMorto === false) is penalized an
+   * extra -100, regardless of why (never emptied a hand to trigger the
+   * auto-pickup, or the morto became the new baço before they could take
+   * it). winnerTeam is set to whichever team has the higher adjusted score.
+   * Idempotent - calling finish() again after the round is already
+   * 'finished' is a no-op.
    */
   finish(): void {
     if (this.state.status === 'finished') return
@@ -296,7 +301,7 @@ export class Game {
     })
 
     this.state.players.forEach((p, seat) => {
-      const handPenalty = p.hand.getCards().reduce((sum, card) => sum + scoreCard(card.rank), 0)
+      const handPenalty = p.hand.getCards().reduce((sum, card) => sum + scoreCardValue(card), 0)
       const team = teamOfSeat(this.state, seat)
       team.score -= handPenalty
     })
@@ -305,6 +310,12 @@ export class Game {
       const team = this.state.teams.find(t => t.id === closerTeamId)!
       team.score += 100
     }
+
+    this.state.teams.forEach(team => {
+      if (!team.hasTakenMorto) {
+        team.score -= 100
+      }
+    })
 
     const winner = this.state.teams.reduce((best, t) => (t.score > best.score ? t : best), this.state.teams[0])
     this.state.winnerTeam = winner.id

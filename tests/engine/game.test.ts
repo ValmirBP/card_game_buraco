@@ -525,13 +525,18 @@ describe('Game', () => {
       const players = makeFourPlayers()
       players[0].hand.addCard(new Card('hearts', 'A', false)) // 15
       players[0].hand.addCard(new Card('hearts', 'K', false)) // 10
-      players[2].hand.addCard(new Card('clubs', '9', false)) // 9
+      players[2].hand.addCard(new Card('clubs', '9', false)) // 10 (official table: 8,9,10=10)
       const game = new Game(players)
       const teamA = game.state.teams.find(t => t.id === 'A')!
+      const teamB = game.state.teams.find(t => t.id === 'B')!
+      // Both teams took their morto so this test isolates the hand-penalty
+      // math from the separate -100 no-morto penalty (covered below).
+      teamA.hasTakenMorto = true
+      teamB.hasTakenMorto = true
       teamA.score = 100
       game.finish()
-      // 100 - (15+10+9) = 66
-      expect(teamA.score).toBe(66)
+      // 100 - (15+10+10) = 65
+      expect(teamA.score).toBe(65)
     })
 
     test('team that closed (a player emptied hand with morto taken + clean canastra) gets +100 bonus', () => {
@@ -542,12 +547,13 @@ describe('Game', () => {
       const teamA = game.state.teams.find(t => t.id === 'A')!
       const teamB = game.state.teams.find(t => t.id === 'B')!
       teamA.hasTakenMorto = true
+      teamB.hasTakenMorto = true
       teamA.melds = [cleanCanastra()]
       teamA.score = 100
       teamB.score = 50
       game.finish()
       expect(teamA.score).toBe(200) // 100 - 0 + 100
-      expect(teamB.score).toBe(41) // 50 - 9, no bonus
+      expect(teamB.score).toBe(40) // 50 - 10, no bonus
     })
 
     test('winnerTeam is set to the team with the higher adjusted score', () => {
@@ -557,6 +563,7 @@ describe('Game', () => {
       const teamA = game.state.teams.find(t => t.id === 'A')!
       const teamB = game.state.teams.find(t => t.id === 'B')!
       teamA.hasTakenMorto = true
+      teamB.hasTakenMorto = true
       teamA.melds = [cleanCanastra()]
       teamA.score = 100
       teamB.score = 50
@@ -570,6 +577,9 @@ describe('Game', () => {
       players[0].hand.addCard(new Card('hearts', 'A', false))
       const game = new Game(players)
       const teamA = game.state.teams.find(t => t.id === 'A')!
+      const teamB = game.state.teams.find(t => t.id === 'B')!
+      teamA.hasTakenMorto = true
+      teamB.hasTakenMorto = true
       teamA.score = 100
       game.finish()
       const scoreAfterFirst = teamA.score
@@ -584,11 +594,93 @@ describe('Game', () => {
       const game = new Game(players)
       const teamA = game.state.teams.find(t => t.id === 'A')!
       const teamB = game.state.teams.find(t => t.id === 'B')!
+      teamA.hasTakenMorto = true
+      teamB.hasTakenMorto = true
       teamA.score = 100
       teamB.score = 50
       game.finish()
       expect(teamA.score).toBe(85) // 100 - 15
-      expect(teamB.score).toBe(41) // 50 - 9
+      expect(teamB.score).toBe(40) // 50 - 10
+    })
+
+    describe('morto penalty (-100 for a team that never took a morto)', () => {
+      test('a team with hasTakenMorto === false loses an extra 100 points', () => {
+        const players = makeFourPlayers()
+        const game = new Game(players)
+        const teamA = game.state.teams.find(t => t.id === 'A')!
+        const teamB = game.state.teams.find(t => t.id === 'B')!
+        teamA.hasTakenMorto = true
+        teamB.hasTakenMorto = false
+        teamA.score = 100
+        teamB.score = 100
+        game.finish()
+        expect(teamA.score).toBe(100) // took the morto, no hand cards -> untouched
+        expect(teamB.score).toBe(0) // 100 - 100 (no morto), no hand cards
+      })
+
+      test('the penalty stacks with the remaining-hand penalty', () => {
+        const players = makeFourPlayers()
+        players[1].hand.addCard(new Card('clubs', '9', false)) // 10
+        const game = new Game(players)
+        const teamB = game.state.teams.find(t => t.id === 'B')!
+        teamB.hasTakenMorto = false
+        teamB.score = 200
+        game.finish()
+        expect(teamB.score).toBe(90) // 200 - 10 (hand) - 100 (no morto)
+      })
+
+      test('a team that took the morto is never charged the -100', () => {
+        const players = makeFourPlayers()
+        const game = new Game(players)
+        const teamA = game.state.teams.find(t => t.id === 'A')!
+        teamA.hasTakenMorto = true
+        teamA.score = 50
+        game.finish()
+        expect(teamA.score).toBe(50)
+      })
+    })
+  })
+
+  describe('batida direta (hand emptied by a meld, not a discard)', () => {
+    test('playCanasta that empties the hand auto-picks up the morto and does NOT end the turn', () => {
+      const players = makeFourPlayers()
+      const cards = [new Card('hearts', '5', false), new Card('hearts', '6', false), new Card('hearts', '7', false)]
+      players[0].hand.addCard(cards[0])
+      players[0].hand.addCard(cards[1])
+      players[0].hand.addCard(cards[2])
+      const game = new Game(players)
+      game.state.mortos = [Array.from({ length: 11 }, () => new Card('clubs', '4', false))]
+
+      expect(players[0].hand.isEmpty()).toBe(false)
+      const success = game.playCanasta(cards)
+      expect(success).toBe(true)
+
+      // Direct batida: hand emptied by the meld itself -> morto comes in
+      // immediately as the new hand, and the turn keeps going (no discard
+      // happened, so nothing advances currentPlayerIndex).
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      expect(teamA.hasTakenMorto).toBe(true)
+      expect(players[0].hand.getSize()).toBe(11)
+      expect(game.state.currentPlayerIndex).toBe(0)
+    })
+
+    test('extendMeld that empties the hand also auto-picks up the morto without ending the turn', () => {
+      const players = makeFourPlayers()
+      const game = new Game(players)
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      players[0].hand.addCard(new Card('hearts', '5', false))
+      players[0].hand.addCard(new Card('hearts', '6', false))
+      players[0].hand.addCard(new Card('hearts', '7', false))
+      game.playCanasta(players[0].hand.getCards())
+
+      game.state.mortos = [Array.from({ length: 11 }, () => new Card('clubs', '4', false))]
+      players[0].hand.addCard(new Card('hearts', '8', false))
+      const success = game.extendMeld(0, [new Card('hearts', '8', false)])
+
+      expect(success).toBe(true)
+      expect(teamA.hasTakenMorto).toBe(true)
+      expect(players[0].hand.getSize()).toBe(11)
+      expect(game.state.currentPlayerIndex).toBe(0)
     })
   })
 
