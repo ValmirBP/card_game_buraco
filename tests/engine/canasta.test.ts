@@ -19,7 +19,7 @@ describe('Canasta', () => {
     const canasta = new Canasta(cards)
     expect(canasta.isCanastra).toBe(false)
     expect(canasta.isClean).toBe(true)
-    expect(canasta.points).toBe(5 + 6 + 7) // no bonus below 7 cards
+    expect(canasta.points).toBe(5 + 5 + 5) // 3..7 = 5 each; no bonus below 7 cards
     expect(canasta.getScore()).toBe(canasta.points)
   })
 
@@ -28,8 +28,10 @@ describe('Canasta', () => {
     const canasta = new Canasta(cards)
     expect(canasta.isCanastra).toBe(true)
     expect(canasta.isClean).toBe(true)
-    const cardSum = 15 + 20 + 3 + 4 + 5 + 6 + 7
+    // A=15, natural 2=10 ("2 = 10, curinga ou natural, sempre 10"), 3..7=5 each
+    const cardSum = 15 + 10 + 5 + 5 + 5 + 5 + 5
     expect(canasta.points).toBe(cardSum + 200)
+    expect(canasta.kind).toBe('limpa')
   })
 
   test('[5,6,7,8,9,10,J] hearts -> clean canastra, +200 bonus', () => {
@@ -37,8 +39,9 @@ describe('Canasta', () => {
     const canasta = new Canasta(cards)
     expect(canasta.isCanastra).toBe(true)
     expect(canasta.isClean).toBe(true)
-    const cardSum = 5 + 6 + 7 + 8 + 9 + 10 + 10 // J=10
+    const cardSum = 5 + 5 + 5 + 10 + 10 + 10 + 10 // 5,6,7=5 each; 8,9,10,J=10 each
     expect(canasta.points).toBe(cardSum + 200)
+    expect(canasta.kind).toBe('limpa')
   })
 
   test('[5,6,2♠,8,9,10,J] hearts -> dirty canastra (2♠ wild fills the 7 gap), +100 bonus', () => {
@@ -46,8 +49,9 @@ describe('Canasta', () => {
     const canasta = new Canasta(cards)
     expect(canasta.isCanastra).toBe(true)
     expect(canasta.isClean).toBe(false)
-    const cardSum = 5 + 6 + 20 + 8 + 9 + 10 + 10
+    const cardSum = 5 + 5 + 10 + 10 + 10 + 10 + 10 // wild 2 = 10 (not a joker)
     expect(canasta.points).toBe(cardSum + 100)
+    expect(canasta.kind).toBe('suja')
   })
 
   test('[5,6,JOKER,8,9,10,J] hearts -> dirty canastra, +100 bonus', () => {
@@ -55,8 +59,9 @@ describe('Canasta', () => {
     const canasta = new Canasta(cards)
     expect(canasta.isCanastra).toBe(true)
     expect(canasta.isClean).toBe(false)
-    const cardSum = 5 + 6 + 20 + 8 + 9 + 10 + 10
+    const cardSum = 5 + 5 + 20 + 10 + 10 + 10 + 10 // joker = 20
     expect(canasta.points).toBe(cardSum + 100)
+    expect(canasta.kind).toBe('suja')
   })
 
   test('[A♠,A♥,A♦] -> ace trio meld, not a canastra (<7 cards)', () => {
@@ -97,6 +102,41 @@ describe('Canasta', () => {
     const cards = [real('Q'), real('K'), real('A')]
     const canasta = new Canasta(cards)
     expect(canasta.type).toBe('sequence')
+  })
+
+  describe('special canastras: quinhentos (+500) and real (+1000)', () => {
+    test('13-card clean run 2..A (ace-high end) -> kind "quinhentos", +500 bonus', () => {
+      const ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'] as const
+      const cards = ranks.map(r => real(r))
+      const canasta = new Canasta(cards)
+      expect(canasta.cards).toHaveLength(13)
+      expect(canasta.isClean).toBe(true)
+      expect(canasta.kind).toBe('quinhentos')
+      // 2=10, 3-7=5 each (25), 8/9/10/J/Q/K=10 each (60), A=15
+      const cardSum = 10 + 25 + 60 + 15
+      expect(canasta.points).toBe(cardSum + 500)
+    })
+
+    test('14-card clean run A..K..A (ace at both ends) -> kind "real", +1000 bonus', () => {
+      const middle = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'] as const
+      const cards = [real('A'), ...middle.map(r => real(r)), real('A')]
+      const canasta = new Canasta(cards)
+      expect(canasta.cards).toHaveLength(14)
+      expect(canasta.isClean).toBe(true)
+      expect(canasta.kind).toBe('real')
+      // 2 aces = 30, 2=10, 3-7=25, 8/9/10/J/Q/K=60
+      const cardSum = 30 + 10 + 25 + 60
+      expect(canasta.points).toBe(cardSum + 1000)
+    })
+
+    test('a dirty double-ace canastra never qualifies as quinhentos/real -> falls back to "suja"', () => {
+      const middle = ['2', '3', '4', '5', '6', '8', '9', '10', 'J', 'Q', 'K'] as const // missing 7
+      const cards = [real('A'), ...middle.map(r => real(r)), real('A'), joker()]
+      const canasta = new Canasta(cards)
+      expect(canasta.cards).toHaveLength(14)
+      expect(canasta.isClean).toBe(false)
+      expect(canasta.kind).toBe('suja')
+    })
   })
 
   describe('withExtraCards', () => {

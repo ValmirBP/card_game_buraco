@@ -1,5 +1,13 @@
 import { Card } from './card'
-import { analyzeMeld, canExtendMeld, canastaPoints, scoreCard, MeldLayoutEntry } from './utils'
+import {
+  analyzeMeld,
+  canExtendMeld,
+  canastaPoints,
+  computeCanastaKind,
+  scoreCardValue,
+  CanastaKind,
+  MeldLayoutEntry,
+} from './utils'
 
 export type CanastaType = 'sequence' | 'aces'
 
@@ -25,6 +33,13 @@ export class Canasta {
   readonly layout: MeldLayoutEntry[]
   /** Whether this meld (or any earlier version it was extended from) has ever been dirty - see CanastaOptions.wasDirty. */
   readonly wasDirty: boolean
+  /**
+   * Canastra kind for UI/bonus purposes: 'simples' (below 7 cards, no
+   * bonus), 'limpa' (7+ clean), 'suja' (7+ dirty), 'quinhentos' (13-card
+   * clean 2-to-Ace run, +500) or 'real' (14-card clean Ace-to-Ace run,
+   * +1000). See computeCanastaKind in utils.ts.
+   */
+  readonly kind: CanastaKind
 
   constructor(cards: Card[], options: CanastaOptions = {}) {
     const analysis = analyzeMeld(cards)
@@ -42,15 +57,16 @@ export class Canasta {
     this.wasDirty = forcedDirty || !analysis.isClean
 
     this.isCanastra = this.cards.length >= 7
+    this.kind = computeCanastaKind(this.cards.length, this.isClean, this.layout)
 
-    const cardSum = this.cards.reduce((sum, c) => sum + scoreCard(c.rank), 0)
-    const bonus = canastaPoints(this.isClean, this.cards.length)
+    const cardSum = this.cards.reduce((sum, c) => sum + scoreCardValue(c), 0)
+    const bonus = canastaPoints(this.kind, this.cards.length)
     this.points = cardSum + bonus
   }
 
   getScore(): number {
-    // points já inclui o valor das cartas + bônus de canastra (200/100 a
-    // partir de 7 cartas; 0 abaixo disso).
+    // points já inclui o valor das cartas + bônus de canastra a partir de 7
+    // cartas (0 abaixo disso): 200 limpa, 100 suja, 500 quinhentos, 1000 real.
     return this.points
   }
 
