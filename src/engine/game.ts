@@ -20,9 +20,10 @@ export class Game {
 
   /**
    * Deals 11 cards to each of the 4 players, reserves 2 mortos of 11 cards
-   * each, flips 1 card to the discard pile, and leaves the rest as the baço.
-   * Count check: 4*11 (hands) + 2*11 (mortos) + 1 (discard) = 67 cards used
-   * immediately out of 108, leaving 41 in the deck.
+   * each, and leaves the rest as the baço. The discard pile starts EMPTY -
+   * no card is flipped at setup, so on the first turn the current player can
+   * only draw from the deck. Count check: 4*11 (hands) + 2*11 (mortos) = 66
+   * cards used immediately out of 108, leaving 42 in the deck.
    */
   setup(): void {
     this.state.deck = createDeck()
@@ -43,11 +44,7 @@ export class Game {
       this.state.mortos.push(morto)
     }
 
-    const topCard = this.state.deck.pop()
-    if (topCard) {
-      this.state.discardPile.push(topCard)
-    }
-
+    this.state.discardPile = []
     this.state.status = 'playing'
   }
 
@@ -213,10 +210,12 @@ export class Game {
   }
 
   /**
-   * A team may only close (bater) the round once it has taken its morto.
+   * A team may only close (bater) the round once it has taken its morto AND
+   * has at least one clean canastra (7+ cards, no curinga at all - a
+   * natural 2 in its own position doesn't count against this).
    */
   canClose(team: Team): boolean {
-    return team.hasTakenMorto
+    return team.hasTakenMorto && team.melds.some(m => m.isCanastra && m.isClean)
   }
 
   endTurn(): void {
@@ -245,8 +244,8 @@ export class Game {
 
   /**
    * A round is over once status is 'playing' AND either:
-   *  - a team has "batido" (a player's hand is empty AND their team has
-   *    already taken the morto), or
+   *  - a team has "batido" (a player's hand is empty AND their team
+   *    canClose - has taken the morto and has a clean 7+ card canastra), or
    *  - the deck (baço) is empty.
    */
   isGameOver(): boolean {
@@ -255,7 +254,7 @@ export class Game {
     const deckEmpty = this.state.deck.length === 0
     const someoneClosed = this.state.players.some((p, seat) => {
       if (!p.hand.isEmpty()) return false
-      return teamOfSeat(this.state, seat).hasTakenMorto
+      return this.canClose(teamOfSeat(this.state, seat))
     })
 
     return someoneClosed || deckEmpty
@@ -275,7 +274,7 @@ export class Game {
 
     let closerTeamId: TeamId | null = null
     this.state.players.forEach((p, seat) => {
-      if (p.hand.isEmpty() && teamOfSeat(this.state, seat).hasTakenMorto) {
+      if (p.hand.isEmpty() && this.canClose(teamOfSeat(this.state, seat))) {
         closerTeamId = teamOfSeat(this.state, seat).id
       }
     })

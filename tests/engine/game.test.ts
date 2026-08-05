@@ -3,6 +3,19 @@ import { HumanPlayer } from '../../src/engine/player'
 import { AIPlayer } from '../../src/engine/ai'
 import { Card } from '../../src/engine/card'
 import { Player } from '../../src/engine/player'
+import { Canasta } from '../../src/engine/canasta'
+
+function cleanCanastra(suit: 'hearts' | 'diamonds' | 'clubs' | 'spades' = 'hearts'): Canasta {
+  return new Canasta([
+    new Card(suit, '5', false),
+    new Card(suit, '6', false),
+    new Card(suit, '7', false),
+    new Card(suit, '8', false),
+    new Card(suit, '9', false),
+    new Card(suit, '10', false),
+    new Card(suit, 'J', false),
+  ])
+}
 
 function makeFourPlayers(): Player[] {
   return [
@@ -55,16 +68,16 @@ describe('Game', () => {
       expect(game.state.mortos[1].length).toBe(11)
     })
 
-    test('flips 1 card to the discard pile', () => {
+    test('discard pile starts empty - no card is flipped at setup', () => {
       const game = new Game(makeFourPlayers())
       game.setup()
-      expect(game.state.discardPile.length).toBe(1)
+      expect(game.state.discardPile.length).toBe(0)
     })
 
-    test('remaining deck (baço) has 41 cards: 108 - 44 - 22 - 1', () => {
+    test('remaining deck (baço) has 42 cards: 108 - 44 - 22', () => {
       const game = new Game(makeFourPlayers())
       game.setup()
-      expect(game.state.deck.length).toBe(41)
+      expect(game.state.deck.length).toBe(42)
     })
   })
 
@@ -329,10 +342,46 @@ describe('Game', () => {
       expect(game.canClose(teamA)).toBe(false)
     })
 
-    test('team can close after taking a morto', () => {
+    test('team cannot close with morto taken but no clean canastra', () => {
       const game = new Game(makeFourPlayers())
       const teamA = game.state.teams.find(t => t.id === 'A')!
       teamA.hasTakenMorto = true
+      expect(game.canClose(teamA)).toBe(false)
+    })
+
+    test('team cannot close with a dirty canastra (has a curinga)', () => {
+      const game = new Game(makeFourPlayers())
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      teamA.hasTakenMorto = true
+      teamA.melds = [
+        new Canasta([
+          new Card('hearts', '5', false),
+          new Card('hearts', '6', false),
+          new Card('spades', '2', false), // wild, different suit
+          new Card('hearts', '8', false),
+          new Card('hearts', '9', false),
+          new Card('hearts', '10', false),
+          new Card('hearts', 'J', false),
+        ]),
+      ]
+      expect(game.canClose(teamA)).toBe(false)
+    })
+
+    test('team can close after taking a morto AND having a clean 7+ card canastra', () => {
+      const game = new Game(makeFourPlayers())
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      teamA.hasTakenMorto = true
+      teamA.melds = [
+        new Canasta([
+          new Card('hearts', '5', false),
+          new Card('hearts', '6', false),
+          new Card('hearts', '7', false),
+          new Card('hearts', '8', false),
+          new Card('hearts', '9', false),
+          new Card('hearts', '10', false),
+          new Card('hearts', 'J', false),
+        ]),
+      ]
       expect(game.canClose(teamA)).toBe(true)
     })
   })
@@ -358,12 +407,25 @@ describe('Game', () => {
       expect(game.isGameOver()).toBe(true)
     })
 
-    test('returns true when a player hand is empty and their team has taken the morto (batida)', () => {
+    test('returns false when a player hand is empty and team took the morto but has no clean canastra', () => {
       const players = makeFourPlayers()
       const game = new Game(players)
       game.setup()
       const teamA = game.state.teams.find(t => t.id === 'A')!
       teamA.hasTakenMorto = true
+      while (!players[0].hand.isEmpty()) {
+        players[0].hand.removeCard(0)
+      }
+      expect(game.isGameOver()).toBe(false)
+    })
+
+    test('returns true when a player hand is empty, their team has taken the morto, and has a clean canastra (batida)', () => {
+      const players = makeFourPlayers()
+      const game = new Game(players)
+      game.setup()
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      teamA.hasTakenMorto = true
+      teamA.melds = [cleanCanastra()]
       while (!players[0].hand.isEmpty()) {
         players[0].hand.removeCard(0)
       }
@@ -395,14 +457,15 @@ describe('Game', () => {
       expect(teamA.score).toBe(66)
     })
 
-    test('team that closed (a player emptied hand with morto taken) gets +100 bonus', () => {
+    test('team that closed (a player emptied hand with morto taken + clean canastra) gets +100 bonus', () => {
       const players = makeFourPlayers()
-      // seat 0 hand empty, team A has taken morto -> team A closed
+      // seat 0 hand empty, team A has taken morto and has a clean canastra -> team A closed
       players[1].hand.addCard(new Card('clubs', '9', false))
       const game = new Game(players)
       const teamA = game.state.teams.find(t => t.id === 'A')!
       const teamB = game.state.teams.find(t => t.id === 'B')!
       teamA.hasTakenMorto = true
+      teamA.melds = [cleanCanastra()]
       teamA.score = 100
       teamB.score = 50
       game.finish()
@@ -417,6 +480,7 @@ describe('Game', () => {
       const teamA = game.state.teams.find(t => t.id === 'A')!
       const teamB = game.state.teams.find(t => t.id === 'B')!
       teamA.hasTakenMorto = true
+      teamA.melds = [cleanCanastra()]
       teamA.score = 100
       teamB.score = 50
       game.finish()

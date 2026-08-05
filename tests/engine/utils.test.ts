@@ -1,13 +1,40 @@
 import { Card, Rank, Suit } from '../../src/engine/card'
-import { isValidCanasta, canExtendMeld } from '../../src/engine/utils'
+import { isValidCanasta, canExtendMeld, isWildInMeld } from '../../src/engine/utils'
 
 function real(rank: Rank, suit: Suit = 'hearts') {
   return new Card(suit, rank, false)
 }
 
-function wild() {
+function joker() {
   return new Card('hearts', '2', true)
 }
+
+function two(suit: Suit) {
+  return new Card(suit, '2', false)
+}
+
+describe('isWildInMeld', () => {
+  test('a joker is always wild', () => {
+    expect(isWildInMeld(joker(), 'hearts', 2)).toBe(true)
+    expect(isWildInMeld(joker(), 'hearts', 5)).toBe(true)
+  })
+
+  test('a non-2 real card is never wild', () => {
+    expect(isWildInMeld(real('5'), 'hearts', 5)).toBe(false)
+  })
+
+  test('a 2 of the meld suit at position 2 is natural (not wild)', () => {
+    expect(isWildInMeld(two('hearts'), 'hearts', 2)).toBe(false)
+  })
+
+  test('a 2 of the meld suit NOT at position 2 is wild', () => {
+    expect(isWildInMeld(two('hearts'), 'hearts', 5)).toBe(true)
+  })
+
+  test('a 2 of a different suit is always wild, even at position 2', () => {
+    expect(isWildInMeld(two('spades'), 'hearts', 2)).toBe(true)
+  })
+})
 
 describe('isValidCanasta', () => {
   test('[5,6,7] same suit -> true (clean sequence)', () => {
@@ -15,18 +42,18 @@ describe('isValidCanasta', () => {
     expect(isValidCanasta(cards)).toBe(true)
   })
 
-  test('[5,7,W] -> true (wild fills the 6 gap)', () => {
-    const cards = [real('5'), real('7'), wild()]
+  test('[5,7,JOKER] -> true (joker fills the 6 gap)', () => {
+    const cards = [real('5'), real('7'), joker()]
     expect(isValidCanasta(cards)).toBe(true)
   })
 
-  test('[5,6,W] -> true (wild extends to 4 or 7)', () => {
-    const cards = [real('5'), real('6'), wild()]
+  test('[5,6,JOKER] -> true (joker extends to 4 or 7)', () => {
+    const cards = [real('5'), real('6'), joker()]
     expect(isValidCanasta(cards)).toBe(true)
   })
 
-  test('[5,6,7,9,W] -> true (wild fills the 8 gap)', () => {
-    const cards = [real('5'), real('6'), real('7'), real('9'), wild()]
+  test('[5,6,7,9,JOKER] -> true (joker fills the 8 gap)', () => {
+    const cards = [real('5'), real('6'), real('7'), real('9'), joker()]
     expect(isValidCanasta(cards)).toBe(true)
   })
 
@@ -35,13 +62,13 @@ describe('isValidCanasta', () => {
     expect(isValidCanasta(cards)).toBe(false)
   })
 
-  test('[5,W,W] -> false (only 1 real card + 2 wilds is invalid)', () => {
-    const cards = [real('5'), wild(), wild()]
+  test('[5,JOKER,JOKER] -> false (only 1 real card + 2 wilds is invalid)', () => {
+    const cards = [real('5'), joker(), joker()]
     expect(isValidCanasta(cards)).toBe(false)
   })
 
-  test('[5,8,W] -> false (gap of 2, only 1 wild available)', () => {
-    const cards = [real('5'), real('8'), wild()]
+  test('[5,8,JOKER] -> false (gap of 2, only 1 wild available)', () => {
+    const cards = [real('5'), real('8'), joker()]
     expect(isValidCanasta(cards)).toBe(false)
   })
 
@@ -55,8 +82,8 @@ describe('isValidCanasta', () => {
     expect(isValidCanasta(cards)).toBe(false)
   })
 
-  test('more than 1 wild card is always invalid, regardless of real card count', () => {
-    const cards = [real('5'), real('6'), real('7'), wild(), wild()]
+  test('more than 1 joker is always invalid', () => {
+    const cards = [real('5'), real('6'), real('7'), joker(), joker()]
     expect(isValidCanasta(cards)).toBe(false)
   })
 
@@ -66,8 +93,9 @@ describe('isValidCanasta', () => {
       expect(isValidCanasta(cards)).toBe(true)
     })
 
-    test('[A,2,3] same suit -> true (ace low)', () => {
-      const cards = [real('A'), real('2'), real('3')]
+    test('[A,3,4] same suit -> true (ace low, no 2 involved)', () => {
+      const cards = [real('A'), real('3'), real('4'), joker()]
+      // needs the joker to fill the "2" gap since no natural 2 present
       expect(isValidCanasta(cards)).toBe(true)
     })
 
@@ -81,14 +109,8 @@ describe('isValidCanasta', () => {
       expect(isValidCanasta(cards)).toBe(false)
     })
 
-    test('[J,Q,K,W] -> true (ace-high branch not required, wild fills nothing needed but still valid seq)', () => {
-      const cards = [real('J'), real('Q'), real('K'), wild()]
-      expect(isValidCanasta(cards)).toBe(true)
-    })
-
-    test('[K,A,W] -> true (wild extends ace-high sequence, e.g. J/Q gap filled from other side not needed; K-A adjacent with wild extending)', () => {
-      // K,A adjacent (ace high) with an extra wild simply extending validity
-      const cards = [real('K'), real('A'), wild()]
+    test('[J,Q,K,JOKER] -> true (extra wild not required but still valid)', () => {
+      const cards = [real('J'), real('Q'), real('K'), joker()]
       expect(isValidCanasta(cards)).toBe(true)
     })
   })
@@ -99,8 +121,8 @@ describe('isValidCanasta', () => {
       expect(isValidCanasta(cards)).toBe(true)
     })
 
-    test('[A♥,A♦,W] -> true (2 aces + 1 wild)', () => {
-      const cards = [real('A', 'hearts'), real('A', 'diamonds'), wild()]
+    test('[A♥,A♦,JOKER] -> true (2 aces + 1 joker)', () => {
+      const cards = [real('A', 'hearts'), real('A', 'diamonds'), joker()]
       expect(isValidCanasta(cards)).toBe(true)
     })
 
@@ -114,14 +136,46 @@ describe('isValidCanasta', () => {
       expect(isValidCanasta(cards)).toBe(true)
     })
 
-    test('[A♥,A♦,W,W] -> false (more than 1 wild never allowed)', () => {
-      const cards = [real('A', 'hearts'), real('A', 'diamonds'), wild(), wild()]
+    test('[A♥,A♦,JOKER,JOKER] -> false (more than 1 wild never allowed)', () => {
+      const cards = [real('A', 'hearts'), real('A', 'diamonds'), joker(), joker()]
       expect(isValidCanasta(cards)).toBe(false)
     })
 
     test('[K♥,K♦,K♣] -> false (trio exception only applies to aces)', () => {
       const cards = [real('K', 'hearts'), real('K', 'diamonds'), real('K', 'clubs')]
       expect(isValidCanasta(cards)).toBe(false)
+    })
+  })
+
+  describe('2 as wild (curinga)', () => {
+    test('[A♥,2♥,3♥] -> true, natural 2 (own suit, position 2)', () => {
+      const cards = [real('A'), two('hearts'), real('3')]
+      expect(isValidCanasta(cards)).toBe(true)
+    })
+
+    test('[5♥,6♥,2♠] -> true, 2♠ is wild (different suit) filling the 7 gap', () => {
+      const cards = [real('5'), real('6'), two('spades')]
+      expect(isValidCanasta(cards)).toBe(true)
+    })
+
+    test('[K♥,A♥,2♥] "dar a volta" -> false, same-suit 2 out of natural position cannot act as wild', () => {
+      const cards = [real('K'), real('A'), two('hearts')]
+      expect(isValidCanasta(cards)).toBe(false)
+    })
+
+    test('[5♥,2♠,JOKER,8♥,9♥,10♥,J♥] -> false, two wilds (2♠ + joker) in the same meld', () => {
+      const cards = [real('5'), two('spades'), joker(), real('8'), real('9'), real('10'), real('J')]
+      expect(isValidCanasta(cards)).toBe(false)
+    })
+
+    test('two same-suit 2s in one meld -> false (only 1 can be natural, extra cannot be wild)', () => {
+      const cards = [real('A'), two('hearts'), two('hearts'), real('3'), real('4')]
+      expect(isValidCanasta(cards)).toBe(false)
+    })
+
+    test('ace trio with a 2 as wild support: [A,A,2any] -> true', () => {
+      const cards = [real('A', 'hearts'), real('A', 'diamonds'), two('clubs')]
+      expect(isValidCanasta(cards)).toBe(true)
     })
   })
 })
@@ -133,7 +187,7 @@ describe('canExtendMeld', () => {
   })
 
   test('extends ace-low sequence at the top with more cards', () => {
-    const existing = [real('A'), real('2'), real('3')]
+    const existing = [real('A'), two('hearts'), real('3')]
     expect(canExtendMeld(existing, [real('4')])).toBe(true)
   })
 
@@ -148,8 +202,8 @@ describe('canExtendMeld', () => {
   })
 
   test('rejects extension that would add a 2nd wild when meld already has one', () => {
-    const existing = [real('5'), real('7'), wild()]
-    expect(canExtendMeld(existing, [wild()])).toBe(false)
+    const existing = [real('5'), real('7'), joker()]
+    expect(canExtendMeld(existing, [joker()])).toBe(false)
   })
 
   test('extends ace trio with another ace', () => {
@@ -160,5 +214,10 @@ describe('canExtendMeld', () => {
   test('rejects non-consecutive extension', () => {
     const existing = [real('5'), real('6'), real('7')]
     expect(canExtendMeld(existing, [real('9')])).toBe(false)
+  })
+
+  test('extending a dirty meld with a normal card keeps it dirty (wild card never removed)', () => {
+    const existing = [real('5'), real('6'), two('spades'), real('8'), real('9'), real('10'), real('J')]
+    expect(canExtendMeld(existing, [real('4')])).toBe(true)
   })
 })
