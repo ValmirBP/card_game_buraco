@@ -299,16 +299,34 @@ export default function GameBoard({ phase }: GameBoardProps) {
                         >
                           {/* Usa canasta.layout (ordem canônica): o curinga
                               aparece na posição da carta que ele representa
-                              e "desliza" quando a carta real chega. */}
-                          <div className="flex -space-x-9 sm:-space-x-10">
-                            {(canasta.layout ?? canasta.cards.map(card => ({ card }))).map(
-                              (slot, cii) => (
-                                <div key={cii} style={{ zIndex: cii }}>
-                                  <CardComponent card={slot.card} />
-                                </div>
-                              )
-                            )}
-                          </div>
+                              e "desliza" quando a carta real chega. Numa
+                              canastra FECHADA (7+ cartas) a carta de maior
+                              valor (última do layout) fica DEITADA (girada
+                              90°), como numa mesa de verdade, sinalizando que
+                              o jogo virou canastra. */}
+                          {(() => {
+                            const slots = canasta.layout ?? canasta.cards.map(card => ({ card }))
+                            const isClosed =
+                              (canasta as { isCanastra?: boolean }).isCanastra ??
+                              canasta.cards.length >= 7
+                            const lastIdx = slots.length - 1
+                            return (
+                              <div className="flex items-center -space-x-9 sm:-space-x-10">
+                                {slots.map((slot, cii) => {
+                                  const deitada = isClosed && cii === lastIdx
+                                  return (
+                                    <div
+                                      key={cii}
+                                      style={{ zIndex: cii }}
+                                      className={deitada ? 'ml-6 rotate-90 sm:ml-7' : ''}
+                                    >
+                                      <CardComponent card={slot.card} />
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            )
+                          })()}
                           <div
                             className={`text-center text-xs font-semibold ${
                               canasta.kind === 'real'
