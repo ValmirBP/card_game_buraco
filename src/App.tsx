@@ -64,8 +64,10 @@ export default function App() {
     setScreen('menu')
   }
 
+  const fitScreen = screen === 'gameplay' || screen === 'onlineGameplay'
+
   return (
-    <Layout>
+    <Layout fit={fitScreen}>
       {screen === 'menu' && (
         <Menu onStart={handleStart} onPlayOnline={() => setScreen('onlineLobby')} />
       )}

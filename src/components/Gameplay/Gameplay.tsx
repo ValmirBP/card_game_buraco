@@ -134,39 +134,46 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
     // Stays in 'play' phase: the human may play more canastas or discard.
   }
 
-  // Compact: keep only the last ~6 entries (log grows unbounded, panel scrolls).
-  const recentLog = gameLog.slice(-6)
+  // Registro compacto: só a última ação (uma linha), pra não gastar altura.
+  const lastLog = gameLog[gameLog.length - 1]
 
   return (
-    <div className="flex flex-col gap-4 pb-32">
-      <Scoreboard />
-      {/* Column order: mesa -> sua mão -> registro. */}
-      <GameBoard phase={phase} />
-      <DrawAnimation anim={drawAnim} />
-      <PlayerHand phase={phase} />
-      <div className="space-y-2 rounded-2xl border border-white/10 bg-black/20 p-4 shadow-lg backdrop-blur-sm">
-        <h3 className="font-display text-base text-card-gold">Registro</h3>
-        <div className="max-h-40 space-y-1.5 overflow-y-auto text-xs text-gray-300 sm:text-sm">
-          {recentLog.length === 0 ? (
-            <p className="text-gray-500">Nenhuma ação ainda.</p>
-          ) : (
-            recentLog.map((entry, i) => (
-              <div key={i} className="border-b border-white/5 pb-1.5 last:border-0 last:pb-0">
-                {entry}
-              </div>
-            ))
-          )}
-        </div>
+    <div className="flex h-full min-h-0 flex-col gap-2">
+      {/* Placar (topo, altura automática) */}
+      <div className="shrink-0">
+        <Scoreboard />
       </div>
-      <ActionPanel
-        phase={phase}
-        canTakeDiscard={canTakeDiscard}
-        showTopCardReminder={showTopCardReminder}
-        onDraw={handleDraw}
-        onTakeDiscard={handleTakeDiscard}
-        onDiscard={handleDiscard}
-        onPlayCanasta={handlePlayCanasta}
-      />
+
+      {/* Mesa — ocupa o espaço flexível do meio; rola internamente só se
+          precisar, sem rolar a página. */}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <GameBoard phase={phase} />
+      </div>
+      <DrawAnimation anim={drawAnim} />
+
+      {/* Registro em uma linha só */}
+      <div className="shrink-0 truncate rounded-lg border border-white/10 bg-black/25 px-3 py-1.5 text-center text-xs text-gray-300">
+        <span className="text-card-gold">Registro:</span>{' '}
+        {lastLog ?? 'Nenhuma ação ainda.'}
+      </div>
+
+      {/* Mão (fixa, embaixo) */}
+      <div className="shrink-0">
+        <PlayerHand phase={phase} />
+      </div>
+
+      {/* Ações (fixas, rodapé) */}
+      <div className="shrink-0">
+        <ActionPanel
+          phase={phase}
+          canTakeDiscard={canTakeDiscard}
+          showTopCardReminder={showTopCardReminder}
+          onDraw={handleDraw}
+          onTakeDiscard={handleTakeDiscard}
+          onDiscard={handleDiscard}
+          onPlayCanasta={handlePlayCanasta}
+        />
+      </div>
     </div>
   )
 }

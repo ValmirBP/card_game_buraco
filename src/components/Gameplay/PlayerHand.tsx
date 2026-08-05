@@ -50,10 +50,12 @@ export default function PlayerHand({ phase }: PlayerHandProps) {
       : 'Selecione 1 carta para descartar ou 3+ para formar uma canasta.'
 
   return (
-    <div className="space-y-2 rounded-2xl border border-white/10 bg-black/25 p-4 shadow-lg backdrop-blur-sm">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h3 className="font-display text-lg text-card-gold">Sua Mão</h3>
-        {hint && <span className="text-xs text-gray-300 sm:text-sm">{hint}</span>}
+    <div className="space-y-1 rounded-xl border border-white/10 bg-black/25 px-3 py-1.5 shadow-lg backdrop-blur-sm">
+      <div className="flex flex-nowrap items-baseline justify-between gap-x-3">
+        <h3 className="shrink-0 font-display text-sm text-card-gold">
+          Sua Mão <span className="text-[10px] font-normal text-gray-400">({hand.length})</span>
+        </h3>
+        {hint && <span className="truncate text-[10px] text-gray-300 sm:text-xs">{hint}</span>}
       </div>
       {/* Seleção NÃO eleva o z-index — a carta selecionada sobe
           verticalmente mas mantém o empilhamento natural do leque, sem
@@ -61,7 +63,7 @@ export default function PlayerHand({ phase }: PlayerHandProps) {
           carta pra frente, temporariamente, pra leitura. */}
       <div
         id="player-hand-anchor"
-        className="scrollbar-gold flex -space-x-8 overflow-x-auto px-1 pb-6 pt-4 sm:-space-x-10"
+        className="scrollbar-gold flex -space-x-8 overflow-x-auto px-1 pb-3 pt-3 sm:-space-x-10"
       >
         {orderedHand(hand).map(({ card, index }, position) => (
           <div
@@ -76,9 +78,6 @@ export default function PlayerHand({ phase }: PlayerHandProps) {
             />
           </div>
         ))}
-      </div>
-      <div className="text-sm text-gray-300">
-        Cartas: {hand.length} · Selecionadas: {selectedCardIndices.length}
       </div>
     </div>
   )

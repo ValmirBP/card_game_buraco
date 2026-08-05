@@ -58,69 +58,55 @@ export default function ActionPanel({
         : 'Baixe/estenda jogos ou descarte 1 carta.'
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-30 border-t border-card-gold/40 bg-card-green-dark/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-4px_20px_rgba(0,0,0,0.4)] backdrop-blur-md">
-      {hint && <p className="mx-auto mb-2 max-w-7xl text-center text-xs text-gray-300">{hint}</p>}
-      {canTake && showTopCardReminder && (
-        <p className="mx-auto mb-2 max-w-7xl text-center text-xs text-card-gold-light">
-          Lembre-se: você deve usar a carta do topo do descarte.
-        </p>
-      )}
-      <div className="mx-auto flex max-w-7xl flex-wrap gap-2 sm:gap-3">
+    <div className="z-30 rounded-xl border border-card-gold/40 bg-card-green-dark/95 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-4px_20px_rgba(0,0,0,0.4)] backdrop-blur-md">
+      {hint && <p className="mx-auto mb-1 max-w-7xl truncate text-center text-[11px] text-gray-300">{hint}</p>}
+      <div className="mx-auto grid max-w-7xl grid-cols-4 gap-1.5">
         <motion.button
           type="button"
-          whileHover={canDraw ? { scale: 1.03 } : undefined}
-          whileTap={canDraw ? { scale: 0.97 } : undefined}
+          whileTap={canDraw ? { scale: 0.96 } : undefined}
           onClick={onDraw}
           disabled={!canDraw}
-          className={`min-h-[44px] flex-1 rounded-xl px-3 py-3 font-bold transition-colors ${
+          className={`flex min-h-[44px] flex-col items-center justify-center rounded-lg px-1 py-1.5 text-xs font-bold leading-tight transition-colors ${
             canDraw ? enabledClasses : disabledClasses
           }`}
         >
-          🂠 Comprar
+          <span className="text-base">🂠</span>Comprar
         </motion.button>
         <motion.button
           type="button"
-          whileHover={canTake ? { scale: 1.03 } : undefined}
-          whileTap={canTake ? { scale: 0.97 } : undefined}
+          whileTap={canTake ? { scale: 0.96 } : undefined}
           onClick={onTakeDiscard}
           disabled={!canTake}
           title={canTake && showTopCardReminder ? 'Lembre-se: você deve usar a carta do topo do descarte' : undefined}
-          className={`min-h-[44px] flex-1 rounded-xl px-3 py-3 font-bold transition-colors ${
+          className={`flex min-h-[44px] flex-col items-center justify-center rounded-lg px-1 py-1.5 text-xs font-bold leading-tight transition-colors ${
             canTake ? enabledClasses : disabledClasses
           }`}
         >
-          🗃️ Pegar Descarte
+          <span className="text-base">🗃️</span>Descarte
         </motion.button>
         <motion.button
           type="button"
-          whileHover={canPlayCanasta ? { scale: 1.03 } : undefined}
-          whileTap={canPlayCanasta ? { scale: 0.97 } : undefined}
+          whileTap={canPlayCanasta ? { scale: 0.96 } : undefined}
           onClick={onPlayCanasta}
           disabled={!canPlayCanasta}
-          className={`min-h-[44px] flex-1 rounded-xl px-3 py-3 font-bold transition-colors ${
+          className={`flex min-h-[44px] flex-col items-center justify-center rounded-lg px-1 py-1.5 text-xs font-bold leading-tight transition-colors ${
             canPlayCanasta ? enabledClasses : disabledClasses
           }`}
         >
-          🃏 Jogar Canasta
+          <span className="text-base">🃏</span>Canasta
         </motion.button>
         <motion.button
           type="button"
-          whileHover={canDiscard ? { scale: 1.03 } : undefined}
-          whileTap={canDiscard ? { scale: 0.97 } : undefined}
+          whileTap={canDiscard ? { scale: 0.96 } : undefined}
           onClick={onDiscard}
           disabled={!canDiscard}
-          className={`min-h-[44px] flex-1 rounded-xl px-3 py-3 font-bold transition-colors ${
+          className={`flex min-h-[44px] flex-col items-center justify-center rounded-lg px-1 py-1.5 text-xs font-bold leading-tight transition-colors ${
             canDiscard ? enabledClasses : disabledClasses
           }`}
         >
-          🗑️ Descartar
+          <span className="text-base">🗑️</span>Descartar
         </motion.button>
       </div>
-      {!isHumanTurn && game.state.status === 'playing' && (
-        <p className="mx-auto mt-2 max-w-7xl text-center text-xs text-gray-300">
-          Aguardando os outros jogadores...
-        </p>
-      )}
     </div>
   )
 }
