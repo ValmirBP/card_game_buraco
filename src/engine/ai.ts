@@ -2,7 +2,8 @@ import { Player, PlayerMove } from './player'
 import { Card, Suit } from './card'
 import { Hand } from './hand'
 import { Canasta } from './canasta'
-import { isValidCanasta, rankToNumber } from './utils'
+import { Team } from './gameState'
+import { isValidCanasta, canExtendMeld, rankToNumber } from './utils'
 
 export type AIDifficulty = 'easy' | 'medium' | 'hard'
 
@@ -11,7 +12,7 @@ export interface GameStateForAI {
   players: Player[]
   deck: Card[]
   discardPile: Card[]
-  melds: Map<string, Canasta[]>
+  teams: Team[]
 }
 
 const SAFE_RANKS = ['2', '3', '4', '5']
@@ -53,7 +54,8 @@ export class AIPlayer implements Player {
   }
 
   private decideMedium(gameState: GameStateForAI): PlayerMove {
-    // Prefere jogar canastas, evita descartar cartas perigosas
+    // Prefere jogar canastas, depois estender jogos do time, depois evita
+    // descartar cartas perigosas.
     const moves = this.getValidMoves(gameState)
 
     // Prioridade 1: jogar canastas
@@ -62,7 +64,13 @@ export class AIPlayer implements Player {
       return canastaMoves[Math.floor(Math.random() * canastaMoves.length)]
     }
 
-    // Prioridade 2: descartar carta "segura" (rank baixo)
+    // Prioridade 2: estender jogo existente do time
+    const extendMoves = moves.filter(m => m.type === 'extend_meld')
+    if (extendMoves.length > 0) {
+      return extendMoves[Math.floor(Math.random() * extendMoves.length)]
+    }
+
+    // Prioridade 3: descartar carta "segura" (rank baixo)
     const discardMoves = moves.filter(m => m.type === 'discard')
     if (discardMoves.length > 0) {
       const safeMove = discardMoves.find(m => {
@@ -78,8 +86,8 @@ export class AIPlayer implements Player {
   }
 
   private decideHard(gameState: GameStateForAI): PlayerMove {
-    // Rastreia cartas descartadas (memoria) e prioriza canastas de forma
-    // deterministica, sem uso de Math.random.
+    // Rastreia cartas descartadas (memoria) e prioriza canastas/extensoes de
+    // forma deterministica, sem uso de Math.random.
     gameState.discardPile.forEach(card => {
       this.discardedCards.add(card.toString())
     })
@@ -93,7 +101,15 @@ export class AIPlayer implements Player {
       return sorted[0]
     }
 
-    // Prioridade 2: descartar a carta menos util. Evita descartar cartas
+    // Prioridade 2: estender o jogo existente do time (deterministico, o de
+    // menor meldIndex primeiro)
+    const extendMoves = moves.filter(m => m.type === 'extend_meld')
+    if (extendMoves.length > 0) {
+      const sorted = [...extendMoves].sort((a, b) => (a.meldIndex ?? 0) - (b.meldIndex ?? 0))
+      return sorted[0]
+    }
+
+    // Prioridade 3: descartar a carta menos util. Evita descartar cartas
     // cujo par/sequencia ja apareceu no descarte (poderiam formar canasta do
     // adversario) e prefere cartas seguras / de baixo valor.
     const discardMoves = moves.filter(m => m.type === 'discard')
@@ -113,17 +129,32 @@ export class AIPlayer implements Player {
     return { type: 'draw' }
   }
 
+  /**
+   * Finds the current player's own team from gameState.teams by looking for
+   * the team whose seats include currentPlayerIndex. Falls back to the
+   * first team if not found (defensive - shouldn't happen with well-formed
+   * state), keeping this AI usable even against partial/mocked game states.
+   */
+  private getOwnTeam(gameState: GameStateForAI): Team | undefined {
+    return gameState.teams.find(t => t.seats.includes(gameState.currentPlayerIndex))
+  }
+
   getValidMoves(gameState: GameStateForAI): PlayerMove[] {
-    void gameState
     const moves: PlayerMove[] = []
 
     // Move 1: draw (sempre valido)
     moves.push({ type: 'draw' })
 
-    // Move 2: jogar canastas detectadas na mao
+    // Move 2: jogar canastas detectadas na mao (novos jogos)
     moves.push(...this.findCanastaMoves())
 
-    // Move 3: descartar (qualquer carta)
+    // Move 3: estender jogos existentes do proprio time
+    const ownTeam = this.getOwnTeam(gameState)
+    if (ownTeam) {
+      moves.push(...this.findExtendMeldMoves(ownTeam))
+    }
+
+    // Move 4: descartar (qualquer carta)
     const myCards = this.hand.getCards()
     for (let i = 0; i < myCards.length; i++) {
       moves.push({ type: 'discard', cardIndex: i })
@@ -133,10 +164,36 @@ export class AIPlayer implements Player {
   }
 
   /**
-   * Busca simples (nao exaustiva) por canastas possiveis na mao: agrupa
-   * cartas reais por naipe, ordena por rank e testa janelas contiguas de
-   * 3+ cartas (com ou sem 1 curinga da mao para preencher uma lacuna de 1).
-   * Suficiente para encontrar canastas obvias (ex: 5H6H7H juntas na mao).
+   * For each meld belonging to the AI's own team, tries extending it with
+   * each single card in hand (and, for wilds, the lone wild) via
+   * canExtendMeld. Not exhaustive (doesn't try multi-card extensions), but
+   * sufficient to find legal, non-harmful extensions - this AI only needs
+   * to never propose an illegal move, not to play optimally.
+   */
+  private findExtendMeldMoves(ownTeam: Team): PlayerMove[] {
+    const moves: PlayerMove[] = []
+    const cards = this.hand.getCards()
+
+    ownTeam.melds.forEach((meld, meldIndex) => {
+      for (const card of cards) {
+        if (canExtendMeld(meld.cards, [card])) {
+          moves.push({ type: 'extend_meld', meldIndex, cards: [card] })
+        }
+      }
+    })
+
+    return moves
+  }
+
+  /**
+   * Busca simples (nao exaustiva) por canastas possiveis na mao:
+   *  - agrupa cartas reais por naipe, ordena por rank e testa janelas
+   *    contiguas de 3+ cartas (com ou sem 1 curinga da mao para preencher
+   *    uma lacuna) - encontra sequencias normais e ace-alto (...Q-K-A, ja
+   *    que rankToNumber trata A como 14).
+   *  - separadamente, procura trincas de ases (2-4 Ases reais de quaisquer
+   *    naipes, com ou sem 1 curinga), que sao validas independente de naipe.
+   * Suficiente para encontrar canastas obvias; nao precisa ser exaustiva.
    */
   private findCanastaMoves(): PlayerMove[] {
     const moves: PlayerMove[] = []
@@ -184,6 +241,15 @@ export class AIPlayer implements Player {
           }
         }
       }
+    }
+
+    // Trinca de ases: 3+ Ases reais (quaisquer naipes) formam um jogo
+    // valido, independente da regra normal de naipe/sequencia.
+    const aces = cards.filter(c => !c.isWild && c.rank === 'A')
+    if (aces.length >= 3) {
+      moves.push({ type: 'play_canasta', cards: [...aces] })
+    } else if (aces.length === 2 && wilds.length > 0) {
+      moves.push({ type: 'play_canasta', cards: [...aces, wilds[0]] })
     }
 
     return moves

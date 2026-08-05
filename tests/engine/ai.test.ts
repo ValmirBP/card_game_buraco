@@ -1,13 +1,27 @@
 import { AIPlayer, GameStateForAI } from '../../src/engine/ai'
 import { Card, createDeck } from '../../src/engine/card'
+import { Team } from '../../src/engine/gameState'
 
-function makeGameState(ai: AIPlayer, overrides: Partial<GameStateForAI> = {}): GameStateForAI {
+function makeTeams(): Team[] {
+  return [
+    { id: 'A', seats: [0, 2], melds: [], score: 0, hasTakenMorto: false },
+    { id: 'B', seats: [1, 3], melds: [], score: 0, hasTakenMorto: false },
+  ]
+}
+
+function makeGameState(
+  ai: AIPlayer,
+  overrides: Partial<GameStateForAI> = {},
+  seatIndex = 0
+): GameStateForAI {
+  const players = [ai]
+  players[seatIndex] = ai
   return {
-    currentPlayerIndex: 0,
-    players: [ai],
+    currentPlayerIndex: seatIndex,
+    players,
     deck: createDeck(),
     discardPile: [],
-    melds: new Map(),
+    teams: makeTeams(),
     ...overrides,
   }
 }
@@ -23,7 +37,7 @@ describe('AIPlayer', () => {
     const ai = new AIPlayer('Bot', 'easy', [new Card('hearts', '5', false)])
     const gameState = makeGameState(ai)
     const move = ai.playTurn(gameState)
-    expect(['draw', 'discard', 'play_canasta']).toContain(move.type)
+    expect(['draw', 'discard', 'play_canasta', 'take_discard', 'extend_meld']).toContain(move.type)
   })
 
   test('easy AI never returns a discard move with an out-of-range cardIndex', () => {
@@ -115,6 +129,71 @@ describe('AIPlayer', () => {
     const gameState = makeGameState(ai, { discardPile: [discarded] })
     ai.playTurn(gameState)
     expect(ai.getDiscardedCards().has(discarded.toString())).toBe(true)
+  })
+
+  test('finds an ace-trio canasta move when hand has 3+ aces', () => {
+    const cards = [
+      new Card('hearts', 'A', false),
+      new Card('diamonds', 'A', false),
+      new Card('clubs', 'A', false),
+    ]
+    const ai = new AIPlayer('Bot', 'medium', cards)
+    const gameState = makeGameState(ai)
+    const move = ai.playTurn(gameState)
+    expect(move.type).toBe('play_canasta')
+    expect(move.cards).toHaveLength(3)
+  })
+
+  test('finds an ace-high sequence canasta move (Q,K,A)', () => {
+    const cards = [
+      new Card('hearts', 'Q', false),
+      new Card('hearts', 'K', false),
+      new Card('hearts', 'A', false),
+    ]
+    const ai = new AIPlayer('Bot', 'medium', cards)
+    const gameState = makeGameState(ai)
+    const move = ai.playTurn(gameState)
+    expect(move.type).toBe('play_canasta')
+    const ranks = move.cards!.map(c => c.rank).sort()
+    expect(ranks).toEqual(['A', 'K', 'Q'])
+  })
+
+  test('medium AI extends an existing team meld when it can, instead of just discarding', () => {
+    const ai = new AIPlayer('Bot', 'medium', [
+      new Card('hearts', '8', false),
+      new Card('clubs', 'K', false),
+    ])
+    const { Canasta } = require('../../src/engine/canasta')
+    const existingMeld = new Canasta([
+      new Card('hearts', '5', false),
+      new Card('hearts', '6', false),
+      new Card('hearts', '7', false),
+    ])
+    const teams = makeTeams()
+    teams[0].melds = [existingMeld]
+    const gameState = makeGameState(ai, { teams })
+    const move = ai.playTurn(gameState)
+    expect(move.type).toBe('extend_meld')
+    expect(move.meldIndex).toBe(0)
+  })
+
+  test('never returns an invalid move regardless of difficulty', () => {
+    for (const difficulty of ['easy', 'medium', 'hard'] as const) {
+      const cards = [
+        new Card('hearts', '5', false),
+        new Card('hearts', '6', false),
+        new Card('spades', 'K', false),
+        new Card('diamonds', '9', false),
+      ]
+      const ai = new AIPlayer('Bot', difficulty, cards)
+      const gameState = makeGameState(ai)
+      const move = ai.playTurn(gameState)
+      expect(move).toBeDefined()
+      if (move.type === 'play_canasta') {
+        const { isValidCanasta } = require('../../src/engine/utils')
+        expect(isValidCanasta(move.cards!)).toBe(true)
+      }
+    }
   })
 
   test('addCanasta pushes canasta and increases score', () => {
