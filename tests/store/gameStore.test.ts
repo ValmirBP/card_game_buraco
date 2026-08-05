@@ -6,49 +6,78 @@ describe('useGameStore', () => {
     useGameStore.getState().resetGame()
   })
 
-  test('initGame creates a playing game with 14 cards dealt to each player', () => {
+  test('initGame creates a playing game with 4 players and 2 teams, 11 cards each', () => {
     useGameStore.getState().initGame('Alice', 'easy')
     const { game } = useGameStore.getState()
 
     expect(game).not.toBeNull()
     expect(game!.state.status).toBe('playing')
-    expect(game!.state.players).toHaveLength(2)
-    expect(game!.state.players[0].hand.getSize()).toBe(14)
-    expect(game!.state.players[1].hand.getSize()).toBe(14)
+    expect(game!.state.players).toHaveLength(4)
+    game!.state.players.forEach(p => {
+      expect(p.hand.getSize()).toBe(11)
+    })
+
+    expect(game!.state.teams).toHaveLength(2)
+    const teamA = game!.state.teams.find(t => t.id === 'A')!
+    const teamB = game!.state.teams.find(t => t.id === 'B')!
+    expect(teamA.seats).toEqual([0, 2])
+    expect(teamB.seats).toEqual([1, 3])
+    expect(game!.state.players[0].name).toBe('Alice')
+
+    expect(game!.state.mortos).toHaveLength(2)
+    expect(game!.state.deck.length).toBe(108 - 4 * 11 - 2 * 11 - 1)
   })
 
-  test('draw adds a card to the current player hand and bumps version', () => {
+  test('drawFromDeck adds a card to the current player hand and bumps version', () => {
     useGameStore.getState().initGame('Alice', 'easy')
     const versionBefore = useGameStore.getState().version
     const sizeBefore = useGameStore.getState().game!.getCurrentPlayer().hand.getSize()
 
-    useGameStore.getState().draw()
+    useGameStore.getState().drawFromDeck()
 
     const state = useGameStore.getState()
     expect(state.game!.getCurrentPlayer().hand.getSize()).toBe(sizeBefore + 1)
     expect(state.version).toBe(versionBefore + 1)
   })
 
-  test('discard removes a card from hand, advances the turn, and bumps version', () => {
+  test('takeDiscardPile moves the whole discard pile into the current player hand', () => {
+    useGameStore.getState().initGame('Alice', 'easy')
+    const game = useGameStore.getState().game!
+    const sizeBefore = game.getCurrentPlayer().hand.getSize()
+    const pileSize = game.state.discardPile.length
+    expect(pileSize).toBeGreaterThan(0)
+
+    const versionBefore = useGameStore.getState().version
+    useGameStore.getState().takeDiscardPile()
+
+    const state = useGameStore.getState()
+    expect(state.game!.getCurrentPlayer().hand.getSize()).toBe(sizeBefore + pileSize)
+    expect(state.game!.state.discardPile.length).toBe(0)
+    expect(state.version).toBe(versionBefore + 1)
+  })
+
+  test('discard removes a card from hand, advances the turn to seat 1, and bumps version', () => {
     useGameStore.getState().initGame('Alice', 'easy')
     const versionBefore = useGameStore.getState().version
     const sizeBefore = useGameStore.getState().game!.state.players[0].hand.getSize()
+    const pileBefore = useGameStore.getState().game!.state.discardPile.length
 
     useGameStore.getState().discard(0)
 
     const state = useGameStore.getState()
     expect(state.game!.state.players[0].hand.getSize()).toBe(sizeBefore - 1)
-    expect(state.game!.state.discardPile.length).toBe(1)
+    expect(state.game!.state.discardPile.length).toBe(pileBefore + 1)
     expect(state.game!.state.currentPlayerIndex).toBe(1)
     expect(state.version).toBeGreaterThan(versionBefore)
   })
 
-  test('playCanasta with 5H/6H/7H artificially placed in hand removes 3 cards, adds a meld, and increases score', () => {
+  test('playCanasta with 5H/6H/7H artificially placed in hand removes 3 cards, credits the team meld/score', () => {
     useGameStore.getState().initGame('Alice', 'easy')
     const game = useGameStore.getState().game!
     const player = game.getCurrentPlayer()
+    const teamA = game.state.teams.find(t => t.id === 'A')!
     const sizeBefore = player.hand.getSize()
-    const scoreBefore = player.score
+    const teamScoreBefore = teamA.score
 
     const c5 = new Card('hearts', '5', false)
     const c6 = new Card('hearts', '6', false)
@@ -63,18 +92,19 @@ describe('useGameStore', () => {
     const state = useGameStore.getState()
     const currentPlayer = state.game!.getCurrentPlayer()
     expect(currentPlayer.hand.getSize()).toBe(sizeBefore)
-    expect(currentPlayer.score).toBeGreaterThan(scoreBefore)
-    expect(state.game!.state.melds.get(player.name)).toHaveLength(1)
+    expect(teamA.score).toBeGreaterThan(teamScoreBefore)
+    expect(teamA.melds).toHaveLength(1)
     expect(state.selectedCardIndices).toEqual([])
     expect(state.version).toBeGreaterThan(versionBefore)
   })
 
-  test('playCanasta with an invalid combination does not touch hand, score, or version', () => {
+  test('playCanasta with an invalid combination does not touch hand, team score, or version', () => {
     useGameStore.getState().initGame('Alice', 'easy')
     const game = useGameStore.getState().game!
     const player = game.getCurrentPlayer()
+    const teamA = game.state.teams.find(t => t.id === 'A')!
     const sizeBefore = player.hand.getSize()
-    const scoreBefore = player.score
+    const teamScoreBefore = teamA.score
     const versionBefore = useGameStore.getState().version
 
     // First 2 cards of a freshly dealt hand are essentially never a valid canasta.
@@ -82,28 +112,101 @@ describe('useGameStore', () => {
 
     const state = useGameStore.getState()
     expect(state.game!.getCurrentPlayer().hand.getSize()).toBe(sizeBefore)
-    expect(state.game!.getCurrentPlayer().score).toBe(scoreBefore)
+    expect(teamA.score).toBe(teamScoreBefore)
     expect(state.version).toBe(versionBefore)
   })
 
-  test('aiTurn executes a real AI turn and returns control to the human player', () => {
+  test('extendMeld adds cards from hand to an existing team meld and updates score', () => {
     useGameStore.getState().initGame('Alice', 'easy')
-    useGameStore.getState().discard(0) // human's turn -> AI's turn (index 1)
+    const game = useGameStore.getState().game!
+    const player = game.getCurrentPlayer()
+    const teamA = game.state.teams.find(t => t.id === 'A')!
+
+    const c5 = new Card('hearts', '5', false)
+    const c6 = new Card('hearts', '6', false)
+    const c7 = new Card('hearts', '7', false)
+    player.hand.addCard(c5)
+    player.hand.addCard(c6)
+    player.hand.addCard(c7)
+    const sizeAfterAdd = player.hand.getSize()
+    useGameStore
+      .getState()
+      .playCanasta([sizeAfterAdd - 3, sizeAfterAdd - 2, sizeAfterAdd - 1])
+
+    const scoreAfterMeld = teamA.score
+    const sizeAfterMeld = player.hand.getSize()
+
+    const c8 = new Card('hearts', '8', false)
+    player.hand.addCard(c8)
+    const versionBefore = useGameStore.getState().version
+
+    useGameStore.getState().extendMeld(0, [sizeAfterMeld])
+
+    const state = useGameStore.getState()
+    expect(state.game!.getCurrentPlayer().hand.getSize()).toBe(sizeAfterMeld)
+    expect(teamA.score).toBeGreaterThan(scoreAfterMeld)
+    expect(teamA.melds[0].cards).toHaveLength(4)
+    expect(state.version).toBeGreaterThan(versionBefore)
+  })
+
+  test('aiTurn runs one AI seat and advances currentPlayerIndex, logging the AI name', () => {
+    useGameStore.getState().initGame('Alice', 'easy')
+    useGameStore.getState().discard(0) // human's turn -> seat 1 (AI, "Adversário 1")
     expect(useGameStore.getState().game!.state.currentPlayerIndex).toBe(1)
 
     const versionBefore = useGameStore.getState().version
     useGameStore.getState().aiTurn()
 
     const state = useGameStore.getState()
-    expect(state.game!.state.currentPlayerIndex).toBe(0)
+    expect(state.game!.state.currentPlayerIndex).toBe(2)
     expect(state.version).toBeGreaterThan(versionBefore)
-    expect(state.gameLog.some(l => l.includes('Bot'))).toBe(true)
+    expect(state.gameLog.some(l => l.includes('Adversário 1'))).toBe(true)
   })
 
-  test('game finishes (status finished) once a player empties their hand via discard', () => {
+  test('aiTurn no-ops when called on the human seat', () => {
+    useGameStore.getState().initGame('Alice', 'easy')
+    expect(useGameStore.getState().game!.state.currentPlayerIndex).toBe(0)
+
+    const versionBefore = useGameStore.getState().version
+    useGameStore.getState().aiTurn()
+
+    const state = useGameStore.getState()
+    expect(state.game!.state.currentPlayerIndex).toBe(0)
+    expect(state.version).toBe(versionBefore)
+  })
+
+  test('picking up the morto keeps the round going, and logs the pickup', () => {
     useGameStore.getState().initGame('Alice', 'easy')
     const game = useGameStore.getState().game!
-    const player = game.getCurrentPlayer() // Alice, index 0
+    const player = game.getCurrentPlayer() // Alice, seat 0, team A
+    while (player.hand.getSize() > 1) {
+      player.hand.removeCard(0)
+    }
+    expect(player.hand.getSize()).toBe(1)
+    expect(game.state.mortos.length).toBe(2)
+
+    useGameStore.getState().discard(0)
+
+    const state = useGameStore.getState()
+    // Team A took the morto automatically, so the hand refills instead of
+    // ending the round.
+    expect(state.game!.state.teams.find(t => t.id === 'A')!.hasTakenMorto).toBe(true)
+    expect(player.hand.getSize()).toBe(11)
+    expect(state.game!.state.status).toBe('playing')
+    expect(state.gameLog.some(l => l.toLowerCase().includes('pegou o morto'))).toBe(true)
+  })
+
+  test('game finishes (status finished) once a player empties their hand a second time, having already taken the morto', () => {
+    useGameStore.getState().initGame('Alice', 'easy')
+    const game = useGameStore.getState().game!
+    const player = game.getCurrentPlayer() // Alice, seat 0, team A
+
+    // Manually mark the team as having already taken the morto and empty
+    // deck/mortos so the second empty-hand triggers the round end rather than
+    // another auto pickup.
+    game.state.teams.find(t => t.id === 'A')!.hasTakenMorto = true
+    game.state.mortos = []
+
     while (player.hand.getSize() > 1) {
       player.hand.removeCard(0)
     }
@@ -114,7 +217,20 @@ describe('useGameStore', () => {
     const state = useGameStore.getState()
     expect(player.hand.isEmpty()).toBe(true)
     expect(state.game!.state.status).toBe('finished')
-    expect(state.game!.state.winner).toBeDefined()
+    expect(state.game!.state.winnerTeam).toBeDefined()
+    expect(state.gameLog.some(l => l.toLowerCase().includes('fim de jogo'))).toBe(true)
+  })
+
+  test('game finishes once the deck (baço) runs out', () => {
+    useGameStore.getState().initGame('Alice', 'easy')
+    const game = useGameStore.getState().game!
+    game.state.deck = []
+
+    useGameStore.getState().discard(0)
+
+    const state = useGameStore.getState()
+    expect(state.game!.state.status).toBe('finished')
+    expect(state.game!.state.winnerTeam).toBeDefined()
     expect(state.gameLog.some(l => l.toLowerCase().includes('fim de jogo'))).toBe(true)
   })
 
