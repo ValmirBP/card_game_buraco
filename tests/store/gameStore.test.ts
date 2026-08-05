@@ -1,5 +1,6 @@
 import { useGameStore } from '../../src/store/gameStore'
 import { Card } from '../../src/engine/card'
+import { Canasta } from '../../src/engine/canasta'
 
 describe('useGameStore', () => {
   beforeEach(() => {
@@ -25,7 +26,9 @@ describe('useGameStore', () => {
     expect(game!.state.players[0].name).toBe('Alice')
 
     expect(game!.state.mortos).toHaveLength(2)
-    expect(game!.state.deck.length).toBe(108 - 4 * 11 - 2 * 11 - 1)
+    // Descarte começa vazio: 108 − 44 (mãos) − 22 (mortos) = 42 no baço.
+    expect(game!.state.discardPile).toHaveLength(0)
+    expect(game!.state.deck.length).toBe(108 - 4 * 11 - 2 * 11)
   })
 
   test('initGame accepts optional bot names and assigns them to the right seats', () => {
@@ -67,9 +70,15 @@ describe('useGameStore', () => {
   test('takeDiscardPile moves the whole discard pile into the current player hand', () => {
     useGameStore.getState().initGame('Alice', 'easy')
     const game = useGameStore.getState().game!
+    // O descarte agora começa vazio — semeia 3 cartas para o teste.
+    game.state.discardPile.push(
+      new Card('hearts', '5', false),
+      new Card('spades', '9', false),
+      new Card('clubs', 'K', false)
+    )
     const sizeBefore = game.getCurrentPlayer().hand.getSize()
     const pileSize = game.state.discardPile.length
-    expect(pileSize).toBeGreaterThan(0)
+    expect(pileSize).toBe(3)
 
     const versionBefore = useGameStore.getState().version
     useGameStore.getState().takeDiscardPile()
@@ -225,10 +234,23 @@ describe('useGameStore', () => {
     const game = useGameStore.getState().game!
     const player = game.getCurrentPlayer() // Alice, seat 0, team A
 
-    // Manually mark the team as having already taken the morto and empty
+    // Manually mark the team as having already taken the morto, give it a
+    // clean canastra (7+ cards, no wilds — now required to close), and empty
     // deck/mortos so the second empty-hand triggers the round end rather than
     // another auto pickup.
-    game.state.teams.find(t => t.id === 'A')!.hasTakenMorto = true
+    const teamA = game.state.teams.find(t => t.id === 'A')!
+    teamA.hasTakenMorto = true
+    teamA.melds.push(
+      new Canasta([
+        new Card('hearts', '4', false),
+        new Card('hearts', '5', false),
+        new Card('hearts', '6', false),
+        new Card('hearts', '7', false),
+        new Card('hearts', '8', false),
+        new Card('hearts', '9', false),
+        new Card('hearts', '10', false),
+      ])
+    )
     game.state.mortos = []
 
     while (player.hand.getSize() > 1) {
