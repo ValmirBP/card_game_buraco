@@ -53,9 +53,19 @@ export class AIPlayer implements Player {
       return { type: 'take_discard' }
     }
 
-    // Aleatorio entre movimentos validos (inclui extend_meld no pool)
     const moves = this.getValidMoves(gameState)
     if (moves.length === 0) return { type: 'draw' }
+
+    // Mesmo no facil, baixar jogos e juntar cartas na mesa sao obrigacoes
+    // basicas do Buraco ("podem e devem"): se houver extend_meld ou
+    // play_canasta disponivel, joga um deles (sorteando entre si). O
+    // "facil" continua fraco no resto (descartes aleatorios, sem memoria).
+    const meldMoves = moves.filter(m => m.type === 'extend_meld' || m.type === 'play_canasta')
+    if (meldMoves.length > 0) {
+      return meldMoves[Math.floor(Math.random() * meldMoves.length)]
+    }
+
+    // Sem jogadas de mesa: aleatorio entre os demais movimentos validos.
     return moves[Math.floor(Math.random() * moves.length)]
   }
 
