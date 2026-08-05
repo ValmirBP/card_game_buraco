@@ -15,7 +15,15 @@ export interface GameStateForAI {
   teams: Team[]
 }
 
-const SAFE_RANKS = ['2', '3', '4', '5']
+// Ranks "seguros" de descarte (baixo valor, pouco úteis ao adversário).
+// NÃO inclui '2': todo 2 pode virar curinga, então nunca é um descarte seguro.
+const SAFE_RANKS = ['3', '4', '5']
+
+/** Curinga: joker (isWild) ou qualquer 2 (todos os 2 podem ser usados como
+ * curinga). A IA nunca descarta um curinga tendo carta comum na mão. */
+function isWildCard(card: Card): boolean {
+  return card.isWild || card.rank === '2'
+}
 
 export class AIPlayer implements Player {
   name: string
@@ -246,9 +254,14 @@ export class AIPlayer implements Player {
       moves.push({ type: 'take_discard' })
     }
 
-    // Move 5: descartar (qualquer carta)
+    // Move 5: descartar. NUNCA oferece descartar um curinga (joker ou 2)
+    // enquanto houver carta comum na mão — curinga é a carta mais valiosa e
+    // só vai pro descarte em último caso (mão só de curingas). Vale para todas
+    // as dificuldades, já que todas escolhem o descarte a partir daqui.
     const myCards = this.hand.getCards()
+    const hasNonWild = myCards.some(c => !isWildCard(c))
     for (let i = 0; i < myCards.length; i++) {
+      if (hasNonWild && isWildCard(myCards[i])) continue
       moves.push({ type: 'discard', cardIndex: i })
     }
 

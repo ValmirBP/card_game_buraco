@@ -255,6 +255,50 @@ describe('AIPlayer', () => {
       const moves = ai.getValidMoves(gameState)
       expect(moves.some(m => m.type === 'take_discard')).toBe(false)
     })
+  })
+
+  describe('IA nunca descarta curinga tendo carta comum', () => {
+    const wildIndicesInMoves = (ai: AIPlayer, moves: ReturnType<AIPlayer['getValidMoves']>) => {
+      const cards = ai.hand.getCards()
+      return moves
+        .filter(m => m.type === 'discard')
+        .filter(m => cards[m.cardIndex!].isWild || cards[m.cardIndex!].rank === '2')
+    }
+
+    test('getValidMoves não oferece descartar joker nem 2 quando há carta comum', () => {
+      const ai = new AIPlayer('Bot', 'hard', [
+        new Card('hearts', '2', true), // joker
+        new Card('spades', '2', false), // 2 natural (curinga em potencial)
+        new Card('clubs', 'K', false),
+        new Card('diamonds', '9', false),
+      ])
+      const moves = ai.getValidMoves(makeGameState(ai))
+      expect(wildIndicesInMoves(ai, moves)).toHaveLength(0)
+      // ainda existe algum descarte (das cartas comuns)
+      expect(moves.some(m => m.type === 'discard')).toBe(true)
+    })
+
+    test('mão só de curingas: aí sim pode descartar curinga (não trava)', () => {
+      const ai = new AIPlayer('Bot', 'hard', [
+        new Card('hearts', '2', true),
+        new Card('spades', '2', false),
+      ])
+      const moves = ai.getValidMoves(makeGameState(ai))
+      expect(moves.some(m => m.type === 'discard')).toBe(true)
+    })
+
+    test('decideHard não escolhe descartar um 2 tendo cartas altas', () => {
+      const ai = new AIPlayer('Bot', 'hard', [
+        new Card('spades', '2', false),
+        new Card('clubs', 'K', false),
+        new Card('diamonds', 'Q', false),
+      ])
+      const move = ai.playTurn(makeGameState(ai))
+      if (move.type === 'discard') {
+        const card = ai.hand.getCards()[move.cardIndex!]
+        expect(card.isWild || card.rank === '2').toBe(false)
+      }
+    })
 
     test('medium AI takes the discard pile whenever the top card is useful', () => {
       const ai = new AIPlayer('Bot', 'medium', [

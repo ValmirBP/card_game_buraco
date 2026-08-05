@@ -164,16 +164,24 @@ const DIFFICULTY_LABEL: Record<string, string> = {
   hard: 'difícil',
 }
 
+/** Um curinga: joker (isWild) ou qualquer 2 (todo 2 pode ser curinga). */
+function isWildCard(card: Card): boolean {
+  return card.isWild || card.rank === '2'
+}
+
 /** Fallback discard used whenever the AI's move can't be honored as-is (or it
  * didn't propose a discard at all): discards the lowest scoreCardValue()-value
- * card in hand. Returns true if a card was actually discarded. */
+ * card in hand, but NEVER a curinga while a non-wild card is available (wilds
+ * are the most valuable cards to hold). Returns true if a card was discarded. */
 function discardLowestValueCard(game: Game, player: Player): boolean {
   const cards = player.hand.getCards()
   if (cards.length === 0) return false
 
-  let lowestIndex = 0
-  let lowestValue = scoreCardValue(cards[0])
-  for (let i = 1; i < cards.length; i++) {
+  const hasNonWild = cards.some(c => !isWildCard(c))
+  let lowestIndex = -1
+  let lowestValue = Infinity
+  for (let i = 0; i < cards.length; i++) {
+    if (hasNonWild && isWildCard(cards[i])) continue
     const value = scoreCardValue(cards[i])
     if (value < lowestValue) {
       lowestValue = value
