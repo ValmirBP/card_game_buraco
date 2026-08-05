@@ -8,7 +8,9 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "server": "tsx server/index.ts",
+    "start": "npm run build && tsx server/index.ts"
   },
   "keywords": [],
   "author": "",
@@ -19,6 +21,7 @@
     "framer-motion": "^12.43.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "ws": "^8.21.2",
     "zustand": "^5.0.14"
   },
   "devDependencies": {
@@ -26,8 +29,10 @@
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/react": "^16.3.2",
     "@types/jest": "^30.0.0",
+    "@types/node": "^26.1.2",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
+    "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^6.0.5",
     "autoprefixer": "^10.5.4",
     "jest": "^30.4.2",
@@ -35,6 +40,7 @@
     "postcss": "^8.5.25",
     "tailwindcss": "^4.3.3",
     "ts-jest": "^29.4.12",
+    "tsx": "^4.23.8",
     "typescript": "^5.9.3",
     "vite": "^8.2.0"
   }
