@@ -1,5 +1,15 @@
 import { Card, Rank, Suit } from '../../src/engine/card'
-import { isValidCanasta, canExtendMeld, isWildInMeld, analyzeMeld, resolveMeldLayout } from '../../src/engine/utils'
+import {
+  isValidCanasta,
+  canExtendMeld,
+  isWildInMeld,
+  analyzeMeld,
+  resolveMeldLayout,
+  scoreCard,
+  scoreCardValue,
+  computeCanastaKind,
+  canastaPoints,
+} from '../../src/engine/utils'
 
 function real(rank: Rank, suit: Suit = 'hearts') {
   return new Card(suit, rank, false)
@@ -12,6 +22,43 @@ function joker() {
 function two(suit: Suit) {
   return new Card(suit, '2', false)
 }
+
+describe('scoreCard / scoreCardValue - official Jogatina value table', () => {
+  test('Ace = 15', () => {
+    expect(scoreCard('A')).toBe(15)
+    expect(scoreCardValue(real('A'))).toBe(15)
+  })
+
+  test('K, Q, J, 10, 9, 8 = 10 each', () => {
+    for (const rank of ['K', 'Q', 'J', '10', '9', '8'] as Rank[]) {
+      expect(scoreCard(rank)).toBe(10)
+      expect(scoreCardValue(real(rank))).toBe(10)
+    }
+  })
+
+  test('7, 6, 5, 4, 3 = 5 each', () => {
+    for (const rank of ['7', '6', '5', '4', '3'] as Rank[]) {
+      expect(scoreCard(rank)).toBe(5)
+      expect(scoreCardValue(real(rank))).toBe(5)
+    }
+  })
+
+  test('a natural (non-wild) 2 is worth 10', () => {
+    expect(scoreCardValue(two('hearts'))).toBe(10)
+  })
+
+  test('a wild 2 (different suit / curinga) is also worth 10 - same as natural', () => {
+    expect(scoreCardValue(two('spades'))).toBe(10)
+  })
+
+  test('scoreCard(rank) alone (retrocompat, rank-only) also reports 2 -> 10', () => {
+    expect(scoreCard('2')).toBe(10)
+  })
+
+  test('a joker (isWild true) is worth 20, distinguished from a plain 2 via scoreCardValue', () => {
+    expect(scoreCardValue(joker())).toBe(20)
+  })
+})
 
 describe('isWildInMeld', () => {
   test('a joker is always wild', () => {
@@ -290,5 +337,100 @@ describe('canExtendMeld', () => {
   test('extending a dirty meld with a normal card keeps it dirty (wild card never removed)', () => {
     const existing = [real('5'), real('6'), two('spades'), real('8'), real('9'), real('10'), real('J')]
     expect(canExtendMeld(existing, [real('4')])).toBe(true)
+  })
+})
+
+describe('Ace at both ends simultaneously (double-ace sequence, A..K..A)', () => {
+  function fullRunNoLowAce(suit: Suit = 'hearts'): Card[] {
+    // 2,3,4,5,6,7,8,9,10,J,Q,K,A - 13 cards, single Ace at the high end.
+    const ranks: Rank[] = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
+    return ranks.map(r => real(r, suit))
+  }
+
+  test('a full 2..K run plus a SECOND ace (low anchor) forms a valid 14-card sequence', () => {
+    const cards = [...fullRunNoLowAce(), real('A', 'hearts')]
+    expect(cards).toHaveLength(14)
+    expect(isValidCanasta(cards)).toBe(true)
+    const analysis = analyzeMeld(cards)!
+    expect(analysis.type).toBe('sequence')
+    expect(analysis.isClean).toBe(true)
+  })
+
+  test('double-ace layout spans values 1..14 with both aces at the anchors', () => {
+    const cards = [...fullRunNoLowAce(), real('A', 'hearts')]
+    const layout = resolveMeldLayout(cards)!
+    const values = layout.map(l => l.representsValue)
+    expect(values).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
+    const aceEntries = layout.filter(l => l.card.rank === 'A')
+    expect(aceEntries.map(e => e.representsValue).sort((a, b) => a - b)).toEqual([1, 14])
+  })
+
+  test('double-ace sequence with an internal gap filled by a curinga is valid but dirty', () => {
+    // Missing the 7; joker fills it. Aces anchor both ends.
+    const ranks: Rank[] = ['2', '3', '4', '5', '6', '8', '9', '10', 'J', 'Q', 'K']
+    const cards = [real('A', 'hearts'), ...ranks.map(r => real(r, 'hearts')), real('A', 'hearts'), joker()]
+    const analysis = analyzeMeld(cards)!
+    expect(analysis.isClean).toBe(false)
+  })
+
+  test('a redundant extra wild (no internal gap) cannot be placed - anchors leave no sliding room', () => {
+    const cards = [...fullRunNoLowAce(), real('A', 'hearts'), joker()]
+    expect(isValidCanasta(cards)).toBe(false)
+  })
+
+  test('two aces of different suits do not trigger the double-ace path (suit mismatch is still invalid)', () => {
+    const ranks: Rank[] = ['3', '4', '5']
+    const cards = [real('A', 'hearts'), ...ranks.map(r => real(r, 'hearts')), real('A', 'spades')]
+    expect(isValidCanasta(cards)).toBe(false)
+  })
+
+  test('K,A,2 same-suit "dar a volta" is still invalid (single ace - not the double-ace case)', () => {
+    const cards = [real('K'), real('A'), two('hearts')]
+    expect(isValidCanasta(cards)).toBe(false)
+  })
+})
+
+describe('computeCanastaKind / canastaPoints - special canastras', () => {
+  test('below 7 cards is always "simples" with 0 bonus, regardless of cleanliness', () => {
+    const layout = resolveMeldLayout([real('5'), real('6'), real('7')])!
+    expect(computeCanastaKind(3, true, layout)).toBe('simples')
+    expect(canastaPoints(computeCanastaKind(3, true, layout), 3)).toBe(0)
+  })
+
+  test('7+ clean, not a full-range run -> "limpa", +200', () => {
+    const layout = resolveMeldLayout([real('5'), real('6'), real('7'), real('8'), real('9'), real('10'), real('J')])!
+    const kind = computeCanastaKind(7, true, layout)
+    expect(kind).toBe('limpa')
+    expect(canastaPoints(kind, 7)).toBe(200)
+  })
+
+  test('7+ dirty -> "suja", +100', () => {
+    const cards = [real('5'), real('6'), two('spades'), real('8'), real('9'), real('10'), real('J')]
+    const analysis = analyzeMeld(cards)!
+    const kind = computeCanastaKind(cards.length, analysis.isClean, analysis.layout)
+    expect(kind).toBe('suja')
+    expect(canastaPoints(kind, cards.length)).toBe(100)
+  })
+
+  test('canastra de quinhentos: clean 13-card run 2..A (ace-high end) -> +500', () => {
+    const ranks: Rank[] = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
+    const cards = ranks.map(r => real(r, 'hearts'))
+    expect(cards).toHaveLength(13)
+    const analysis = analyzeMeld(cards)!
+    expect(analysis.isClean).toBe(true)
+    const kind = computeCanastaKind(cards.length, analysis.isClean, analysis.layout)
+    expect(kind).toBe('quinhentos')
+    expect(canastaPoints(kind, cards.length)).toBe(500)
+  })
+
+  test('canastra real: clean 14-card run A..K..A (ace at both ends) -> +1000', () => {
+    const ranks: Rank[] = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
+    const cards = [real('A', 'hearts'), ...ranks.map(r => real(r, 'hearts')), real('A', 'hearts')]
+    expect(cards).toHaveLength(14)
+    const analysis = analyzeMeld(cards)!
+    expect(analysis.isClean).toBe(true)
+    const kind = computeCanastaKind(cards.length, analysis.isClean, analysis.layout)
+    expect(kind).toBe('real')
+    expect(canastaPoints(kind, cards.length)).toBe(1000)
   })
 })

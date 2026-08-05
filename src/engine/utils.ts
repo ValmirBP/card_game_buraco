@@ -1,11 +1,41 @@
 import { Card, Rank, Suit } from './card'
 
+/**
+ * Card-value table per the official Buraco Aberto Jogatina rules:
+ *  - Ace = 15
+ *  - K, Q, J, 10, 9, 8 = 10 each
+ *  - 7, 6, 5, 4, 3 = 5 each
+ *  - 2 = 10 (curinga or natural, always 10)
+ *
+ * NOTE (retrocompatibility): this rank-only signature cannot distinguish a
+ * joker from a '2' - both are represented with rank '2' in this engine (see
+ * createDeck), differing only by `Card.isWild`. Since a joker is worth 20
+ * (not 10), callers that need the correct joker value MUST use
+ * `scoreCardValue(card)` instead, which looks at `isWild`. This function is
+ * kept exactly as-is (rank-based, '2' -> 10) for backward compatibility with
+ * existing callers (e.g. the store's AI discard-lowest-value heuristic) that
+ * only ever pass a Rank.
+ */
 export function scoreCard(rank: Rank): number {
   if (rank === 'A') return 15
-  if (rank === 'K' || rank === 'Q' || rank === 'J') return 10
-  if (rank === '2') return 20 // Curinga
+  if (rank === '2') return 10
   const num = parseInt(rank, 10)
-  return isNaN(num) ? 0 : num
+  if (!isNaN(num)) {
+    return num >= 8 ? 10 : 5 // 8,9,10 = 10; 3..7 = 5
+  }
+  return 10 // K, Q, J
+}
+
+/**
+ * Correct point value of a specific card, distinguishing a joker
+ * (`isWild === true`, worth 20) from every other card (looked up via
+ * `scoreCard(rank)`, where a '2' - curinga or natural - is worth 10). This is
+ * the value that MUST be used for canasta scoring and hand-penalty
+ * calculations; `scoreCard(rank)` alone under-values jokers.
+ */
+export function scoreCardValue(card: Card): number {
+  if (card.isWild) return 20
+  return scoreCard(card.rank)
 }
 
 export function rankToNumber(rank: Rank): number {
@@ -188,11 +218,83 @@ function buildSequenceAnalysis(
  * curinga) - a second same-suit 2 in the same meld is always invalid.
  * Cross-suit 2s are always curinga, same as a joker.
  */
+/**
+ * "Ás nas duas pontas": when a same-suit sequence has exactly 2 Aces, one
+ * sits fixed as the LOW anchor (value 1, before the 2) and the other as the
+ * HIGH anchor (value 14, after the K) - producing a run of up to 14 cards
+ * (A,2,3...K,A). Unlike a normal sequence, there's no "which end" ambiguity
+ * and no sliding room past either anchor, since both ends are already
+ * occupied by a real Ace: a lone curinga can only fill an internal gap
+ * between the anchors, never sit outside them. A natural same-suit 2 (at its
+ * own position-2 slot, between the two anchors) never dirties, matching the
+ * user's kept exception; a joker or cross-suit 2 (the meld's one allowed
+ * curinga) dirties as usual. K-A-2 "dar a volta" style wrapping is still
+ * impossible here since the low/high anchors are fixed at 1 and 14 - a 2
+ * can never sit adjacent to the high-Ace anchor.
+ */
+function analyzeDoubleAceSequence(
+  aces: Card[],
+  rest: Card[],
+  twos: Card[],
+  jokers: Card[]
+): MeldAnalysis | null {
+  const restRanks = rest.map(c => c.rank)
+  if (new Set(restRanks).size !== restRanks.length) return null
+
+  const suit = aces[0].suit
+  const sameSuitTwos = twos.filter(c => c.suit === suit)
+  const crossSuitTwos = twos.filter(c => c.suit !== suit)
+  if (sameSuitTwos.length > 1) return null
+
+  const genericWild = jokers[0] ?? crossSuitTwos[0]
+  const genericWildCount = jokers.length + crossSuitTwos.length
+  if (genericWildCount > 1) return null
+
+  const realRest = sameSuitTwos.length === 1 ? [...rest, sameSuitTwos[0]] : rest
+  const sortedValues = realRest.map(c => sequenceRankValue(c.rank, 'high')).sort((a, b) => a - b)
+
+  const fullValues = [1, ...sortedValues, 14]
+  let gapCount = 0
+  let wildValue: number | null = null
+  for (let i = 1; i < fullValues.length; i++) {
+    const diff = fullValues[i] - fullValues[i - 1]
+    if (diff <= 0) return null // duplicate value - shouldn't happen given rank dedupe above
+    if (diff > 1) {
+      gapCount += diff - 1
+      if (diff === 2) wildValue = fullValues[i - 1] + 1
+    }
+  }
+  // No sliding room past the fixed Ace anchors: an unused wild can't be
+  // placed anywhere, so the gap count must match the wild budget exactly.
+  if (gapCount !== genericWildCount) return null
+
+  const isClean = genericWildCount === 0
+
+  const entries: MeldLayoutEntry[] = [
+    { card: aces[0], representsValue: 1 },
+    ...realRest.map(c => ({ card: c, representsValue: sequenceRankValue(c.rank, 'high') })),
+    { card: aces[1], representsValue: 14 },
+  ]
+  if (genericWild && wildValue !== null) {
+    entries.push({ card: genericWild, representsValue: wildValue })
+  }
+  entries.sort((a, b) => a.representsValue - b.representsValue)
+
+  return { type: 'sequence', isClean, layout: entries }
+}
+
 function analyzeSequence(others: Card[], twos: Card[], jokers: Card[]): MeldAnalysis | null {
   if (others.length === 0) return null
 
   const suit = others[0].suit
   if (!others.every(c => c.suit === suit)) return null
+
+  const aceCards = others.filter(c => c.rank === 'A')
+  if (aceCards.length === 2) {
+    const rest = others.filter(c => c.rank !== 'A')
+    return analyzeDoubleAceSequence(aceCards, rest, twos, jokers)
+  }
+  if (aceCards.length > 2) return null
 
   const otherRanks = others.map(c => c.rank)
   if (new Set(otherRanks).size !== otherRanks.length) return null
@@ -308,12 +410,59 @@ export function canExtendMeld(existing: Card[], added: Card[]): boolean {
 }
 
 /**
- * Canastra bonus: a meld only becomes a "canastra" at 7+ cards. Below that
- * there is no bonus (only the card values themselves count). A 7+ card
- * canastra scores 200 if clean (no curinga at all) or 100 if dirty (exactly
- * 1 curinga - joker or wild-2).
+ * Canastra "kind" for bonus/UI purposes:
+ *  - 'simples': fewer than 7 cards - not a canastra yet, no bonus.
+ *  - 'quinhentos': clean 13-card run from 2 to Ace (ace-high end), no
+ *    curinga at all - e.g. 2,3,4...K,A of one suit.
+ *  - 'real': clean 14-card run from Ace to Ace (one Ace at each end,
+ *    "duplicated" - see the ace-both-ends sequence support in
+ *    analyzeSequence), no curinga at all.
+ *  - 'limpa': any other clean 7+ card canastra.
+ *  - 'suja': any dirty (1 curinga) 7+ card canastra.
  */
-export function canastaPoints(isClean: boolean, cardCount: number): number {
+export type CanastaKind = 'simples' | 'limpa' | 'suja' | 'quinhentos' | 'real'
+
+/**
+ * `layout` isn't actually needed to tell quinhentos/real apart from a plain
+ * "limpa" canastra: a single suit only has 13 distinct ranks, so a clean
+ * (wild-free), gapless, same-suit sequence can only reach 13 cards by using
+ * every rank of that suit exactly once (a "quinhentos", 2..K..A regardless
+ * of whether the Ace displays low or high - same 13-card set either way),
+ * and can only reach 14 cards via the double-ace path (a "real", the only
+ * way to fit a 14th same-suit card is a duplicated Ace anchoring both
+ * ends). It's kept as a parameter for API stability / future use (e.g. if
+ * ace-trio melds ever needed a distinct large-count kind).
+ */
+export function computeCanastaKind(
+  cardCount: number,
+  isClean: boolean,
+  _layout: MeldLayoutEntry[]
+): CanastaKind {
+  if (cardCount < 7) return 'simples'
+  if (!isClean) return 'suja'
+  if (cardCount === 14) return 'real'
+  if (cardCount === 13) return 'quinhentos'
+  return 'limpa'
+}
+
+/**
+ * Canastra bonus: a meld only becomes a "canastra" at 7+ cards. Below that
+ * there is no bonus (only the card values themselves count). Otherwise:
+ *  - 'real' (Ace-to-Ace, 14 cards, clean): +1000
+ *  - 'quinhentos' (2-to-Ace, 13 cards, clean): +500
+ *  - 'limpa' / 'simples' fallback at 7+ cards (clean, no special pattern): +200
+ *  - 'suja' (1 curinga): +100
+ */
+export function canastaPoints(kind: CanastaKind, cardCount: number): number {
   if (cardCount < 7) return 0
-  return isClean ? 200 : 100
+  switch (kind) {
+    case 'real':
+      return 1000
+    case 'quinhentos':
+      return 500
+    case 'suja':
+      return 100
+    default:
+      return 200
+  }
 }
