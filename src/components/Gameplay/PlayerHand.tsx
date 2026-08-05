@@ -60,11 +60,13 @@ export default function PlayerHand({ phase }: PlayerHandProps) {
         className="scrollbar-gold flex -space-x-8 overflow-x-auto px-1 pb-6 pt-4 sm:-space-x-10"
       >
         {orderedHand(hand).map(({ card, index }, position) => (
+          {/* Seleção NÃO eleva o z-index — a carta sobe verticalmente mas
+              mantém o empilhamento natural do leque, sem cobrir o canto
+              (rank/naipe) da carta vizinha. Só o hover traz pra frente,
+              temporariamente, pra leitura. */}
           <div
             key={`${card.suit}-${card.rank}-${index}`}
-            className={`relative flex-shrink-0 transition-[z-index] hover:z-30 ${
-              selectedCardIndices.includes(index) ? 'z-20' : ''
-            }`}
+            className="relative flex-shrink-0 hover:z-30"
           >
             <CardComponent
               card={card}
