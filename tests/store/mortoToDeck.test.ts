@@ -27,6 +27,10 @@ describe('probe: morto vira monte no fluxo real da store', () => {
     useGameStore.getState().discard(0) // passa pro assento 1 (IA)
     game.state.deck = []
     game.state.mortos = [Array.from({ length: 11 }, () => new Card('clubs', '6', false))]
+    // Esvazia o descarte para forçar a IA a comprar do monte (com pilha de
+    // descarte útil ela poderia optar por "pegar o descarte" e não promover o
+    // morto — o que tornava este teste intermitente).
+    game.state.discardPile = []
 
     useGameStore.getState().aiTurn()
 
