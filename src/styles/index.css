@@ -36,6 +36,11 @@ html, body, #root {
   height: 100%;
 }
 
+html, body {
+  /* Evita pull-to-refresh e bounce lateral no meio da partida (mobile). */
+  overscroll-behavior: none;
+}
+
 /* Thin, gold-tinted scrollbars for horizontally-scrolling card rows */
 .scrollbar-gold {
   scrollbar-width: thin;
