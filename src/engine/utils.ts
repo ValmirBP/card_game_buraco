@@ -71,9 +71,21 @@ function trySequenceWithAceMode(realCards: Card[], wildCount: number, aceMode: A
 
 export type MeldType = 'sequence' | 'aces'
 
+/**
+ * One card's slot in the canonical (ascending) display order of a meld.
+ * `representsValue` is the sequence-rank-value the card occupies (for a
+ * curinga, the value of the real card it stands in for; for an ace-trio
+ * meld every entry is 14, since there's no notion of "position").
+ */
+export interface MeldLayoutEntry {
+  card: Card
+  representsValue: number
+}
+
 export interface MeldAnalysis {
   type: MeldType
   isClean: boolean
+  layout: MeldLayoutEntry[]
 }
 
 /**
@@ -89,19 +101,92 @@ function analyzeAceTrio(others: Card[], twos: Card[], jokers: Card[]): MeldAnaly
   const totalWild = jokers.length + twos.length
   if (totalWild > 1) return null
 
-  return { type: 'aces', isClean: totalWild === 0 }
+  const wild = jokers[0] ?? twos[0]
+  const layout: MeldLayoutEntry[] = others.map(c => ({ card: c, representsValue: 14 }))
+  if (wild) layout.push({ card: wild, representsValue: 14 })
+
+  return { type: 'aces', isClean: totalWild === 0, layout }
+}
+
+/**
+ * Computes the numeric value a lone curinga represents within a sequence,
+ * given the sorted values of the real cards. If there's exactly one
+ * internal gap (a single missing rank between two real cards), the curinga
+ * fills it. Otherwise (the real cards are already fully consecutive and the
+ * curinga is "extra"/redundant) the curinga slides down to the smallest
+ * available slot just below the lowest real card - unless that would fall
+ * outside the valid range, in which case it goes just above the highest
+ * real card instead. This implements the "desce" (slides down) behaviour:
+ * re-running this after adding a real card that fills the curinga's old
+ * slot naturally produces the next-lowest slot.
+ */
+function computeWildValue(sortedRealValues: number[], aceMode: AceMode): number {
+  for (let i = 1; i < sortedRealValues.length; i++) {
+    const diff = sortedRealValues[i] - sortedRealValues[i - 1]
+    if (diff === 2) return sortedRealValues[i - 1] + 1
+  }
+
+  const min = sortedRealValues[0]
+  const max = sortedRealValues[sortedRealValues.length - 1]
+  const floor = aceMode === 'low' ? 1 : 2
+  if (min - 1 >= floor) return min - 1
+  return max + 1
+}
+
+function buildLayout(
+  reals: Card[],
+  wild: Card | undefined,
+  aceMode: AceMode,
+  wildValue: number | undefined
+): MeldLayoutEntry[] {
+  const entries: MeldLayoutEntry[] = reals.map(c => ({
+    card: c,
+    representsValue: sequenceRankValue(c.rank, aceMode),
+  }))
+  if (wild && wildValue !== undefined) {
+    entries.push({ card: wild, representsValue: wildValue })
+  }
+  entries.sort((a, b) => a.representsValue - b.representsValue)
+  return entries
+}
+
+function buildSequenceAnalysis(
+  reals: Card[],
+  wild: Card | undefined,
+  aceMode: AceMode,
+  isClean: boolean
+): MeldAnalysis {
+  const sortedReals = [...reals].sort(
+    (a, b) => sequenceRankValue(a.rank, aceMode) - sequenceRankValue(b.rank, aceMode)
+  )
+  const values = sortedReals.map(c => sequenceRankValue(c.rank, aceMode))
+  const wildValue = wild ? computeWildValue(values, aceMode) : undefined
+  return {
+    type: 'sequence',
+    isClean,
+    layout: buildLayout(sortedReals, wild, aceMode, wildValue),
+  }
 }
 
 /**
  * Same-suit consecutive sequence check. `others` are the non-2, non-wild
- * cards, which must all share one suit - that suit becomes the meld's suit
- * for isWildInMeld purposes. Any '2' of that same suit is a *candidate* to
- * be the natural rank-2 card (only one such candidate may actually be used
- * as natural - a duplicate can't be demoted to wild, since a same-suit 2
- * out of position isn't allowed to stand in as a generic wild, only
- * cross-suit 2s and jokers can). Tries both Ace interpretations (low:
- * A-2-3..., high: ...Q-K-A) when no natural 2 is involved; a natural 2
- * only makes sense under the ace-low interpretation.
+ * cards, which must all share one suit - that suit becomes the meld's suit.
+ * A '2' of that same suit is tried under two interpretations, preferring
+ * whichever validates first:
+ *
+ *  1. NATURAL - the 2 sits at its own rank-2 slot (ace-low). Never dirties
+ *     the meld, regardless of any '9' present.
+ *  2. CURINGA (Part A) - the 2 stands in for a missing card elsewhere in
+ *     the sequence, exactly like a joker/cross-suit 2, EXCEPT it does not
+ *     dirty the meld UNLESS a real '9' of that suit is also present ("regra
+ *     do 9") - in which case the meld becomes dirty. This interpretation is
+ *     only reachable when the 2 is the sole curinga (budget of 1 already
+ *     spent on it), since a same-suit 2 can never be demoted to a generic
+ *     wild alongside another joker/cross-suit 2.
+ *
+ * A same-suit 2 can only ever be used once (either as natural OR as
+ * curinga) - a second same-suit 2 in the same meld is always invalid.
+ * Cross-suit 2s are always curinga, same as a joker.
  */
 function analyzeSequence(others: Card[], twos: Card[], jokers: Card[]): MeldAnalysis | null {
   if (others.length === 0) return null
@@ -112,26 +197,54 @@ function analyzeSequence(others: Card[], twos: Card[], jokers: Card[]): MeldAnal
   const otherRanks = others.map(c => c.rank)
   if (new Set(otherRanks).size !== otherRanks.length) return null
 
-  const naturalCandidates = twos.filter(c => !isWildInMeld(c, suit, 2))
-  const wildTwos = twos.filter(c => isWildInMeld(c, suit, 2))
-  if (naturalCandidates.length > 1) return null
+  const sameSuitTwos = twos.filter(c => c.suit === suit)
+  const crossSuitTwos = twos.filter(c => c.suit !== suit)
+  if (sameSuitTwos.length > 1) return null
 
-  const totalWild = jokers.length + wildTwos.length
-  if (totalWild > 1) return null
+  const genericWild = jokers[0] ?? crossSuitTwos[0]
+  const genericWildCount = jokers.length + crossSuitTwos.length
 
-  if (naturalCandidates.length === 1) {
-    const realCards = [...others, naturalCandidates[0]]
-    if (trySequenceWithAceMode(realCards, totalWild, 'low')) {
-      return { type: 'sequence', isClean: totalWild === 0 }
+  if (sameSuitTwos.length === 1) {
+    const natural2 = sameSuitTwos[0]
+
+    // Interpretation 1 (preferred): natural 2 at its own rank-2 slot.
+    if (genericWildCount <= 1) {
+      const realCards = [...others, natural2]
+      if (trySequenceWithAceMode(realCards, genericWildCount, 'low')) {
+        return buildSequenceAnalysis(
+          realCards,
+          genericWildCount === 1 ? genericWild : undefined,
+          'low',
+          genericWildCount === 0
+        )
+      }
     }
+
+    // Interpretation 2 (Part A): the 2 acts as the sequence's sole curinga.
+    // Only reachable when it's the ONLY wild in the meld (budget = 1).
+    // Restricted to ace-LOW numbering only: allowing this under ace-HIGH
+    // would reintroduce "dar a volta" (e.g. K,A,2 wrapping the 2 around
+    // from the top of the sequence back past the Ace), which is illegal.
+    if (genericWildCount === 0 && trySequenceWithAceMode(others, 1, 'low')) {
+      const hasReal9 = others.some(c => c.rank === '9')
+      return buildSequenceAnalysis(others, natural2, 'low', !hasReal9)
+    }
+
     return null
   }
 
-  if (
-    trySequenceWithAceMode(others, totalWild, 'low') ||
-    trySequenceWithAceMode(others, totalWild, 'high')
-  ) {
-    return { type: 'sequence', isClean: totalWild === 0 }
+  // No same-suit 2 present: only cross-suit 2s / jokers can be the curinga.
+  if (genericWildCount > 1) return null
+
+  for (const aceMode of ['low', 'high'] as AceMode[]) {
+    if (trySequenceWithAceMode(others, genericWildCount, aceMode)) {
+      return buildSequenceAnalysis(
+        others,
+        genericWildCount === 1 ? genericWild : undefined,
+        aceMode,
+        genericWildCount === 0
+      )
+    }
   }
   return null
 }
@@ -156,6 +269,17 @@ export function analyzeMeld(cards: Card[]): MeldAnalysis | null {
   const others = cards.filter(c => c.rank !== '2' && !c.isWild)
 
   return analyzeAceTrio(others, twos, jokers) ?? analyzeSequence(others, twos, jokers)
+}
+
+/**
+ * Convenience wrapper over analyzeMeld exposing just the canonical display
+ * order (ascending) and, for each card, the sequence value it represents -
+ * for a curinga, the value of the real card it's standing in for. Returns
+ * null for an invalid meld. Consumers (UI) use this to draw the curinga in
+ * the correct visual slot.
+ */
+export function resolveMeldLayout(cards: Card[]): MeldLayoutEntry[] | null {
+  return analyzeMeld(cards)?.layout ?? null
 }
 
 /**

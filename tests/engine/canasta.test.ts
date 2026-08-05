@@ -142,4 +142,76 @@ describe('Canasta', () => {
       expect(() => canasta.withExtraCards([real('8', 'diamonds')])).toThrow()
     })
   })
+
+  describe('Part A/B: 2-mesmo-naipe curinga, regra do 9, sujeira permanente', () => {
+    test('[6♠,2♠,8♠] -> valid, clean, layout represents 7', () => {
+      const cards = [real('6', 'spades'), two('spades'), real('8', 'spades')]
+      const canasta = new Canasta(cards)
+      expect(canasta.isClean).toBe(true)
+      expect(canasta.layout.map(l => l.representsValue)).toEqual([6, 7, 8])
+    })
+
+    test('extending [6♠,2♠,8♠] with 7♠ -> curinga desliza para representar 5, continua limpa', () => {
+      const cards = [real('6', 'spades'), two('spades'), real('8', 'spades')]
+      const canasta = new Canasta(cards)
+      const extended = canasta.withExtraCards([real('7', 'spades')])
+      expect(extended.isClean).toBe(true)
+      expect(extended.layout.map(l => l.representsValue)).toEqual([5, 6, 7, 8])
+    })
+
+    test('extending further with 9♠ (2 ainda curinga fora de posicao) -> SUJA permanentemente', () => {
+      const cards = [real('6', 'spades'), two('spades'), real('7', 'spades'), real('8', 'spades')]
+      const canasta = new Canasta(cards) // clean, 2 represents 5
+      const extended = canasta.withExtraCards([real('9', 'spades')])
+      expect(extended.isClean).toBe(false)
+    })
+
+    test('once dirtied by the 9-rule, stays dirty even if later cards would let the 2 look natural', () => {
+      const cards = [real('6', 'spades'), two('spades'), real('7', 'spades'), real('8', 'spades')]
+      const canasta = new Canasta(cards)
+      const dirtied = canasta.withExtraCards([real('9', 'spades')])
+      expect(dirtied.isClean).toBe(false)
+
+      // Now add A,3,4,5 - a fresh analysis of the full card set (A,2,3,4,5,6,7,8,9)
+      // would say the 2 is natural (clean), but the meld must stay dirty forever.
+      const further = dirtied.withExtraCards([
+        real('A', 'spades'),
+        real('3', 'spades'),
+        real('4', 'spades'),
+        real('5', 'spades'),
+      ])
+      expect(further.isClean).toBe(false)
+    })
+
+    test('joker still dirties a canastra (unaffected by Part A)', () => {
+      const cards = [real('5'), real('6'), joker(), real('8'), real('9'), real('10'), real('J')]
+      const canasta = new Canasta(cards)
+      expect(canasta.isClean).toBe(false)
+    })
+
+    test('a 2 already at its natural position never dirties even when a 9 is added', () => {
+      const cards = [
+        real('A', 'spades'),
+        two('spades'),
+        real('3', 'spades'),
+        real('4', 'spades'),
+        real('5', 'spades'),
+        real('6', 'spades'),
+        real('7', 'spades'),
+        real('8', 'spades'),
+      ]
+      const canasta = new Canasta(cards)
+      expect(canasta.isClean).toBe(true)
+      const extended = canasta.withExtraCards([real('9', 'spades')])
+      expect(extended.isClean).toBe(true)
+    })
+
+    test('clone preserves permanent dirty state', () => {
+      const cards = [real('6', 'spades'), two('spades'), real('7', 'spades'), real('8', 'spades')]
+      const canasta = new Canasta(cards)
+      const dirtied = canasta.withExtraCards([real('9', 'spades')])
+      const cloned = dirtied.clone()
+      expect(cloned.isClean).toBe(false)
+    })
+  })
 })

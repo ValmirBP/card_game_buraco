@@ -1,5 +1,5 @@
 import { Card, Rank, Suit } from '../../src/engine/card'
-import { isValidCanasta, canExtendMeld, isWildInMeld } from '../../src/engine/utils'
+import { isValidCanasta, canExtendMeld, isWildInMeld, analyzeMeld, resolveMeldLayout } from '../../src/engine/utils'
 
 function real(rank: Rank, suit: Suit = 'hearts') {
   return new Card(suit, rank, false)
@@ -177,6 +177,77 @@ describe('isValidCanasta', () => {
       const cards = [real('A', 'hearts'), real('A', 'diamonds'), two('clubs')]
       expect(isValidCanasta(cards)).toBe(true)
     })
+  })
+})
+
+describe('Part A: 2-do-mesmo-naipe como curinga nao suja', () => {
+  test('[6♠,2♠,8♠] -> valid, isClean true (2♠ tapando o 7, mesmo naipe)', () => {
+    const cards = [real('6', 'spades'), two('spades'), real('8', 'spades')]
+    const analysis = analyzeMeld(cards)
+    expect(analysis).not.toBeNull()
+    expect(analysis!.isClean).toBe(true)
+  })
+
+  test('joker still dirties a sequence (Part A.2)', () => {
+    const cards = [real('6', 'spades'), joker(), real('8', 'spades')]
+    const analysis = analyzeMeld(cards)
+    expect(analysis).not.toBeNull()
+    expect(analysis!.isClean).toBe(false)
+  })
+
+  test('2 of a DIFFERENT suit still dirties (Part A.2)', () => {
+    const cards = [real('6', 'spades'), real('7', 'spades'), two('hearts'), real('9', 'spades')]
+    const analysis = analyzeMeld(cards)
+    expect(analysis).not.toBeNull()
+    expect(analysis!.isClean).toBe(false)
+  })
+
+  test('Regra do 9: 2-mesmo-naipe curinga + 9 real presente -> suja', () => {
+    const cards = [two('spades'), real('6', 'spades'), real('7', 'spades'), real('8', 'spades'), real('9', 'spades')]
+    const analysis = analyzeMeld(cards)
+    expect(analysis).not.toBeNull()
+    expect(analysis!.isClean).toBe(false)
+  })
+
+  test('Regra do 9 NAO se aplica quando o 2 esta na posicao natural', () => {
+    const cards = [
+      real('A', 'spades'),
+      two('spades'),
+      real('3', 'spades'),
+      real('4', 'spades'),
+      real('5', 'spades'),
+      real('6', 'spades'),
+      real('7', 'spades'),
+      real('8', 'spades'),
+      real('9', 'spades'),
+    ]
+    const analysis = analyzeMeld(cards)
+    expect(analysis).not.toBeNull()
+    expect(analysis!.isClean).toBe(true)
+  })
+})
+
+describe('Part B: layout / resolveMeldLayout - curinga desliza para a menor posicao', () => {
+  test('[6♠,2♠,8♠] -> 2♠ representa o 7 (unico gap)', () => {
+    const cards = [real('6', 'spades'), two('spades'), real('8', 'spades')]
+    const layout = resolveMeldLayout(cards)!
+    expect(layout.map(l => l.representsValue)).toEqual([6, 7, 8])
+    const wildEntry = layout.find(l => l.card.rank === '2')!
+    expect(wildEntry.representsValue).toBe(7)
+  })
+
+  test('[6♠,2♠,7♠,8♠] -> 2♠ desliza para representar o 5 (sem gap interno)', () => {
+    const cards = [real('6', 'spades'), two('spades'), real('7', 'spades'), real('8', 'spades')]
+    const layout = resolveMeldLayout(cards)!
+    expect(layout.map(l => l.representsValue)).toEqual([5, 6, 7, 8])
+    const wildEntry = layout.find(l => l.card.rank === '2')!
+    expect(wildEntry.representsValue).toBe(5)
+  })
+
+  test('natural 2 (own position) has representsValue 2', () => {
+    const cards = [real('A', 'spades'), two('spades'), real('3', 'spades')]
+    const layout = resolveMeldLayout(cards)!
+    expect(layout.map(l => l.representsValue)).toEqual([1, 2, 3])
   })
 })
 
