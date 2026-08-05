@@ -289,12 +289,17 @@ export default function GameBoard({ phase }: GameBoardProps) {
                               : ''
                           }`}
                         >
+                          {/* Usa canasta.layout (ordem canônica): o curinga
+                              aparece na posição da carta que ele representa
+                              e "desliza" quando a carta real chega. */}
                           <div className="flex -space-x-9 sm:-space-x-10">
-                            {canasta.cards.map((card, cii) => (
-                              <div key={cii} style={{ zIndex: cii }}>
-                                <CardComponent card={card} />
-                              </div>
-                            ))}
+                            {(canasta.layout ?? canasta.cards.map(card => ({ card }))).map(
+                              (slot, cii) => (
+                                <div key={cii} style={{ zIndex: cii }}>
+                                  <CardComponent card={slot.card} />
+                                </div>
+                              )
+                            )}
                           </div>
                           <div
                             className={`text-center text-xs font-semibold ${
