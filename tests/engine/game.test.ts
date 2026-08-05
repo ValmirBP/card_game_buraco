@@ -250,6 +250,7 @@ describe('Game', () => {
       players[2].hand.addCard(cards[0])
       players[2].hand.addCard(cards[1])
       players[2].hand.addCard(cards[2])
+      players[2].hand.addCard(new Card('clubs', 'K', false)) // keeper: this meld must not empty the hand
       const game = new Game(players)
       game.endTurn() // -> seat 1
       game.endTurn() // -> seat 2 (Team A partner)
@@ -283,20 +284,27 @@ describe('Game', () => {
       const game = new Game(players)
       const teamA = game.state.teams.find(t => t.id === 'A')!
 
-      // seed an existing meld directly on the team (as if played earlier)
-      players[0].hand.addCard(new Card('hearts', '5', false))
-      players[0].hand.addCard(new Card('hearts', '6', false))
-      players[0].hand.addCard(new Card('hearts', '7', false))
-      game.playCanasta(players[0].hand.getCards())
+      // seed an existing meld directly on the team (as if played earlier) -
+      // pushed straight onto team.melds rather than via playCanasta, so this
+      // seeding step is independent of the hand-emptying legality rule under
+      // test in the 'extendMeld' describe block below.
+      const seedMeld = new Canasta([
+        new Card('hearts', '5', false),
+        new Card('hearts', '6', false),
+        new Card('hearts', '7', false),
+      ])
+      teamA.melds.push(seedMeld)
+      teamA.score += seedMeld.getScore()
 
       const scoreBeforeExtend = teamA.score
 
       players[0].hand.addCard(new Card('hearts', '8', false))
+      players[0].hand.addCard(new Card('clubs', 'K', false)) // keeper: this extend must not empty the hand
       const success = game.extendMeld(0, [new Card('hearts', '8', false)])
 
       expect(success).toBe(true)
       expect(teamA.melds[0].cards).toHaveLength(4)
-      expect(players[0].hand.getSize()).toBe(0)
+      expect(players[0].hand.getSize()).toBe(1)
       expect(teamA.score).toBeGreaterThan(scoreBeforeExtend)
     })
 
@@ -309,10 +317,13 @@ describe('Game', () => {
       const players = makeFourPlayers()
       const game = new Game(players)
       const teamA = game.state.teams.find(t => t.id === 'A')!
-      players[0].hand.addCard(new Card('hearts', '5', false))
-      players[0].hand.addCard(new Card('hearts', '6', false))
-      players[0].hand.addCard(new Card('hearts', '7', false))
-      game.playCanasta(players[0].hand.getCards())
+      teamA.melds.push(
+        new Canasta([
+          new Card('hearts', '5', false),
+          new Card('hearts', '6', false),
+          new Card('hearts', '7', false),
+        ])
+      )
 
       players[0].hand.addCard(new Card('diamonds', '8', false))
       const success = game.extendMeld(0, [new Card('diamonds', '8', false)])
@@ -326,14 +337,18 @@ describe('Game', () => {
       const players = makeFourPlayers()
       const game = new Game(players)
       const teamA = game.state.teams.find(t => t.id === 'A')!
-      players[0].hand.addCard(new Card('hearts', '5', false))
-      players[0].hand.addCard(new Card('hearts', '6', false))
-      players[0].hand.addCard(new Card('hearts', '7', false))
-      game.playCanasta(players[0].hand.getCards())
+      teamA.melds.push(
+        new Canasta([
+          new Card('hearts', '5', false),
+          new Card('hearts', '6', false),
+          new Card('hearts', '7', false),
+        ])
+      )
 
       game.endTurn()
       game.endTurn() // seat 2, Team A partner
       players[2].hand.addCard(new Card('hearts', '8', false))
+      players[2].hand.addCard(new Card('clubs', 'K', false)) // keeper: this extend must not empty the hand
       const success = game.extendMeld(0, [new Card('hearts', '8', false)])
       expect(success).toBe(true)
       expect(teamA.melds[0].cards).toHaveLength(4)
@@ -668,10 +683,13 @@ describe('Game', () => {
       const players = makeFourPlayers()
       const game = new Game(players)
       const teamA = game.state.teams.find(t => t.id === 'A')!
-      players[0].hand.addCard(new Card('hearts', '5', false))
-      players[0].hand.addCard(new Card('hearts', '6', false))
-      players[0].hand.addCard(new Card('hearts', '7', false))
-      game.playCanasta(players[0].hand.getCards())
+      teamA.melds.push(
+        new Canasta([
+          new Card('hearts', '5', false),
+          new Card('hearts', '6', false),
+          new Card('hearts', '7', false),
+        ])
+      )
 
       game.state.mortos = [Array.from({ length: 11 }, () => new Card('clubs', '4', false))]
       players[0].hand.addCard(new Card('hearts', '8', false))
@@ -681,6 +699,250 @@ describe('Game', () => {
       expect(teamA.hasTakenMorto).toBe(true)
       expect(players[0].hand.getSize()).toBe(11)
       expect(game.state.currentPlayerIndex).toBe(0)
+    })
+  })
+
+  describe('hand-emptying meld legality (cannot empty hand unless able to take morto or bater)', () => {
+    test('playCanasta: team already took morto, no clean canastra -> emptying the hand via a non-canastra meld is ILLEGAL (returns false, no side effects)', () => {
+      const players = makeFourPlayers()
+      const cards = [new Card('hearts', '5', false), new Card('hearts', '6', false), new Card('hearts', '7', false)]
+      players[0].hand.addCard(cards[0])
+      players[0].hand.addCard(cards[1])
+      players[0].hand.addCard(cards[2])
+      const game = new Game(players)
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      teamA.hasTakenMorto = true // already took the morto
+      game.state.mortos = [] // no morto left to auto-pick-up anyway
+
+      const success = game.playCanasta(cards)
+
+      expect(success).toBe(false)
+      expect(players[0].hand.getSize()).toBe(3)
+      expect(teamA.melds).toHaveLength(0)
+      expect(teamA.score).toBe(0)
+    })
+
+    test('playCanasta: same scenario but the meld played IS a clean 7+ canastra -> legal direct batida, isGameOver becomes true', () => {
+      const players = makeFourPlayers()
+      const cards = [
+        new Card('hearts', '5', false),
+        new Card('hearts', '6', false),
+        new Card('hearts', '7', false),
+        new Card('hearts', '8', false),
+        new Card('hearts', '9', false),
+        new Card('hearts', '10', false),
+        new Card('hearts', 'J', false),
+      ]
+      for (const c of cards) players[0].hand.addCard(c)
+      const game = new Game(players)
+      game.state.status = 'playing'
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      teamA.hasTakenMorto = true
+      game.state.mortos = []
+
+      const success = game.playCanasta(cards)
+
+      expect(success).toBe(true)
+      expect(players[0].hand.getSize()).toBe(0)
+      expect(teamA.melds).toHaveLength(1)
+      expect(game.isGameOver()).toBe(true)
+    })
+
+    test('playCanasta: team has NOT taken morto and a morto is available -> legal, auto-picks up morto, game continues', () => {
+      const players = makeFourPlayers()
+      const cards = [new Card('hearts', '5', false), new Card('hearts', '6', false), new Card('hearts', '7', false)]
+      players[0].hand.addCard(cards[0])
+      players[0].hand.addCard(cards[1])
+      players[0].hand.addCard(cards[2])
+      const game = new Game(players)
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      teamA.hasTakenMorto = false
+      game.state.mortos = [Array.from({ length: 11 }, () => new Card('clubs', '4', false))]
+
+      const success = game.playCanasta(cards)
+
+      expect(success).toBe(true)
+      expect(teamA.hasTakenMorto).toBe(true)
+      expect(players[0].hand.getSize()).toBe(11)
+      expect(game.isGameOver()).toBe(false)
+    })
+
+    test('extendMeld: team already took morto, no clean canastra -> extending with the last card in hand is ILLEGAL (no side effects)', () => {
+      const players = makeFourPlayers()
+      const game = new Game(players)
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      teamA.melds.push(
+        new Canasta([
+          new Card('hearts', '5', false),
+          new Card('hearts', '6', false),
+          new Card('hearts', '7', false),
+        ])
+      )
+
+      teamA.hasTakenMorto = true
+      game.state.mortos = []
+      players[0].hand.addCard(new Card('hearts', '8', false)) // last card in hand
+
+      const success = game.extendMeld(0, [new Card('hearts', '8', false)])
+
+      expect(success).toBe(false)
+      expect(players[0].hand.getSize()).toBe(1)
+      expect(teamA.melds[0].cards).toHaveLength(3)
+    })
+
+    test('extendMeld: same scenario but extension makes the meld a clean 7+ canastra -> legal direct batida', () => {
+      const players = makeFourPlayers()
+      const game = new Game(players)
+      game.state.status = 'playing'
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      teamA.melds.push(
+        new Canasta([
+          new Card('hearts', '5', false),
+          new Card('hearts', '6', false),
+          new Card('hearts', '7', false),
+        ])
+      )
+
+      teamA.hasTakenMorto = true
+      game.state.mortos = []
+      const extraCards = [
+        new Card('hearts', '8', false),
+        new Card('hearts', '9', false),
+        new Card('hearts', '10', false),
+        new Card('hearts', 'J', false),
+      ]
+      for (const c of extraCards) players[0].hand.addCard(c) // last cards in hand
+
+      const success = game.extendMeld(0, extraCards)
+
+      expect(success).toBe(true)
+      expect(players[0].hand.getSize()).toBe(0)
+      expect(teamA.melds[0].cards).toHaveLength(7)
+      expect(game.isGameOver()).toBe(true)
+    })
+
+    test('extendMeld: team has NOT taken morto and a morto is available -> legal, auto-picks up morto', () => {
+      const players = makeFourPlayers()
+      const game = new Game(players)
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      teamA.melds.push(
+        new Canasta([
+          new Card('hearts', '5', false),
+          new Card('hearts', '6', false),
+          new Card('hearts', '7', false),
+        ])
+      )
+
+      teamA.hasTakenMorto = false
+      game.state.mortos = [Array.from({ length: 11 }, () => new Card('clubs', '4', false))]
+      players[0].hand.addCard(new Card('hearts', '8', false)) // last card in hand
+
+      const success = game.extendMeld(0, [new Card('hearts', '8', false)])
+
+      expect(success).toBe(true)
+      expect(teamA.hasTakenMorto).toBe(true)
+      expect(players[0].hand.getSize()).toBe(11)
+    })
+  })
+
+  describe('wouldPlayCanastaEmptyHandIllegally / wouldExtendMeldEmptyHandIllegally (UI helpers)', () => {
+    test('wouldPlayCanastaEmptyHandIllegally: true when the meld would empty the hand and the team can neither take morto nor bater', () => {
+      const players = makeFourPlayers()
+      const cards = [new Card('hearts', '5', false), new Card('hearts', '6', false), new Card('hearts', '7', false)]
+      for (const c of cards) players[0].hand.addCard(c)
+      const game = new Game(players)
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      teamA.hasTakenMorto = true
+      game.state.mortos = []
+
+      expect(game.wouldPlayCanastaEmptyHandIllegally(cards)).toBe(true)
+    })
+
+    test('wouldPlayCanastaEmptyHandIllegally: false when the meld is a clean 7+ canastra (direct batida)', () => {
+      const players = makeFourPlayers()
+      const cards = [
+        new Card('hearts', '5', false),
+        new Card('hearts', '6', false),
+        new Card('hearts', '7', false),
+        new Card('hearts', '8', false),
+        new Card('hearts', '9', false),
+        new Card('hearts', '10', false),
+        new Card('hearts', 'J', false),
+      ]
+      for (const c of cards) players[0].hand.addCard(c)
+      const game = new Game(players)
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      teamA.hasTakenMorto = true
+      game.state.mortos = []
+
+      expect(game.wouldPlayCanastaEmptyHandIllegally(cards)).toBe(false)
+    })
+
+    test('wouldPlayCanastaEmptyHandIllegally: false when a morto is still available to take', () => {
+      const players = makeFourPlayers()
+      const cards = [new Card('hearts', '5', false), new Card('hearts', '6', false), new Card('hearts', '7', false)]
+      for (const c of cards) players[0].hand.addCard(c)
+      const game = new Game(players)
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      teamA.hasTakenMorto = false
+      game.state.mortos = [Array.from({ length: 11 }, () => new Card('clubs', '4', false))]
+
+      expect(game.wouldPlayCanastaEmptyHandIllegally(cards)).toBe(false)
+    })
+
+    test('wouldPlayCanastaEmptyHandIllegally: false when the meld would NOT empty the hand', () => {
+      const players = makeFourPlayers()
+      const cards = [new Card('hearts', '5', false), new Card('hearts', '6', false), new Card('hearts', '7', false)]
+      for (const c of cards) players[0].hand.addCard(c)
+      players[0].hand.addCard(new Card('clubs', 'K', false)) // keeper
+      const game = new Game(players)
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      teamA.hasTakenMorto = true
+      game.state.mortos = []
+
+      expect(game.wouldPlayCanastaEmptyHandIllegally(cards)).toBe(false)
+    })
+
+    test('wouldExtendMeldEmptyHandIllegally: true when extending with the last card in hand and the team can neither take morto nor bater', () => {
+      const players = makeFourPlayers()
+      const game = new Game(players)
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      teamA.melds.push(
+        new Canasta([
+          new Card('hearts', '5', false),
+          new Card('hearts', '6', false),
+          new Card('hearts', '7', false),
+        ])
+      )
+      teamA.hasTakenMorto = true
+      game.state.mortos = []
+      players[0].hand.addCard(new Card('hearts', '8', false))
+
+      expect(game.wouldExtendMeldEmptyHandIllegally(0, [new Card('hearts', '8', false)])).toBe(true)
+    })
+
+    test('wouldExtendMeldEmptyHandIllegally: false when the extension completes a clean 7+ canastra', () => {
+      const players = makeFourPlayers()
+      const game = new Game(players)
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      teamA.melds.push(
+        new Canasta([
+          new Card('hearts', '5', false),
+          new Card('hearts', '6', false),
+          new Card('hearts', '7', false),
+        ])
+      )
+      teamA.hasTakenMorto = true
+      game.state.mortos = []
+      const extraCards = [
+        new Card('hearts', '8', false),
+        new Card('hearts', '9', false),
+        new Card('hearts', '10', false),
+        new Card('hearts', 'J', false),
+      ]
+      for (const c of extraCards) players[0].hand.addCard(c)
+
+      expect(game.wouldExtendMeldEmptyHandIllegally(0, extraCards)).toBe(false)
     })
   })
 

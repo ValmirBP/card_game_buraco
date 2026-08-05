@@ -118,11 +118,13 @@ export class Game {
     const indicesToRemove = this.findCardIndices(player, cards)
     if (indicesToRemove === null) return false
 
+    const team = this.getTeamOfCurrentPlayer()
+    if (this.wouldEmptyHandIllegally(player, cards.length, team, [canasta])) return false
+
     for (const idx of indicesToRemove) {
       player.hand.removeCard(idx)
     }
 
-    const team = this.getTeamOfCurrentPlayer()
     team.melds.push(canasta)
     team.score += canasta.getScore()
 
@@ -147,12 +149,15 @@ export class Game {
     const indicesToRemove = this.findCardIndices(player, cards)
     if (indicesToRemove === null) return false
 
+    const extended = meld.withExtraCards(cards)
+    const resultingMelds = team.melds.map((m, i) => (i === meldIndex ? extended : m))
+    if (this.wouldEmptyHandIllegally(player, cards.length, team, resultingMelds)) return false
+
     for (const idx of indicesToRemove) {
       player.hand.removeCard(idx)
     }
 
     const oldScore = meld.getScore()
-    const extended = meld.withExtraCards(cards)
     team.melds[meldIndex] = extended
     team.score += extended.getScore() - oldScore
 
@@ -228,8 +233,88 @@ export class Game {
    * (Hand emptiness is the trigger checked by the caller.)
    */
   canClose(team: Team): boolean {
+    return this.canCloseWithMelds(team, team.melds)
+  }
+
+  /**
+   * Same check as canClose, but against an explicit `melds` list rather than
+   * `team.melds` directly - lets callers evaluate a hypothetical post-play
+   * meld set (e.g. including a canasta not yet committed to the team) before
+   * mutating state. See wouldEmptyHandIllegally.
+   */
+  private canCloseWithMelds(team: Team, melds: Canasta[]): boolean {
     const mortoSatisfied = team.hasTakenMorto || this.state.mortos.length === 0
-    return mortoSatisfied && team.melds.some(m => m.isCanastra && m.isClean)
+    return mortoSatisfied && melds.some(m => m.isCanastra && m.isClean)
+  }
+
+  /**
+   * The Buraco rule this enforces: a player may only empty their hand via a
+   * meld (playCanasta/extendMeld) if, immediately after, their team can
+   * EITHER take the morto (team hasn't taken one yet AND one is still on the
+   * table) OR close/bater (canClose, evaluated against `resultingMelds` -
+   * the team's meld set AFTER this play, including the new/extended meld -
+   * since a canastra just completed by this very play must count). If
+   * neither holds, emptying the hand would leave the player stuck with
+   * nothing to discard and no way to end the turn, so the play is illegal.
+   *
+   * Returns false (legal) whenever this particular play wouldn't actually
+   * empty the hand - `cardsToRemoveCount` must equal the current hand size
+   * for the illegality check to even apply.
+   */
+  wouldEmptyHandIllegally(
+    player: Player,
+    cardsToRemoveCount: number,
+    team: Team,
+    resultingMelds: Canasta[]
+  ): boolean {
+    if (player.hand.getSize() !== cardsToRemoveCount) return false
+
+    const couldTakeMorto = !team.hasTakenMorto && this.state.mortos.length > 0
+    if (couldTakeMorto) return false
+
+    return !this.canCloseWithMelds(team, resultingMelds)
+  }
+
+  /**
+   * UI helper: would playing `cards` as a NEW canasta (via playCanasta) for
+   * the current player's team be refused because it empties the hand
+   * illegally? Mirrors the check playCanasta itself runs, without mutating
+   * anything - lets the UI disable the "Jogar Canasta" button and show a
+   * hint before the player attempts an illegal play. Returns false (i.e.
+   * "not illegal") for a card set that doesn't even form a valid canasta,
+   * since playCanasta would already reject it for that separate reason.
+   */
+  wouldPlayCanastaEmptyHandIllegally(cards: Card[]): boolean {
+    if (!isValidCanasta(cards)) return false
+    let canasta: Canasta
+    try {
+      canasta = new Canasta(cards)
+    } catch {
+      return false
+    }
+    const player = this.getCurrentPlayer()
+    const team = this.getTeamOfCurrentPlayer()
+    return this.wouldEmptyHandIllegally(player, cards.length, team, [...team.melds, canasta])
+  }
+
+  /**
+   * UI helper: would extending meld `meldIndex` with `cards` (via
+   * extendMeld) for the current player's team be refused because it empties
+   * the hand illegally? Mirrors the check extendMeld itself runs, without
+   * mutating anything. Returns false when the meld index doesn't exist or
+   * the extension isn't itself valid, since extendMeld would already reject
+   * it for that separate reason.
+   */
+  wouldExtendMeldEmptyHandIllegally(meldIndex: number, cards: Card[]): boolean {
+    const team = this.getTeamOfCurrentPlayer()
+    const meld = team.melds[meldIndex]
+    if (!meld) return false
+    if (!canExtendMeld(meld.cards, cards)) return false
+
+    const player = this.getCurrentPlayer()
+    const extended = meld.withExtraCards(cards)
+    const resultingMelds = team.melds.map((m, i) => (i === meldIndex ? extended : m))
+    return this.wouldEmptyHandIllegally(player, cards.length, team, resultingMelds)
   }
 
   endTurn(): void {

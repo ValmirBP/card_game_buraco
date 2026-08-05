@@ -41,13 +41,21 @@ export default function ActionPanel({
   const canDraw = isHumanTurn && phase === 'draw'
   const canTake = canDraw && canTakeDiscard
   const canDiscard = isHumanTurn && phase === 'play' && selectedCardIndices.length === 1
-  const canPlayCanasta = isHumanTurn && phase === 'play' && selectedCardIndices.length >= 3
+
+  const selectedCards = selectedCardIndices
+    .map(i => game.state.players[0].hand.getCards()[i])
+    .filter((c): c is NonNullable<typeof c> => Boolean(c))
+  const wouldEmptyHandIllegally =
+    selectedCardIndices.length >= 3 && game.wouldPlayCanastaEmptyHandIllegally(selectedCards)
+  const canPlayCanasta = isHumanTurn && phase === 'play' && selectedCardIndices.length >= 3 && !wouldEmptyHandIllegally
 
   const hint = !isHumanTurn
     ? null
-    : phase === 'draw'
-      ? 'Compre do monte ou pegue o descarte.'
-      : 'Baixe/estenda jogos ou descarte 1 carta.'
+    : wouldEmptyHandIllegally
+      ? 'Você não pode baixar todas as cartas sem poder bater.'
+      : phase === 'draw'
+        ? 'Compre do monte ou pegue o descarte.'
+        : 'Baixe/estenda jogos ou descarte 1 carta.'
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-30 border-t border-card-gold/40 bg-card-green-dark/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-4px_20px_rgba(0,0,0,0.4)] backdrop-blur-md">

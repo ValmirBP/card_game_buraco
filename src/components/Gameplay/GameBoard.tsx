@@ -56,6 +56,12 @@ export default function GameBoard({ phase }: GameBoardProps) {
       return
     }
 
+    if (game.wouldExtendMeldEmptyHandIllegally(meldIndex, selectedCards)) {
+      setHint('Você não pode baixar todas as cartas sem poder bater.')
+      window.setTimeout(() => setHint(null), 2600)
+      return
+    }
+
     useGameStore.getState().extendMeld(meldIndex, selectedCardIndices)
   }
 

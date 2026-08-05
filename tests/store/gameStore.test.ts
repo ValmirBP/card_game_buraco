@@ -196,6 +196,37 @@ describe('useGameStore', () => {
     expect(state.gameLog.some(l => l.includes('Adversário 1'))).toBe(true)
   })
 
+  test('aiTurn does not get stuck when the engine rejects a hand-emptying meld (team already took morto, no clean canastra): falls back to discard and ends the turn', () => {
+    useGameStore.getState().initGame('Alice', 'easy')
+    useGameStore.getState().discard(0) // human's turn -> seat 1 (AI, "Adversário 1")
+    const game = useGameStore.getState().game!
+    expect(game.state.currentPlayerIndex).toBe(1)
+
+    const aiPlayer = game.getCurrentPlayer()
+    const teamB = game.getTeamOfCurrentPlayer()
+    teamB.hasTakenMorto = true // already took the morto
+    game.state.mortos = [] // none left to auto-pick-up
+    teamB.melds = [] // no clean canastra
+
+    // Force the AI's hand down to exactly one valid (non-canastra) trio, so
+    // any meld strategy that proposes playing it would empty the hand -
+    // exactly the confirmed-bug scenario the engine now refuses.
+    while (!aiPlayer.hand.isEmpty()) {
+      aiPlayer.hand.removeCard(0)
+    }
+    aiPlayer.hand.addCard(new Card('hearts', '5', false))
+    aiPlayer.hand.addCard(new Card('hearts', '6', false))
+    aiPlayer.hand.addCard(new Card('hearts', '7', false))
+
+    useGameStore.getState().aiTurn()
+
+    const state = useGameStore.getState()
+    // The turn must have progressed to the next seat (2) rather than
+    // stalling on seat 1 with an empty/unplayable hand.
+    expect(state.game!.state.currentPlayerIndex).toBe(2)
+    expect(teamB.hasTakenMorto).toBe(true)
+  })
+
   test('aiTurn no-ops when called on the human seat', () => {
     useGameStore.getState().initGame('Alice', 'easy')
     expect(useGameStore.getState().game!.state.currentPlayerIndex).toBe(0)
