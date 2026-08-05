@@ -154,9 +154,9 @@ export default function Result({ onBackToMenu, onNextRound, onNewMatch }: Result
                   />
                 </div>
                 <div className="mt-1 text-xs text-gray-400">
-                  canastras: {matchCanastras[team.id].clean} limpa
-                  {matchCanastras[team.id].clean === 1 ? '' : 's'} · {matchCanastras[team.id].dirty} suja
-                  {matchCanastras[team.id].dirty === 1 ? '' : 's'}
+                  {matchCanastras[team.id].clean} canastra
+                  {matchCanastras[team.id].clean === 1 ? '' : 's'} limpa
+                  {matchCanastras[team.id].clean === 1 ? '' : 's'}
                 </div>
               </div>
             </motion.div>
