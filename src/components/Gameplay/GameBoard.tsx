@@ -158,49 +158,46 @@ export default function GameBoard({ phase }: GameBoardProps) {
             </div>
           </div>
 
-          {/* Mortos: stacked one on top of the other (slightly offset so both
-              are visible), each with a "N cartas" badge. As a team picks one
-              up, it's removed from `mortos` and the remaining one re-centers. */}
+          {/* Mortos: the two mortos overlap in a cross (✚) — morto 1 laid
+              horizontally (rotated 90°) on top of morto 2 standing upright,
+              crossed at the center — each with its own "N cartas" badge. Once
+              a team picks one up it's removed from `mortos` and the cross
+              resolves back to a single upright card (or "ambos pegos"). */}
           <div className="flex flex-col items-center gap-1.5">
             <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-300 sm:text-xs">
               Morto{mortos.length !== 1 ? 's' : ''}
             </span>
             {mortos.length > 0 ? (
-              <div
-                className="relative flex items-center justify-center"
-                style={{
-                  width: 'calc(var(--morto-w, 4rem) + 0.75rem)',
-                  height: 'calc(var(--morto-h, 5.5rem) + 0.75rem)',
-                }}
-              >
+              <div className="relative flex h-20 w-20 items-center justify-center sm:h-24 sm:w-24">
                 <AnimatePresence>
-                  {mortos.map((morto, i) => (
-                    <motion.div
-                      key={i}
-                      layout
-                      initial={{ opacity: 0, scale: 0.85 }}
-                      animate={{
-                        opacity: 1,
-                        scale: 1,
-                        x: i * 14 - 7,
-                        y: i * 14 - 7,
-                      }}
-                      exit={{ opacity: 0, scale: 0.7 }}
-                      style={{ zIndex: mortos.length - i }}
-                      className="absolute flex flex-col items-center gap-1"
-                    >
-                      <div className="relative scale-75 sm:scale-90">
-                        <CardBack variant={i === 0 ? 'blue' : 'red'} />
-                        <span
-                          className={`absolute flex h-6 min-w-6 items-center justify-center rounded-full bg-card-gold px-1.5 text-[10px] font-bold text-black shadow ${
-                            i === 0 ? '-right-3 -top-3' : '-bottom-3 -left-3'
-                          }`}
-                        >
-                          {morto.length}
-                        </span>
-                      </div>
-                    </motion.div>
-                  ))}
+                  {mortos.map((morto, i) => {
+                    // i === 0 -> morto 1, laid horizontally on top; i === 1 ->
+                    // morto 2, upright underneath. If only one morto remains
+                    // (the other already taken) it just sits upright, centered.
+                    const isCrossed = mortos.length === 2
+                    const rotate = isCrossed && i === 0 ? 90 : 0
+                    return (
+                      <motion.div
+                        key={i}
+                        layout
+                        initial={{ opacity: 0, scale: 0.85, rotate }}
+                        animate={{ opacity: 1, scale: 1, rotate }}
+                        exit={{ opacity: 0, scale: 0.7 }}
+                        style={{ zIndex: i === 0 ? 2 : 1 }}
+                        className="absolute flex flex-col items-center gap-1"
+                      >
+                        <div className="relative scale-75 sm:scale-90">
+                          <CardBack variant={i === 0 ? 'blue' : 'red'} />
+                          <span
+                            className="absolute -right-3 -top-3 flex h-6 min-w-6 items-center justify-center rounded-full bg-card-gold px-1.5 text-[10px] font-bold text-black shadow"
+                            style={{ transform: rotate ? `rotate(-${rotate}deg)` : undefined }}
+                          >
+                            {morto.length}
+                          </span>
+                        </div>
+                      </motion.div>
+                    )
+                  })}
                 </AnimatePresence>
               </div>
             ) : (
