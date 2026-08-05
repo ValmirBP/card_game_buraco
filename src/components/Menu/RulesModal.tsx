@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
 
 interface RulesModalProps {
@@ -5,12 +6,12 @@ interface RulesModalProps {
 }
 
 export default function RulesModal({ onClose }: RulesModalProps) {
-  return (
+  return createPortal(
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="rules-modal-title"
@@ -64,6 +65,7 @@ export default function RulesModal({ onClose }: RulesModalProps) {
           Fechar
         </button>
       </motion.div>
-    </motion.div>
+    </motion.div>,
+    document.body
   )
 }
