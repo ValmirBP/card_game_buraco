@@ -1,7 +1,7 @@
 import { Player, PlayerMove } from './player'
 import { Card, createDeck } from './card'
 import { Canasta } from './canasta'
-import { GameState, Team, TeamId, createGameState, teamOfSeat } from './gameState'
+import { GameState, Team, TeamId, TeamScoreBreakdown, createGameState, teamOfSeat } from './gameState'
 import { isValidCanasta, canExtendMeld, scoreCardValue } from './utils'
 
 const HAND_SIZE = 11
@@ -373,17 +373,27 @@ export class Game {
   }
 
   /**
-   * Finalizes the round: each team's score is reduced by the sum of the
-   * remaining hand card values across BOTH partners (using scoreCardValue,
-   * which correctly values jokers at 20 - unlike the rank-only scoreCard),
-   * and the team that closed (a player emptied their hand while their team
-   * had already taken the morto) gets a +100 bonus. Additionally, any team
-   * that never took a morto (team.hasTakenMorto === false) is penalized an
-   * extra -100, regardless of why (never emptied a hand to trigger the
-   * auto-pickup, or the morto became the new baço before they could take
-   * it). winnerTeam is set to whichever team has the higher adjusted score.
-   * Idempotent - calling finish() again after the round is already
-   * 'finished' is a no-op.
+   * Finalizes the round and computes a per-team score breakdown
+   * (state.scoreBreakdowns) with 4 components:
+   *  - meldPoints: sum of canasta.getScore() across the team's current
+   *    melds, recomputed fresh from `team.melds` (NOT read off the
+   *    incrementally-accumulated `team.score`) so this can never double-count
+   *    whatever score bookkeeping happened during play.
+   *  - batidaBonus: +100 if this team closed the round (a player emptied
+   *    their hand while canClose held for their team), else 0.
+   *  - mortoPenalty: -100 if the team never took a morto AND a morto is
+   *    still on the table (state.mortos.length > 0) - i.e. taking one was
+   *    still possible but they didn't. If both mortos already became the
+   *    new baço (mortos.length === 0, see drawFromDeck/promoteMortoIfDeckEmpty),
+   *    nobody could take one anymore, so nobody is penalized for it.
+   *  - handPenalty: negative sum of scoreCardValue (jokers=20) across BOTH
+   *    partners' remaining hand cards.
+   * team.score is set to the sum of these 4 components (meldPoints +
+   * batidaBonus + mortoPenalty + handPenalty), so `team.score` and the
+   * corresponding breakdown's `total` always agree. winnerTeam is set to
+   * whichever team ends with the higher score. Idempotent - calling finish()
+   * again after the round is already 'finished' is a no-op (scoreBreakdowns
+   * and team.score are left untouched from the first call).
    */
   finish(): void {
     if (this.state.status === 'finished') return
@@ -396,22 +406,25 @@ export class Game {
       }
     })
 
-    this.state.players.forEach((p, seat) => {
-      const handPenalty = p.hand.getCards().reduce((sum, card) => sum + scoreCardValue(card), 0)
-      const team = teamOfSeat(this.state, seat)
-      team.score -= handPenalty
+    const breakdowns: TeamScoreBreakdown[] = this.state.teams.map(team => {
+      const meldPoints = team.melds.reduce((sum, m) => sum + m.getScore(), 0)
+      const batidaBonus = closerTeamId === team.id ? 100 : 0
+      const mortoPenalty = !team.hasTakenMorto && this.state.mortos.length > 0 ? -100 : 0
+      const handPenalty =
+        0 -
+        team.seats.reduce((sum, seat) => {
+          const cards = this.state.players[seat].hand.getCards()
+          return sum + cards.reduce((s, card) => s + scoreCardValue(card), 0)
+        }, 0)
+      const total = meldPoints + batidaBonus + mortoPenalty + handPenalty
+      return { teamId: team.id, meldPoints, batidaBonus, mortoPenalty, handPenalty, total }
     })
 
-    if (closerTeamId) {
-      const team = this.state.teams.find(t => t.id === closerTeamId)!
-      team.score += 100
-    }
-
-    this.state.teams.forEach(team => {
-      if (!team.hasTakenMorto) {
-        team.score -= 100
-      }
+    breakdowns.forEach(b => {
+      const team = this.state.teams.find(t => t.id === b.teamId)!
+      team.score = b.total
     })
+    this.state.scoreBreakdowns = breakdowns
 
     const winner = this.state.teams.reduce((best, t) => (t.score > best.score ? t : best), this.state.teams[0])
     this.state.winnerTeam = winner.id

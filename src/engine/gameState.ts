@@ -15,6 +15,20 @@ export interface Team {
 }
 
 /**
+ * Per-team score breakdown produced by Game.finish(), so the result screen
+ * can show exactly where a team's final score came from instead of just the
+ * total. `total` always equals `team.score` after finish() runs.
+ */
+export interface TeamScoreBreakdown {
+  teamId: TeamId
+  meldPoints: number // sum of canasta.getScore() across the team's melds on the table
+  batidaBonus: number // +100 if this team closed the round (bateu), else 0
+  mortoPenalty: number // -100 if penalized per the morto rule (see Game.finish), else 0
+  handPenalty: number // negative: -(sum of scoreCardValue across both partners' remaining hand cards)
+  total: number // meldPoints + batidaBonus + mortoPenalty + handPenalty
+}
+
+/**
  * Seat -> team mapping: seats 0 and 2 are Team A (partners across the
  * table), seats 1 and 3 are Team B.
  */
@@ -41,6 +55,7 @@ export interface GameState {
   round: number
   status: GameStatus
   winnerTeam?: TeamId
+  scoreBreakdowns?: TeamScoreBreakdown[]
 }
 
 export function createGameState(players: Player[]): GameState {

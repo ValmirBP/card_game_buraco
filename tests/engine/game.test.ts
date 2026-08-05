@@ -536,6 +536,13 @@ describe('Game', () => {
   })
 
   describe('finish - team scoring', () => {
+    // NOTE: team.score is now fully DERIVED by finish() from 4 components
+    // (meldPoints computed fresh from team.melds via canasta.getScore(),
+    // batidaBonus, mortoPenalty, handPenalty - see "Parte B" below), rather
+    // than adjusted relative to whatever team.score happened to hold before
+    // finish() ran. So these tests no longer pre-seed team.score as a proxy
+    // for "already accumulated meld points" - they push real melds when they
+    // want meld points to count, and assert the resulting derived total.
     test('subtracts sum of remaining hand values (both partners) from team score', () => {
       const players = makeFourPlayers()
       players[0].hand.addCard(new Card('hearts', 'A', false)) // 15
@@ -548,10 +555,9 @@ describe('Game', () => {
       // math from the separate -100 no-morto penalty (covered below).
       teamA.hasTakenMorto = true
       teamB.hasTakenMorto = true
-      teamA.score = 100
       game.finish()
-      // 100 - (15+10+10) = 65
-      expect(teamA.score).toBe(65)
+      // 0 (no melds) - (15+10+10) = -35
+      expect(teamA.score).toBe(-35)
     })
 
     test('team that closed (a player emptied hand with morto taken + clean canastra) gets +100 bonus', () => {
@@ -564,11 +570,11 @@ describe('Game', () => {
       teamA.hasTakenMorto = true
       teamB.hasTakenMorto = true
       teamA.melds = [cleanCanastra()]
-      teamA.score = 100
-      teamB.score = 50
       game.finish()
-      expect(teamA.score).toBe(200) // 100 - 0 + 100
-      expect(teamB.score).toBe(40) // 50 - 10, no bonus
+      // teamA: meldPoints 255 (cleanCanastra) + batida 100 + 0 + 0 hand = 355
+      expect(teamA.score).toBe(355)
+      // teamB: 0 meld + 0 batida + 0 morto - 10 hand = -10
+      expect(teamB.score).toBe(-10)
     })
 
     test('winnerTeam is set to the team with the higher adjusted score', () => {
@@ -580,8 +586,6 @@ describe('Game', () => {
       teamA.hasTakenMorto = true
       teamB.hasTakenMorto = true
       teamA.melds = [cleanCanastra()]
-      teamA.score = 100
-      teamB.score = 50
       game.finish()
       expect(game.state.winnerTeam).toBe('A')
       expect(game.state.status).toBe('finished')
@@ -595,7 +599,6 @@ describe('Game', () => {
       const teamB = game.state.teams.find(t => t.id === 'B')!
       teamA.hasTakenMorto = true
       teamB.hasTakenMorto = true
-      teamA.score = 100
       game.finish()
       const scoreAfterFirst = teamA.score
       game.finish()
@@ -611,47 +614,144 @@ describe('Game', () => {
       const teamB = game.state.teams.find(t => t.id === 'B')!
       teamA.hasTakenMorto = true
       teamB.hasTakenMorto = true
-      teamA.score = 100
-      teamB.score = 50
       game.finish()
-      expect(teamA.score).toBe(85) // 100 - 15
-      expect(teamB.score).toBe(40) // 50 - 10
+      expect(teamA.score).toBe(-15) // 0 meld - 15 hand
+      expect(teamB.score).toBe(-10) // 0 meld - 10 hand
     })
 
-    describe('morto penalty (-100 for a team that never took a morto)', () => {
-      test('a team with hasTakenMorto === false loses an extra 100 points', () => {
+    describe('morto penalty (-100 for a team that never took a morto, only while a morto remains on the table)', () => {
+      test('a team with hasTakenMorto === false loses an extra 100 points when mortos.length > 0', () => {
         const players = makeFourPlayers()
         const game = new Game(players)
+        // A morto is still sitting on the table (not yet promoted to deck),
+        // so failing to take it is what's being penalized.
+        game.state.mortos = [Array.from({ length: 11 }, () => new Card('clubs', '4', false))]
         const teamA = game.state.teams.find(t => t.id === 'A')!
         const teamB = game.state.teams.find(t => t.id === 'B')!
         teamA.hasTakenMorto = true
         teamB.hasTakenMorto = false
-        teamA.score = 100
-        teamB.score = 100
         game.finish()
-        expect(teamA.score).toBe(100) // took the morto, no hand cards -> untouched
-        expect(teamB.score).toBe(0) // 100 - 100 (no morto), no hand cards
+        expect(teamA.score).toBe(0) // took the morto, no hand cards, no meld -> untouched
+        expect(teamB.score).toBe(-100) // no morto taken, one still available -> penalized
       })
 
       test('the penalty stacks with the remaining-hand penalty', () => {
         const players = makeFourPlayers()
         players[1].hand.addCard(new Card('clubs', '9', false)) // 10
         const game = new Game(players)
+        game.state.mortos = [Array.from({ length: 11 }, () => new Card('clubs', '4', false))]
         const teamB = game.state.teams.find(t => t.id === 'B')!
         teamB.hasTakenMorto = false
-        teamB.score = 200
         game.finish()
-        expect(teamB.score).toBe(90) // 200 - 10 (hand) - 100 (no morto)
+        expect(teamB.score).toBe(-110) // 0 meld - 10 (hand) - 100 (no morto)
       })
 
       test('a team that took the morto is never charged the -100', () => {
         const players = makeFourPlayers()
         const game = new Game(players)
+        game.state.mortos = [Array.from({ length: 11 }, () => new Card('clubs', '4', false))]
         const teamA = game.state.teams.find(t => t.id === 'A')!
         teamA.hasTakenMorto = true
-        teamA.score = 50
         game.finish()
-        expect(teamA.score).toBe(50)
+        expect(teamA.score).toBe(0)
+      })
+    })
+
+    describe('Parte A - morto penalty refined: no penalty once mortos become the deck', () => {
+      test('team without morto + a morto still on the table (mortos.length > 0) -> -100', () => {
+        const players = makeFourPlayers()
+        const game = new Game(players)
+        game.state.mortos = [Array.from({ length: 11 }, () => new Card('clubs', '4', false))]
+        const teamB = game.state.teams.find(t => t.id === 'B')!
+        teamB.hasTakenMorto = false
+        game.finish()
+        expect(teamB.score).toBe(-100)
+      })
+
+      test('team without morto but mortos turned into the deck (mortos=[]) -> NO penalty', () => {
+        const players = makeFourPlayers()
+        const game = new Game(players)
+        // Both mortos already got promoted to the baço (deck ran dry and
+        // was refilled from a morto - see Game.drawFromDeck) - nobody could
+        // still take one, so nobody should be charged for not having one.
+        game.state.mortos = []
+        const teamA = game.state.teams.find(t => t.id === 'A')!
+        const teamB = game.state.teams.find(t => t.id === 'B')!
+        teamA.hasTakenMorto = false
+        teamB.hasTakenMorto = false
+        game.finish()
+        expect(teamA.score).toBe(0)
+        expect(teamB.score).toBe(0)
+      })
+
+      test('a team that took the morto is never penalized, regardless of mortos.length', () => {
+        const players = makeFourPlayers()
+        const game = new Game(players)
+        game.state.mortos = [Array.from({ length: 11 }, () => new Card('clubs', '4', false))]
+        const teamA = game.state.teams.find(t => t.id === 'A')!
+        teamA.hasTakenMorto = true
+        game.finish()
+        expect(teamA.score).toBe(0)
+      })
+    })
+
+    describe('Parte B - scoreBreakdowns (per-team score detail)', () => {
+      test('breakdown with melds + batida + morto penalty + hand penalty sums correctly for each team', () => {
+        const players = makeFourPlayers()
+        players[1].hand.addCard(new Card('clubs', '9', false)) // 10, team B hand penalty
+        const game = new Game(players)
+        game.state.mortos = [Array.from({ length: 11 }, () => new Card('clubs', '4', false))]
+        const teamA = game.state.teams.find(t => t.id === 'A')!
+        const teamB = game.state.teams.find(t => t.id === 'B')!
+        teamA.hasTakenMorto = true
+        teamB.hasTakenMorto = false
+        teamA.melds = [cleanCanastra()] // 255 meld points; seat 0's empty hand -> team A closes
+        game.finish()
+
+        const breakdowns = game.state.scoreBreakdowns!
+        expect(breakdowns).toHaveLength(2)
+
+        const bA = breakdowns.find(b => b.teamId === 'A')!
+        expect(bA.meldPoints).toBe(255)
+        expect(bA.batidaBonus).toBe(100)
+        expect(bA.mortoPenalty).toBe(0)
+        expect(bA.handPenalty).toBe(0)
+        expect(bA.total).toBe(355)
+        expect(teamA.score).toBe(bA.total)
+
+        const bB = breakdowns.find(b => b.teamId === 'B')!
+        expect(bB.meldPoints).toBe(0)
+        expect(bB.batidaBonus).toBe(0)
+        expect(bB.mortoPenalty).toBe(-100)
+        expect(bB.handPenalty).toBe(-10)
+        expect(bB.total).toBe(-110)
+        expect(teamB.score).toBe(bB.total)
+      })
+
+      test('finish() called twice does not duplicate or change scoreBreakdowns', () => {
+        const players = makeFourPlayers()
+        const game = new Game(players)
+        const teamA = game.state.teams.find(t => t.id === 'A')!
+        teamA.hasTakenMorto = true
+        teamA.melds = [cleanCanastra()]
+        game.finish()
+        const firstBreakdowns = game.state.scoreBreakdowns
+        const firstScore = teamA.score
+        game.finish()
+        expect(game.state.scoreBreakdowns).toBe(firstBreakdowns) // same reference, no-op
+        expect(teamA.score).toBe(firstScore)
+      })
+
+      test('total always matches team.score for every team', () => {
+        const players = makeFourPlayers()
+        players[0].hand.addCard(new Card('hearts', 'K', false))
+        const game = new Game(players)
+        game.state.mortos = [Array.from({ length: 11 }, () => new Card('clubs', '4', false))]
+        game.finish()
+        for (const team of game.state.teams) {
+          const breakdown = game.state.scoreBreakdowns!.find(b => b.teamId === team.id)!
+          expect(team.score).toBe(breakdown.total)
+        }
       })
     })
   })
