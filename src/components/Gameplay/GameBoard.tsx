@@ -37,7 +37,9 @@ export default function GameBoard({ phase }: GameBoardProps) {
 
   const { players, discardPile, deck, mortos, teams, currentPlayerIndex, status } = game.state
   const topDiscard = discardPile[discardPile.length - 1]
-  const fanDiscard = discardPile.slice(-4, -1) // up to 3 cards just under the top one
+  // Buraco ABERTO: o lixo é totalmente visível — todas as cartas abaixo do
+  // topo aparecem em leque (com scroll horizontal quando a pilha cresce).
+  const fanDiscard = discardPile.slice(0, -1)
   const isHumanTurn = status === 'playing' && currentPlayerIndex === 0
   const currentTurnName = players[currentPlayerIndex]?.name
 
@@ -130,9 +132,9 @@ export default function GameBoard({ phase }: GameBoardProps) {
               </span>
               <div className="relative flex items-center">
                 {fanDiscard.length > 0 && (
-                  <div className="mr-[-2.4rem] flex -space-x-8 opacity-60 sm:mr-[-2.8rem]">
+                  <div className="scrollbar-gold mr-[-2.4rem] flex max-w-[40vw] -space-x-8 overflow-x-auto py-1 opacity-70 sm:mr-[-2.8rem] sm:max-w-[24rem]">
                     {fanDiscard.map((card, i) => (
-                      <div key={i} style={{ zIndex: i }} className="scale-90">
+                      <div key={i} style={{ zIndex: i }} className="flex-shrink-0 scale-90">
                         <CardComponent card={card} />
                       </div>
                     ))}
