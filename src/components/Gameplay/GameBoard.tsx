@@ -158,30 +158,59 @@ export default function GameBoard({ phase }: GameBoardProps) {
             </div>
           </div>
 
-          {/* Mortos */}
-          <div className="flex items-center justify-center gap-3 sm:gap-4">
+          {/* Mortos: stacked one on top of the other (slightly offset so both
+              are visible), each with a "N cartas" badge. As a team picks one
+              up, it's removed from `mortos` and the remaining one re-centers. */}
+          <div className="flex flex-col items-center gap-1.5">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-300 sm:text-xs">
+              Morto{mortos.length !== 1 ? 's' : ''}
+            </span>
             {mortos.length > 0 ? (
-              mortos.map((morto, i) => (
-                <div key={i} className="flex flex-col items-center gap-1.5">
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-300 sm:text-xs">
-                    Morto {i + 1}
-                  </span>
-                  <div className="relative flex h-16 w-16 items-center justify-center sm:h-20 sm:w-20">
-                    <div className="absolute scale-75 sm:scale-90">
-                      <CardBack variant={i === 0 ? 'blue' : 'red'} />
-                    </div>
-                    <div className="absolute rotate-90 scale-75 sm:scale-90">
-                      <CardBack variant={i === 0 ? 'red' : 'blue'} />
-                    </div>
-                  </div>
-                  <span className="text-[10px] text-gray-400">{morto.length} cartas</span>
-                </div>
-              ))
+              <div
+                className="relative flex items-center justify-center"
+                style={{
+                  width: 'calc(var(--morto-w, 4rem) + 0.75rem)',
+                  height: 'calc(var(--morto-h, 5.5rem) + 0.75rem)',
+                }}
+              >
+                <AnimatePresence>
+                  {mortos.map((morto, i) => (
+                    <motion.div
+                      key={i}
+                      layout
+                      initial={{ opacity: 0, scale: 0.85 }}
+                      animate={{
+                        opacity: 1,
+                        scale: 1,
+                        x: i * 8,
+                        y: i * 8,
+                      }}
+                      exit={{ opacity: 0, scale: 0.7 }}
+                      style={{ zIndex: mortos.length - i }}
+                      className="absolute flex flex-col items-center gap-1"
+                    >
+                      <div className="relative scale-75 sm:scale-90">
+                        <CardBack variant={i === 0 ? 'blue' : 'red'} />
+                        <span className="absolute -right-3 -top-3 flex h-6 min-w-6 items-center justify-center rounded-full bg-card-gold px-1.5 text-[10px] font-bold text-black shadow">
+                          {morto.length}
+                        </span>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
             ) : (
               <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-gray-300">
                 Ambos os mortos já foram pegos
               </span>
             )}
+            <div className="flex gap-3 text-[10px] text-gray-400">
+              {mortos.map((morto, i) => (
+                <span key={i}>
+                  Morto {i + 1}: {morto.length} cartas
+                </span>
+              ))}
+            </div>
           </div>
         </div>
 
