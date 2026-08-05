@@ -3,7 +3,7 @@ import { Game } from '../engine/game'
 import { HumanPlayer, Player } from '../engine/player'
 import { AIPlayer, AIDifficulty, GameStateForAI } from '../engine/ai'
 import { Card } from '../engine/card'
-import { scoreCard } from '../engine/utils'
+import { scoreCardValue } from '../engine/utils'
 
 /** Max meld actions (play_canasta/extend_meld) the AI is allowed to make in a
  * single turn before we force it to discard. Guards against an infinite loop
@@ -73,16 +73,16 @@ const DIFFICULTY_LABEL: Record<string, string> = {
 }
 
 /** Fallback discard used whenever the AI's move can't be honored as-is (or it
- * didn't propose a discard at all): discards the lowest scoreCard()-value
+ * didn't propose a discard at all): discards the lowest scoreCardValue()-value
  * card in hand. Returns true if a card was actually discarded. */
 function discardLowestValueCard(game: Game, player: Player): boolean {
   const cards = player.hand.getCards()
   if (cards.length === 0) return false
 
   let lowestIndex = 0
-  let lowestValue = scoreCard(cards[0].rank)
+  let lowestValue = scoreCardValue(cards[0])
   for (let i = 1; i < cards.length; i++) {
-    const value = scoreCard(cards[i].rank)
+    const value = scoreCardValue(cards[i])
     if (value < lowestValue) {
       lowestValue = value
       lowestIndex = i
