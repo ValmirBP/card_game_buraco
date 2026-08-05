@@ -303,6 +303,15 @@ export default function GameBoard({ phase }: GameBoardProps) {
                           >
                             {canasta.isClean ? 'Limpa' : 'Suja'}
                             {canasta.type === 'aces' ? ' · Trinca de Áses' : ''} (+{canasta.points})
+                            {/* Engine rules (canastra = 7+ cards) are owned by a
+                             * parallel agent; read `isCanastra` defensively so
+                             * this compiles regardless of merge order, falling
+                             * back to the 7+ card-count rule if the field
+                             * isn't there yet. */}
+                            {((canasta as unknown as { isCanastra?: boolean }).isCanastra ??
+                              canasta.cards.length >= 7) && (
+                              <span className="ml-1 text-card-gold">· Canastra!</span>
+                            )}
                           </div>
                         </motion.div>
                       )
