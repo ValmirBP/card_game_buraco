@@ -3,7 +3,10 @@ import { Layout } from './components/Layout'
 import Menu, { type BotNames } from './components/Menu/Menu'
 import Gameplay from './components/Gameplay/Gameplay'
 import Result from './components/Result/Result'
+import OnlineLobby from './components/Online/OnlineLobby'
+import OnlineGameplay from './components/Online/OnlineGameplay'
 import { useGameStore } from './store/gameStore'
+import { useOnlineStore } from './online/onlineStore'
 import type { AIDifficulty } from './engine/ai'
 
 const DEFAULT_BOT_NAMES: BotNames = {
@@ -12,7 +15,7 @@ const DEFAULT_BOT_NAMES: BotNames = {
   opponent2: 'Adversário 2',
 }
 
-type Screen = 'menu' | 'gameplay' | 'result'
+type Screen = 'menu' | 'gameplay' | 'result' | 'onlineLobby' | 'onlineGameplay'
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('menu')
@@ -56,13 +59,27 @@ export default function App() {
     setScreen('menu')
   }
 
+  const handleOnlineBackToMenu = () => {
+    useOnlineStore.getState().leave()
+    setScreen('menu')
+  }
+
   return (
     <Layout>
-      {screen === 'menu' && <Menu onStart={handleStart} />}
+      {screen === 'menu' && (
+        <Menu onStart={handleStart} onPlayOnline={() => setScreen('onlineLobby')} />
+      )}
       {screen === 'gameplay' && game && <Gameplay onGameEnd={() => setScreen('result')} />}
       {screen === 'result' && game && (
         <Result onBackToMenu={handleBackToMenu} onNextRound={handleNextRound} onNewMatch={handleNewMatch} />
       )}
+      {screen === 'onlineLobby' && (
+        <OnlineLobby
+          onBackToMenu={handleOnlineBackToMenu}
+          onGameStart={() => setScreen('onlineGameplay')}
+        />
+      )}
+      {screen === 'onlineGameplay' && <OnlineGameplay onBackToMenu={handleOnlineBackToMenu} />}
     </Layout>
   )
 }

@@ -15,6 +15,7 @@ export interface BotNames {
 
 interface MenuProps {
   onStart: (difficulty: AIDifficulty, playerName: string, names: BotNames) => void
+  onPlayOnline: () => void
 }
 
 const DEFAULT_BOT_NAMES: BotNames = {
@@ -32,7 +33,7 @@ const FAN_CARDS: { card: EngineCard; rotate: number; x: number }[] = [
   { card: new EngineCard('hearts', '10'), rotate: 18, x: 78 },
 ]
 
-export default function Menu({ onStart }: MenuProps) {
+export default function Menu({ onStart, onPlayOnline }: MenuProps) {
   const [showDifficulty, setShowDifficulty] = useState(false)
   const [showRules, setShowRules] = useState(false)
   const [playerName, setPlayerName] = useState('Você')
@@ -152,6 +153,15 @@ export default function Menu({ onStart }: MenuProps) {
           className="min-h-[44px] w-full rounded-xl bg-gradient-to-b from-card-gold-light to-card-gold px-6 py-3 font-bold text-black shadow-lg shadow-black/30 transition-colors hover:from-card-gold hover:to-card-gold-dark"
         >
           Jogar vs IA
+        </motion.button>
+        <motion.button
+          type="button"
+          whileHover={{ scale: 1.03 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={onPlayOnline}
+          className="min-h-[44px] w-full rounded-xl border-2 border-card-gold/70 bg-black/20 px-6 py-3 font-bold text-card-gold backdrop-blur-sm transition-colors hover:bg-card-gold/10"
+        >
+          Jogar Online
         </motion.button>
         <motion.button
           type="button"
