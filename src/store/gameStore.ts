@@ -159,10 +159,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!game || game.state.status !== 'playing') return
 
     const player = game.getCurrentPlayer()
+    const mortosBefore = game.state.mortos.length
     const card = game.drawFromDeck()
+    const log = [...gameLog]
+    // Nas compras, mortos só diminuem quando um morto é promovido a monte.
+    if (game.state.mortos.length < mortosBefore) {
+      log.push('O monte acabou — o morto virou o novo monte!')
+    }
     if (!card) {
       set({
-        gameLog: [...gameLog, 'O monte acabou.'],
+        gameLog: [...log, 'O monte acabou.'],
         version: get().version + 1,
       })
       return
@@ -170,7 +176,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     player.hand.addCard(card)
     set({
-      gameLog: [...gameLog, `${player.name} comprou uma carta.`],
+      gameLog: [...log, `${player.name} comprou uma carta.`],
       version: get().version + 1,
     })
   },
@@ -285,6 +291,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const log = [...gameLog]
     let hadMorto = game.getTeamOfCurrentPlayer().hasTakenMorto
     let gameEnded = false
+    const mortosBeforeDraw = game.state.mortos.length
 
     // Draw phase: normally draws from the deck, but honors a take_discard
     // proposal from the AI's strategy if one comes back (the current
@@ -314,6 +321,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
       } else {
         log.push('O monte acabou.')
       }
+    }
+
+    // Nas compras, mortos só diminuem quando um morto é promovido a monte.
+    if (game.state.mortos.length < mortosBeforeDraw) {
+      log.push('O monte acabou — o morto virou o novo monte!')
     }
 
     let discarded = false

@@ -54,14 +54,25 @@ export class Game {
    * 2" while it's still around) becomes the new baço and the draw proceeds
    * from it - this keeps the round alive instead of ending it by exhaustion.
    * Only returns null once both the deck and the mortos are exhausted.
+   *
+   * The promotion is also done EAGERLY right after a draw empties the baço
+   * (not only lazily on the next draw), so the table never shows an empty
+   * monte while a morto sits unused - which players read as a stuck game.
    */
   drawFromDeck(): Card | null {
-    if (this.state.deck.length === 0) {
-      const morto = this.state.mortos.pop()
-      if (!morto) return null
-      this.state.deck = morto
+    this.promoteMortoIfDeckEmpty()
+    if (this.state.deck.length === 0) return null
+    const card = this.state.deck.pop()!
+    this.promoteMortoIfDeckEmpty()
+    return card
+  }
+
+  /** If the baço is empty and a morto remains on the table, the morto
+   * immediately becomes the new baço. */
+  private promoteMortoIfDeckEmpty(): void {
+    if (this.state.deck.length === 0 && this.state.mortos.length > 0) {
+      this.state.deck = this.state.mortos.pop()!
     }
-    return this.state.deck.pop()!
   }
 
   /**
