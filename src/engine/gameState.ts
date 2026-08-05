@@ -35,7 +35,9 @@ export interface GameState {
   currentPlayerIndex: number // 0..3
   deck: Card[] // baço
   discardPile: Card[]
-  mortos: Card[][] // 2 mortos of 11 cards each; emptied/removed once taken
+  mortos: Card[][] // 2 mortos of 11 cards each; removed once taken via
+  // pickUpMorto, or once consumed as the new baço when the deck runs dry
+  // (see Game.drawFromDeck)
   round: number
   status: GameStatus
   winnerTeam?: TeamId

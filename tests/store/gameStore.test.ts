@@ -270,7 +270,10 @@ describe('useGameStore', () => {
   test('game finishes once the deck (baço) runs out', () => {
     useGameStore.getState().initGame('Alice', 'easy')
     const game = useGameStore.getState().game!
+    // A morto still on the table becomes the new baço when the deck runs
+    // out (see Game.drawFromDeck), so exhaustion requires both to be empty.
     game.state.deck = []
+    game.state.mortos = []
 
     useGameStore.getState().discard(0)
 

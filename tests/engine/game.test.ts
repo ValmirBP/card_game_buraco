@@ -99,6 +99,57 @@ describe('Game', () => {
     expect(game.drawFromDeck()).toBeNull()
   })
 
+  describe('drawFromDeck - morto becomes new deck when baço runs out', () => {
+    test('deck empties with a morto still available: draws a card, consumes one morto, deck becomes 10', () => {
+      const game = new Game(makeFourPlayers())
+      game.setup()
+      game.state.deck = []
+      game.state.mortos = [
+        Array.from({ length: 11 }, () => new Card('hearts', '3', false)),
+      ]
+
+      const card = game.drawFromDeck()
+
+      expect(card).not.toBeNull()
+      expect(game.state.mortos.length).toBe(0)
+      expect(game.state.deck.length).toBe(10)
+      expect(game.isGameOver()).toBe(false)
+    })
+
+    test('deck empties with no mortos available: returns null and isGameOver is true', () => {
+      const game = new Game(makeFourPlayers())
+      game.setup()
+      game.state.deck = []
+      game.state.mortos = []
+
+      const card = game.drawFromDeck()
+
+      expect(card).toBeNull()
+      expect(game.isGameOver()).toBe(true)
+      expect(game.state.status).toBe('playing')
+    })
+
+    test('with two mortos, exhausting the deck twice converts each morto before the game can end by exhaustion', () => {
+      const game = new Game(makeFourPlayers())
+      game.setup()
+      game.state.deck = []
+      game.state.mortos = [
+        Array.from({ length: 11 }, () => new Card('hearts', '4', false)),
+        Array.from({ length: 11 }, () => new Card('clubs', '5', false)),
+      ]
+
+      // Drain what becomes the deck after the first morto (morto 2) converts.
+      while (game.drawFromDeck() !== null) {
+        // drain
+      }
+
+      // Both mortos consumed by now; deck and mortos empty -> game over by exhaustion.
+      expect(game.state.deck.length).toBe(0)
+      expect(game.state.mortos.length).toBe(0)
+      expect(game.isGameOver()).toBe(true)
+    })
+  })
+
   describe('discard', () => {
     test('removes card from current player hand and adds to discard pile', () => {
       const players = makeFourPlayers()

@@ -48,9 +48,18 @@ export class Game {
     this.state.status = 'playing'
   }
 
+  /**
+   * Draws the top card of the baço. If the baço is empty but at least one
+   * morto is still on the table, the last morto (mortos.pop(), i.e. "morto
+   * 2" while it's still around) becomes the new baço and the draw proceeds
+   * from it - this keeps the round alive instead of ending it by exhaustion.
+   * Only returns null once both the deck and the mortos are exhausted.
+   */
   drawFromDeck(): Card | null {
     if (this.state.deck.length === 0) {
-      return null
+      const morto = this.state.mortos.pop()
+      if (!morto) return null
+      this.state.deck = morto
     }
     return this.state.deck.pop()!
   }
@@ -246,12 +255,14 @@ export class Game {
    * A round is over once status is 'playing' AND either:
    *  - a team has "batido" (a player's hand is empty AND their team
    *    canClose - has taken the morto and has a clean 7+ card canastra), or
-   *  - the deck (baço) is empty.
+   *  - the deck (baço) AND both mortos are exhausted (a morto becomes the
+   *    new baço when the deck runs out while a morto is still available -
+   *    see drawFromDeck).
    */
   isGameOver(): boolean {
     if (this.state.status !== 'playing') return false
 
-    const deckEmpty = this.state.deck.length === 0
+    const deckEmpty = this.state.deck.length === 0 && this.state.mortos.length === 0
     const someoneClosed = this.state.players.some((p, seat) => {
       if (!p.hand.isEmpty()) return false
       return this.canClose(teamOfSeat(this.state, seat))
