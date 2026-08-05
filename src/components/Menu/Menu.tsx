@@ -7,8 +7,20 @@ import type { AIDifficulty } from '../../engine/ai'
 import { Card as EngineCard } from '../../engine/card'
 import { CardComponent } from '../Card'
 
+export interface BotNames {
+  partner: string
+  opponent1: string
+  opponent2: string
+}
+
 interface MenuProps {
-  onStart: (difficulty: AIDifficulty, playerName: string) => void
+  onStart: (difficulty: AIDifficulty, playerName: string, names: BotNames) => void
+}
+
+const DEFAULT_BOT_NAMES: BotNames = {
+  partner: 'Parceiro',
+  opponent1: 'Adversário 1',
+  opponent2: 'Adversário 2',
 }
 
 /** Purely decorative fan of cards shown behind the title. */
@@ -24,12 +36,19 @@ export default function Menu({ onStart }: MenuProps) {
   const [showDifficulty, setShowDifficulty] = useState(false)
   const [showRules, setShowRules] = useState(false)
   const [playerName, setPlayerName] = useState('Você')
+  const [showNameEditor, setShowNameEditor] = useState(false)
+  const [botNames, setBotNames] = useState<BotNames>(DEFAULT_BOT_NAMES)
 
   const handleSelectDifficulty = (difficulty: AIDifficulty) => {
     const name = playerName.trim() || 'Você'
-    useGameStore.getState().initGame(name, difficulty)
+    const names: BotNames = {
+      partner: botNames.partner.trim() || DEFAULT_BOT_NAMES.partner,
+      opponent1: botNames.opponent1.trim() || DEFAULT_BOT_NAMES.opponent1,
+      opponent2: botNames.opponent2.trim() || DEFAULT_BOT_NAMES.opponent2,
+    }
+    useGameStore.getState().initGame(name, difficulty, names)
     setShowDifficulty(false)
-    onStart(difficulty, name)
+    onStart(difficulty, name, names)
   }
 
   return (
@@ -64,6 +83,64 @@ export default function Menu({ onStart }: MenuProps) {
           onChange={e => setPlayerName(e.target.value)}
           className="min-h-[44px] w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-center text-white placeholder-gray-400 shadow-inner outline-none backdrop-blur-sm transition focus:ring-4 focus:ring-card-gold/70"
         />
+      </div>
+
+      <div className="w-full max-w-sm px-4">
+        <button
+          type="button"
+          onClick={() => setShowNameEditor(v => !v)}
+          className="w-full text-center text-sm text-gray-300 underline decoration-dotted underline-offset-4 transition-colors hover:text-card-gold"
+        >
+          {showNameEditor ? 'Ocultar edição de nomes' : 'Editar nomes'}
+        </button>
+        {showNameEditor && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="mt-3 flex flex-col gap-3 overflow-hidden"
+          >
+            <div>
+              <label htmlFor="partner-name" className="mb-1 block text-xs text-gray-300">
+                Parceiro
+              </label>
+              <input
+                id="partner-name"
+                type="text"
+                placeholder={DEFAULT_BOT_NAMES.partner}
+                value={botNames.partner}
+                onChange={e => setBotNames(n => ({ ...n, partner: e.target.value }))}
+                className="min-h-[44px] w-full rounded-xl border border-white/10 bg-black/30 px-4 py-2 text-center text-white placeholder-gray-400 shadow-inner outline-none backdrop-blur-sm transition focus:ring-4 focus:ring-card-gold/70"
+              />
+            </div>
+            <div>
+              <label htmlFor="opponent1-name" className="mb-1 block text-xs text-gray-300">
+                Adversário 1
+              </label>
+              <input
+                id="opponent1-name"
+                type="text"
+                placeholder={DEFAULT_BOT_NAMES.opponent1}
+                value={botNames.opponent1}
+                onChange={e => setBotNames(n => ({ ...n, opponent1: e.target.value }))}
+                className="min-h-[44px] w-full rounded-xl border border-white/10 bg-black/30 px-4 py-2 text-center text-white placeholder-gray-400 shadow-inner outline-none backdrop-blur-sm transition focus:ring-4 focus:ring-card-gold/70"
+              />
+            </div>
+            <div>
+              <label htmlFor="opponent2-name" className="mb-1 block text-xs text-gray-300">
+                Adversário 2
+              </label>
+              <input
+                id="opponent2-name"
+                type="text"
+                placeholder={DEFAULT_BOT_NAMES.opponent2}
+                value={botNames.opponent2}
+                onChange={e => setBotNames(n => ({ ...n, opponent2: e.target.value }))}
+                className="min-h-[44px] w-full rounded-xl border border-white/10 bg-black/30 px-4 py-2 text-center text-white placeholder-gray-400 shadow-inner outline-none backdrop-blur-sm transition focus:ring-4 focus:ring-card-gold/70"
+              />
+            </div>
+          </motion.div>
+        )}
       </div>
 
       <div className="flex w-full max-w-sm flex-col gap-4 px-4">

@@ -1,10 +1,16 @@
 import { useState } from 'react'
 import { Layout } from './components/Layout'
-import Menu from './components/Menu/Menu'
+import Menu, { type BotNames } from './components/Menu/Menu'
 import Gameplay from './components/Gameplay/Gameplay'
 import Result from './components/Result/Result'
 import { useGameStore } from './store/gameStore'
 import type { AIDifficulty } from './engine/ai'
+
+const DEFAULT_BOT_NAMES: BotNames = {
+  partner: 'Parceiro',
+  opponent1: 'Adversário 1',
+  opponent2: 'Adversário 2',
+}
 
 type Screen = 'menu' | 'gameplay' | 'result'
 
@@ -15,6 +21,7 @@ export default function App() {
   // instance. Menu.onStart reports what the player picked before starting.
   const [lastDifficulty, setLastDifficulty] = useState<AIDifficulty>('medium')
   const [lastPlayerName, setLastPlayerName] = useState('Você')
+  const [lastBotNames, setLastBotNames] = useState<BotNames>(DEFAULT_BOT_NAMES)
 
   const game = useGameStore(s => s.game)
   // `version` selected alongside `game` per the store's reactivity contract:
@@ -23,14 +30,15 @@ export default function App() {
   const version = useGameStore(s => s.version)
   void version
 
-  const handleStart = (difficulty: AIDifficulty, playerName: string) => {
+  const handleStart = (difficulty: AIDifficulty, playerName: string, names: BotNames) => {
     setLastDifficulty(difficulty)
     setLastPlayerName(playerName)
+    setLastBotNames(names)
     setScreen('gameplay')
   }
 
   const handlePlayAgain = () => {
-    useGameStore.getState().initGame(lastPlayerName, lastDifficulty)
+    useGameStore.getState().initGame(lastPlayerName, lastDifficulty, lastBotNames)
     setScreen('gameplay')
   }
 

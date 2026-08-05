@@ -34,9 +34,16 @@ export interface GameStore {
   selectedCardIndices: number[]
   gameLog: string[]
 
-  /** Seat 0 = human (`playerName`); seat 2 = human's AI partner; seats 1 and
-   * 3 = the opposing team. All three AIs play at `aiDifficulty`. */
-  initGame: (playerName: string, aiDifficulty: AIDifficulty) => void
+  /** Seat 0 = human (`playerName`); seat 2 = human's AI partner (`names.partner`);
+   * seat 1 = `names.opponent1`; seat 3 = `names.opponent2`. All three AIs play
+   * at `aiDifficulty`. `names` is optional and defaults to the traditional
+   * "Parceiro" / "Adversário 1" / "Adversário 2" labels for backward
+   * compatibility with existing callers/tests. */
+  initGame: (
+    playerName: string,
+    aiDifficulty: AIDifficulty,
+    names?: { partner?: string; opponent1?: string; opponent2?: string }
+  ) => void
   /** Draw one card from the deck (baço) into the current player's hand. */
   drawFromDeck: () => void
   /** Take the entire discard pile into the current player's hand. */
@@ -124,11 +131,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
   selectedCardIndices: [],
   gameLog: [],
 
-  initGame: (playerName, aiDifficulty) => {
+  initGame: (playerName, aiDifficulty, names) => {
+    const partnerName = names?.partner?.trim() || 'Parceiro'
+    const opponent1Name = names?.opponent1?.trim() || 'Adversário 1'
+    const opponent2Name = names?.opponent2?.trim() || 'Adversário 2'
+
     const human = new HumanPlayer(playerName)
-    const opponent1 = new AIPlayer('Adversário 1', aiDifficulty)
-    const partner = new AIPlayer('Parceiro', aiDifficulty)
-    const opponent2 = new AIPlayer('Adversário 2', aiDifficulty)
+    const opponent1 = new AIPlayer(opponent1Name, aiDifficulty)
+    const partner = new AIPlayer(partnerName, aiDifficulty)
+    const opponent2 = new AIPlayer(opponent2Name, aiDifficulty)
     const game = new Game([human, opponent1, partner, opponent2])
     game.setup()
 
@@ -138,7 +149,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       version: get().version + 1,
       selectedCardIndices: [],
       gameLog: [
-        `Partida iniciada: ${playerName} e Parceiro (Time A) vs Adversário 1 e Adversário 2 (Time B), dificuldade ${label}.`,
+        `Partida iniciada: ${playerName} e ${partnerName} (Time A) vs ${opponent1Name} e ${opponent2Name} (Time B), dificuldade ${label}.`,
       ],
     })
   },

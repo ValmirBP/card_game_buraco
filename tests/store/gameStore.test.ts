@@ -28,6 +28,30 @@ describe('useGameStore', () => {
     expect(game!.state.deck.length).toBe(108 - 4 * 11 - 2 * 11 - 1)
   })
 
+  test('initGame accepts optional bot names and assigns them to the right seats', () => {
+    useGameStore.getState().initGame('Alice', 'easy', {
+      partner: 'Bia',
+      opponent1: 'Carlos',
+      opponent2: 'Duda',
+    })
+    const { game, gameLog } = useGameStore.getState()
+
+    expect(game!.state.players[0].name).toBe('Alice')
+    expect(game!.state.players[1].name).toBe('Carlos')
+    expect(game!.state.players[2].name).toBe('Bia')
+    expect(game!.state.players[3].name).toBe('Duda')
+    expect(gameLog.some(l => l.includes('Bia') && l.includes('Carlos') && l.includes('Duda'))).toBe(true)
+  })
+
+  test('initGame without names falls back to the default bot names (backward compatible)', () => {
+    useGameStore.getState().initGame('Alice', 'easy')
+    const { game } = useGameStore.getState()
+
+    expect(game!.state.players[1].name).toBe('Adversário 1')
+    expect(game!.state.players[2].name).toBe('Parceiro')
+    expect(game!.state.players[3].name).toBe('Adversário 2')
+  })
+
   test('drawFromDeck adds a card to the current player hand and bumps version', () => {
     useGameStore.getState().initGame('Alice', 'easy')
     const versionBefore = useGameStore.getState().version
