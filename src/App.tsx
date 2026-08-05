@@ -16,7 +16,7 @@ type Screen = 'menu' | 'gameplay' | 'result'
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('menu')
-  // Remembered so "Jogar Novamente" from the Result screen can restart with
+  // Remembered so "Nova Partida" from the Result screen can restart with
   // the same settings without having to dig them out of the (reset) game
   // instance. Menu.onStart reports what the player picked before starting.
   const [lastDifficulty, setLastDifficulty] = useState<AIDifficulty>('medium')
@@ -37,8 +37,17 @@ export default function App() {
     setScreen('gameplay')
   }
 
-  const handlePlayAgain = () => {
+  // Match just ended (matchWinner set) -> start a brand-new match with the
+  // same settings. `initGame` also resets matchScores/matchCanastras/round.
+  const handleNewMatch = () => {
     useGameStore.getState().initGame(lastPlayerName, lastDifficulty, lastBotNames)
+    setScreen('gameplay')
+  }
+
+  // Match still in progress -> advance to the next round, keeping the
+  // accumulated matchScores/matchCanastras.
+  const handleNextRound = () => {
+    useGameStore.getState().startNextRound()
     setScreen('gameplay')
   }
 
@@ -52,7 +61,7 @@ export default function App() {
       {screen === 'menu' && <Menu onStart={handleStart} />}
       {screen === 'gameplay' && game && <Gameplay onGameEnd={() => setScreen('result')} />}
       {screen === 'result' && game && (
-        <Result onBackToMenu={handleBackToMenu} onPlayAgain={handlePlayAgain} />
+        <Result onBackToMenu={handleBackToMenu} onNextRound={handleNextRound} onNewMatch={handleNewMatch} />
       )}
     </Layout>
   )

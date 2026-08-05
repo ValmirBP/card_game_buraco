@@ -1,10 +1,15 @@
 import { motion } from 'framer-motion'
-import { useGameStore } from '../../store/gameStore'
+import { useGameStore, MATCH_TARGET } from '../../store/gameStore'
 import type { TeamId, TeamScoreBreakdown } from '../../engine/gameState'
 
 interface ResultProps {
   onBackToMenu: () => void
-  onPlayAgain: () => void
+  /** Advances to the next round of the SAME match (match still in
+   * progress — no `matchWinner` yet). */
+  onNextRound: () => void
+  /** Starts a brand-new match (current match just ended — `matchWinner`
+   * is set). */
+  onNewMatch: () => void
 }
 
 const TEAM_LABEL: Record<TeamId, string> = { A: 'Nós', B: 'Eles' }
@@ -24,17 +29,21 @@ function BreakdownRow({ label, value, muted }: { label: string; value: number; m
   )
 }
 
-export default function Result({ onBackToMenu, onPlayAgain }: ResultProps) {
+export default function Result({ onBackToMenu, onNextRound, onNewMatch }: ResultProps) {
   // `version` selected alongside `game` per the store's reactivity contract
   // (game is a mutable engine instance with a stable reference).
   useGameStore(s => s.version)
   const game = useGameStore(s => s.game)
+  const matchScores = useGameStore(s => s.matchScores)
+  const matchCanastras = useGameStore(s => s.matchCanastras)
+  const round = useGameStore(s => s.round)
+  const matchWinner = useGameStore(s => s.matchWinner)
 
   if (!game) return null
 
   const { teams, players, winnerTeam, scoreBreakdowns } = game.state
   // Team A is always seats [0, 2] = the human + their AI partner ("Nós").
-  const humanTeamWon = winnerTeam === 'A'
+  const humanMatchWon = matchWinner === 'A'
   const sortedTeams = [...teams].sort((a, b) => b.score - a.score)
 
   const breakdownOf = (id: TeamId): TeamScoreBreakdown | undefined =>
@@ -55,12 +64,24 @@ export default function Result({ onBackToMenu, onPlayAgain }: ResultProps) {
         transition={{ type: 'spring', stiffness: 260, damping: 20 }}
       >
         <h1 className="font-display text-4xl text-card-gold drop-shadow-[0_2px_10px_rgba(212,175,55,0.5)] sm:text-6xl">
-          {humanTeamWon ? '🎉 Vocês venceram!' : 'A dupla adversária venceu'}
+          {matchWinner
+            ? humanMatchWon
+              ? '🎉 Vocês venceram a partida!'
+              : 'A dupla adversária venceu a partida'
+            : `Fim da rodada ${round}`}
         </h1>
         {winnerTeam && (
           <p className="mt-3 text-lg text-gray-200 sm:text-xl">
-            {TEAM_LABEL[winnerTeam]} ({seatsOfTeam(winnerTeam)}) venceu com{' '}
-            {teams.find(t => t.id === winnerTeam)!.score} pontos!
+            {matchWinner ? (
+              <>
+                {TEAM_LABEL[matchWinner]} venceu a partida com {matchScores[matchWinner]} pontos!
+              </>
+            ) : (
+              <>
+                Nesta rodada, {TEAM_LABEL[winnerTeam]} ({seatsOfTeam(winnerTeam)}) venceu com{' '}
+                {teams.find(t => t.id === winnerTeam)!.score} pontos.
+              </>
+            )}
           </p>
         )}
       </motion.div>
@@ -118,6 +139,26 @@ export default function Result({ onBackToMenu, onPlayAgain }: ResultProps) {
                   </div>
                 </div>
               )}
+
+              <div className="mt-2 border-t border-white/10 pt-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-semibold text-gray-200">Total da partida</span>
+                  <span className="font-bold tabular-nums text-card-gold">
+                    {matchScores[team.id]} / {MATCH_TARGET}
+                  </span>
+                </div>
+                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                  <div
+                    className="h-full rounded-full bg-card-gold transition-[width]"
+                    style={{ width: `${Math.min(100, (matchScores[team.id] / MATCH_TARGET) * 100)}%` }}
+                  />
+                </div>
+                <div className="mt-1 text-xs text-gray-400">
+                  canastras: {matchCanastras[team.id].clean} limpa
+                  {matchCanastras[team.id].clean === 1 ? '' : 's'} · {matchCanastras[team.id].dirty} suja
+                  {matchCanastras[team.id].dirty === 1 ? '' : 's'}
+                </div>
+              </div>
             </motion.div>
           )
         })}
@@ -133,10 +174,10 @@ export default function Result({ onBackToMenu, onPlayAgain }: ResultProps) {
           type="button"
           whileHover={{ scale: 1.03 }}
           whileTap={{ scale: 0.97 }}
-          onClick={onPlayAgain}
+          onClick={matchWinner ? onNewMatch : onNextRound}
           className="min-h-[44px] w-full rounded-xl bg-gradient-to-b from-card-gold-light to-card-gold px-6 py-3 font-bold text-black shadow-lg shadow-black/30 transition-colors hover:from-card-gold hover:to-card-gold-dark"
         >
-          Jogar Novamente
+          {matchWinner ? 'Nova Partida' : 'Próxima Rodada'}
         </motion.button>
         <motion.button
           type="button"

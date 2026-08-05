@@ -4,12 +4,79 @@ import { HumanPlayer, Player } from '../engine/player'
 import { AIPlayer, AIDifficulty, GameStateForAI } from '../engine/ai'
 import { Card } from '../engine/card'
 import { scoreCardValue } from '../engine/utils'
+import type { Team, TeamId } from '../engine/gameState'
 
 /** Max meld actions (play_canasta/extend_meld) the AI is allowed to make in a
  * single turn before we force it to discard. Guards against an infinite loop
  * if playTurn() ever kept returning meld moves (e.g. a buggy/adversarial
  * strategy). */
 const MAX_AI_MELD_ACTIONS_PER_TURN = 12
+
+/** A "partida" (match) is won by the first team to reach this many
+ * accumulated points across however many rounds (`Game` instances) it takes.
+ * A single `Game` only ever models one round; the match layer lives entirely
+ * in this store. */
+export const MATCH_TARGET = 3000
+
+export type CanastraCount = { clean: number; dirty: number }
+
+/** Config remembered across rounds so `startNextRound()` can rebuild a fresh
+ * `Game` with the same 4 players (same names/difficulty) that `initGame()`
+ * was called with. */
+export interface MatchConfig {
+  playerName: string
+  aiDifficulty: AIDifficulty
+  names?: { partner?: string; opponent1?: string; opponent2?: string }
+}
+
+/** Counts this round's 7+ canastras per team, split by clean/dirty. */
+function countRoundCanastras(team: Team): CanastraCount {
+  let clean = 0
+  let dirty = 0
+  for (const meld of team.melds) {
+    if (!meld.isCanastra) continue
+    if (meld.isClean) clean++
+    else dirty++
+  }
+  return { clean, dirty }
+}
+
+/** Pure accumulation step for the match layer: folds one finished round's
+ * per-team scores/canastras into the running match totals, and decides
+ * whether the match itself just ended (a team reached MATCH_TARGET; ties at
+ * or above the target go to team A). Exported for direct unit testing since
+ * `team.score` gets recomputed by the engine's `Game.finish()` from the
+ * actual hand/melds and can't easily be forced to an arbitrary value in an
+ * integration test. */
+export function accumulateMatchRound(
+  matchScores: Record<TeamId, number>,
+  matchCanastras: Record<TeamId, CanastraCount>,
+  teams: Team[]
+): {
+  matchScores: Record<TeamId, number>
+  matchCanastras: Record<TeamId, CanastraCount>
+  matchWinner?: TeamId
+} {
+  const newScores = { ...matchScores }
+  const newCanastras: Record<TeamId, CanastraCount> = {
+    A: { ...matchCanastras.A },
+    B: { ...matchCanastras.B },
+  }
+
+  for (const team of teams) {
+    newScores[team.id] += team.score
+    const { clean, dirty } = countRoundCanastras(team)
+    newCanastras[team.id].clean += clean
+    newCanastras[team.id].dirty += dirty
+  }
+
+  let matchWinner: TeamId | undefined
+  if (newScores.A >= MATCH_TARGET || newScores.B >= MATCH_TARGET) {
+    matchWinner = newScores.B > newScores.A ? 'B' : 'A'
+  }
+
+  return { matchScores: newScores, matchCanastras: newCanastras, matchWinner }
+}
 
 export interface GameStore {
   /**
@@ -33,6 +100,25 @@ export interface GameStore {
    * (indices into the current player's hand array). */
   selectedCardIndices: number[]
   gameLog: string[]
+
+  /** Accumulated points across every round of the current match (persists
+   * across `startNextRound()`, reset by `initGame()`). */
+  matchScores: Record<TeamId, number>
+  /** Accumulated count of 7+ canastras per team across the match, split by
+   * clean/dirty. */
+  matchCanastras: Record<TeamId, CanastraCount>
+  /** 1-based current round number within the match. */
+  round: number
+  /** Set once a team's `matchScores` reaches MATCH_TARGET; undefined while
+   * the match is still in progress. */
+  matchWinner?: TeamId
+  /** Remembers the settings `initGame()` was last called with, so
+   * `startNextRound()` can rebuild a fresh `Game` with the same 4 players. */
+  matchConfig?: MatchConfig
+  /** Guards against double-accumulating the same finished round into
+   * matchScores/matchCanastras (e.g. if a UI action fires again after the
+   * round already ended). Reset to false by `startNextRound()`. */
+  roundFinalized: boolean
 
   /** Seat 0 = human (`playerName`); seat 2 = human's AI partner (`names.partner`);
    * seat 1 = `names.opponent1`; seat 3 = `names.opponent2`. All three AIs play
@@ -64,6 +150,12 @@ export interface GameStore {
   toggleCardSelection: (index: number) => void
   clearSelection: () => void
   resetGame: () => void
+  /** Starts the next round of the current match: builds a fresh `Game` with
+   * the same 4 players (from `matchConfig`), deals new hands, increments
+   * `round`, and resets per-round selection/finalization state while
+   * keeping `matchScores`/`matchCanastras`. No-op once `matchWinner` is
+   * set (the match already ended). */
+  startNextRound: () => void
 }
 
 const DIFFICULTY_LABEL: Record<string, string> = {
@@ -125,11 +217,44 @@ function buildAIState(game: Game): GameStateForAI {
   }
 }
 
-export const useGameStore = create<GameStore>((set, get) => ({
+export const useGameStore = create<GameStore>((set, get) => {
+  /** Called immediately after `checkGameOver()` reports the round just
+   * ended. Folds this round's per-team scores/canastras into the match
+   * totals (accumulateMatchRound), guarded by `roundFinalized` so it can
+   * never double-count the same finished round, and logs either "Fim da
+   * partida" (if a team just reached MATCH_TARGET, setting `matchWinner`)
+   * or "Fim da rodada N". Issues its own `set()` call, separate from
+   * whatever gameLog/version patch the caller applies afterwards. */
+  function finalizeRoundIfNeeded(game: Game, log: string[]): void {
+    const { roundFinalized, matchScores, matchCanastras, round } = get()
+    if (roundFinalized) return
+
+    const result = accumulateMatchRound(matchScores, matchCanastras, game.state.teams)
+    if (result.matchWinner) {
+      log.push(`Fim da partida — Time ${result.matchWinner} venceu!`)
+    } else {
+      log.push(`Fim da rodada ${round}.`)
+    }
+
+    set({
+      matchScores: result.matchScores,
+      matchCanastras: result.matchCanastras,
+      matchWinner: result.matchWinner,
+      roundFinalized: true,
+    })
+  }
+
+  return {
   game: null,
   version: 0,
   selectedCardIndices: [],
   gameLog: [],
+  matchScores: { A: 0, B: 0 },
+  matchCanastras: { A: { clean: 0, dirty: 0 }, B: { clean: 0, dirty: 0 } },
+  round: 1,
+  matchWinner: undefined,
+  matchConfig: undefined,
+  roundFinalized: false,
 
   initGame: (playerName, aiDifficulty, names) => {
     const partnerName = names?.partner?.trim() || 'Parceiro'
@@ -151,6 +276,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
       gameLog: [
         `Partida iniciada: ${playerName} e ${partnerName} (Time A) vs ${opponent1Name} e ${opponent2Name} (Time B), dificuldade ${label}.`,
       ],
+      matchScores: { A: 0, B: 0 },
+      matchCanastras: { A: { clean: 0, dirty: 0 }, B: { clean: 0, dirty: 0 } },
+      round: 1,
+      matchWinner: undefined,
+      matchConfig: { playerName, aiDifficulty, names },
+      roundFinalized: false,
     })
   },
 
@@ -217,7 +348,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const log = [...gameLog, `${player.name} descartou uma carta.`]
     checkMortoTransition(game, player, log, hadMorto)
 
-    if (!checkGameOver(game, log)) {
+    if (checkGameOver(game, log)) {
+      finalizeRoundIfNeeded(game, log)
+    } else {
       game.endTurn()
     }
 
@@ -247,7 +380,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     const log = [...gameLog, `${player.name} baixou uma canastra!`]
     checkMortoTransition(game, player, log, hadMorto)
-    checkGameOver(game, log)
+    if (checkGameOver(game, log)) {
+      finalizeRoundIfNeeded(game, log)
+    }
 
     set({
       gameLog: log,
@@ -272,7 +407,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     const log = [...gameLog, `${player.name} estendeu um jogo do time!`]
     checkMortoTransition(game, player, log, hadMorto)
-    checkGameOver(game, log)
+    if (checkGameOver(game, log)) {
+      finalizeRoundIfNeeded(game, log)
+    }
 
     set({
       gameLog: log,
@@ -380,7 +517,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
     }
 
-    if (!gameEnded) {
+    if (gameEnded) {
+      finalizeRoundIfNeeded(game, log)
+    } else {
       game.endTurn()
     }
 
@@ -401,5 +540,45 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   clearSelection: () => set({ selectedCardIndices: [] }),
 
-  resetGame: () => set({ game: null, version: 0, selectedCardIndices: [], gameLog: [] }),
-}))
+  resetGame: () =>
+    set({
+      game: null,
+      version: 0,
+      selectedCardIndices: [],
+      gameLog: [],
+      matchScores: { A: 0, B: 0 },
+      matchCanastras: { A: { clean: 0, dirty: 0 }, B: { clean: 0, dirty: 0 } },
+      round: 1,
+      matchWinner: undefined,
+      matchConfig: undefined,
+      roundFinalized: false,
+    }),
+
+  startNextRound: () => {
+    const { matchWinner, matchConfig, gameLog, round } = get()
+    if (matchWinner) return // match already over — nothing to do.
+    if (!matchConfig) return // no round to rebuild from (shouldn't happen once a match is running).
+
+    const partnerName = matchConfig.names?.partner?.trim() || 'Parceiro'
+    const opponent1Name = matchConfig.names?.opponent1?.trim() || 'Adversário 1'
+    const opponent2Name = matchConfig.names?.opponent2?.trim() || 'Adversário 2'
+
+    const human = new HumanPlayer(matchConfig.playerName)
+    const opponent1 = new AIPlayer(opponent1Name, matchConfig.aiDifficulty)
+    const partner = new AIPlayer(partnerName, matchConfig.aiDifficulty)
+    const opponent2 = new AIPlayer(opponent2Name, matchConfig.aiDifficulty)
+    const game = new Game([human, opponent1, partner, opponent2])
+    game.setup()
+
+    const nextRound = round + 1
+    set({
+      game,
+      version: get().version + 1,
+      selectedCardIndices: [],
+      gameLog: [...gameLog, `Rodada ${nextRound} iniciada.`],
+      round: nextRound,
+      roundFinalized: false,
+    })
+  },
+  }
+})
