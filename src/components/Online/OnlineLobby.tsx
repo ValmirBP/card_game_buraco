@@ -1,8 +1,24 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { useOnlineStore } from '../../online/onlineStore'
+import QRCode from 'qrcode'
+import { useOnlineStore, joinUrlFor } from '../../online/onlineStore'
 import DifficultySelector from '../Menu/DifficultySelector'
 import type { AIDifficulty } from '../../engine/ai'
+
+/** Room code from a `?sala=CODE` invite link, read once on first render.
+ * Used to pre-fill the join view so scanning the QR from OnlineLobby just
+ * needs a name + tap. Returns null (and leaves the URL untouched) when the
+ * param isn't present. */
+function readInviteCodeFromUrl(): string | null {
+  const params = new URLSearchParams(window.location.search)
+  const code = params.get('sala')
+  if (!code) return null
+  // Clean the param so a refresh/back doesn't re-trigger the prefill.
+  params.delete('sala')
+  const query = params.toString()
+  window.history.replaceState({}, '', window.location.pathname + (query ? `?${query}` : ''))
+  return code.toUpperCase()
+}
 
 interface OnlineLobbyProps {
   onBackToMenu: () => void
@@ -20,19 +36,41 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
   const lobby = useOnlineStore((s) => s.lobby)
   const view = useOnlineStore((s) => s.view)
   const errorMsg = useOnlineStore((s) => s.errorMsg)
+  const serverUrl = useOnlineStore((s) => s.serverUrl)
   const createRoom = useOnlineStore((s) => s.create)
   const joinRoom = useOnlineStore((s) => s.join)
   const startRoom = useOnlineStore((s) => s.start)
   const clearError = useOnlineStore((s) => s.clearError)
 
+  const [inviteCode] = useState(readInviteCodeFromUrl)
   const [name, setName] = useState('Você')
-  const [joinCode, setJoinCode] = useState('')
-  const [mode, setMode] = useState<'choose' | 'create' | 'join'>('choose')
+  const [joinCode, setJoinCode] = useState(inviteCode ?? '')
+  const [mode, setMode] = useState<'choose' | 'create' | 'join'>(inviteCode ? 'join' : 'choose')
   const [showDifficulty, setShowDifficulty] = useState(false)
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
 
   useEffect(() => {
     if (view) onGameStart()
   }, [view, onGameStart])
+
+  useEffect(() => {
+    if (!code) {
+      setQrDataUrl(null)
+      return
+    }
+    const url = joinUrlFor(code, serverUrl)
+    let cancelled = false
+    QRCode.toDataURL(url, { width: 220, margin: 1 })
+      .then((dataUrl) => {
+        if (!cancelled) setQrDataUrl(dataUrl)
+      })
+      .catch(() => {
+        if (!cancelled) setQrDataUrl(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [code, serverUrl])
 
   const handleCreate = (difficulty: AIDifficulty) => {
     setShowDifficulty(false)
@@ -146,6 +184,15 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
             </p>
             <p className="mt-2 text-xs text-gray-400">Compartilhe este código para outros entrarem</p>
           </div>
+
+          {qrDataUrl && (
+            <div className="flex flex-col items-center gap-2">
+              <div className="rounded-2xl bg-white p-3 shadow-lg">
+                <img src={qrDataUrl} alt="QR code para entrar na sala" width={200} height={200} className="block" />
+              </div>
+              <p className="text-xs text-gray-400">Aponte a câmera do outro celular para entrar</p>
+            </div>
+          )}
 
           <div className="space-y-2 text-left">
             {SEAT_LABELS.map((label, i) => {

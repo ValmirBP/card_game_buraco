@@ -20,8 +20,8 @@ export interface LobbySeatView {
 }
 
 export type ServerMessage =
-  | { type: 'joined'; code: string; seat: number; isHost: boolean }
-  | { type: 'lobby'; code: string; seats: LobbySeatView[]; isHost: boolean }
+  | { type: 'joined'; code: string; seat: number; isHost: boolean; serverUrl?: string }
+  | { type: 'lobby'; code: string; seats: LobbySeatView[]; isHost: boolean; serverUrl?: string }
   | { type: 'state'; view: SeatView }
   | { type: 'log'; lines: string[] }
   | { type: 'error'; message: string }
@@ -40,9 +40,11 @@ export class ProtocolServer {
   private sockets = new Map<string, ClientSocket>()
   private connStates = new Map<string, ConnState>()
   private aiTurnDelayMs: number
+  private serverUrl?: string
 
-  constructor(opts?: { aiTurnDelayMs?: number }) {
+  constructor(opts?: { aiTurnDelayMs?: number; serverUrl?: string }) {
     this.aiTurnDelayMs = opts?.aiTurnDelayMs ?? DEFAULT_AI_TURN_DELAY_MS
+    this.serverUrl = opts?.serverUrl
   }
 
   registerConnection(connId: string, socket: ClientSocket): void {
@@ -86,6 +88,7 @@ export class ProtocolServer {
         code: room.code,
         seats: this.lobbySeats(room),
         isHost: seat.index === 0,
+        serverUrl: this.serverUrl,
       })
     }
   }
@@ -144,7 +147,7 @@ export class ProtocolServer {
   private handleCreate(connId: string, name: string, difficulty: Difficulty): void {
     const { code } = this.rooms.createRoom(connId, name, difficulty)
     this.connStates.set(connId, { roomCode: code, seat: 0 })
-    this.send(connId, { type: 'joined', code, seat: 0, isHost: true })
+    this.send(connId, { type: 'joined', code, seat: 0, isHost: true, serverUrl: this.serverUrl })
     this.broadcastLobby(code)
   }
 
@@ -155,7 +158,13 @@ export class ProtocolServer {
       return
     }
     this.connStates.set(connId, { roomCode: code, seat: result.seat })
-    this.send(connId, { type: 'joined', code, seat: result.seat, isHost: result.seat === 0 })
+    this.send(connId, {
+      type: 'joined',
+      code,
+      seat: result.seat,
+      isHost: result.seat === 0,
+      serverUrl: this.serverUrl,
+    })
     this.broadcastLobby(code)
   }
 

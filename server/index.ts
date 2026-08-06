@@ -70,12 +70,20 @@ function lanAddresses(): string[] {
   return addresses
 }
 
+/** Best LAN base URL (first non-internal IPv4) with the port, e.g.
+ * `http://192.168.2.169:3001`. Empty if no LAN IP is available (e.g. no
+ * network), so the client falls back to window.location.origin. */
+function lanBaseUrl(): string {
+  const addresses = lanAddresses()
+  return addresses.length > 0 ? `http://${addresses[0]}:${PORT}` : ''
+}
+
 const httpServer = createServer((req, res) => {
   void serveStatic(req, res)
 })
 
 const wss = new WebSocketServer({ server: httpServer })
-const protocol = new ProtocolServer()
+const protocol = new ProtocolServer({ serverUrl: lanBaseUrl() })
 
 let nextConnId = 1
 

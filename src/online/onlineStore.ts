@@ -19,8 +19,8 @@ type ClientMessage =
   | { type: 'nextRound' }
 
 type ServerMessage =
-  | { type: 'joined'; code: string; seat: number; isHost: boolean }
-  | { type: 'lobby'; code: string; seats: LobbySeat[]; isHost: boolean }
+  | { type: 'joined'; code: string; seat: number; isHost: boolean; serverUrl?: string }
+  | { type: 'lobby'; code: string; seats: LobbySeat[]; isHost: boolean; serverUrl?: string }
   | { type: 'state'; view: SeatView }
   | { type: 'log'; lines: string[] }
   | { type: 'error'; message: string }
@@ -34,6 +34,10 @@ interface OnlineState {
   view: SeatView | null
   log: string[]
   errorMsg: string | null
+  /** LAN base URL reported by the server (e.g. `http://192.168.2.169:3001`),
+   * used to build a join link/QR that works from another device. Falls back
+   * to window.location.origin when the server didn't find a LAN IP. */
+  serverUrl: string | null
   /** Local UI-only selection state, mirrors the single-player store's
    * selectedCardIndices — indices into `view.yourHand`. */
   selectedCardIndices: number[]
@@ -47,6 +51,14 @@ interface OnlineState {
   toggleCardSelection: (index: number) => void
   clearSelection: () => void
   clearError: () => void
+}
+
+/** Builds the shareable "join this room" URL for the given room code, using
+ * the server-reported LAN base URL when available so it works from another
+ * device on the network (falls back to this page's own origin). */
+export function joinUrlFor(code: string, serverUrl: string | null): string {
+  const base = serverUrl || window.location.origin
+  return `${base}/?sala=${code}`
 }
 
 let socket: WebSocket | null = null
@@ -116,10 +128,21 @@ function handleServerMessage(msg: ServerMessage): void {
   switch (msg.type) {
     case 'joined':
       lastJoin = { name: lastJoin?.name ?? '', code: msg.code, difficulty: lastJoin?.difficulty }
-      useOnlineStore.setState({ code: msg.code, seat: msg.seat, isHost: msg.isHost, errorMsg: null })
+      useOnlineStore.setState({
+        code: msg.code,
+        seat: msg.seat,
+        isHost: msg.isHost,
+        errorMsg: null,
+        serverUrl: msg.serverUrl || null,
+      })
       break
     case 'lobby':
-      useOnlineStore.setState({ code: msg.code, isHost: msg.isHost, lobby: msg.seats })
+      useOnlineStore.setState({
+        code: msg.code,
+        isHost: msg.isHost,
+        lobby: msg.seats,
+        serverUrl: msg.serverUrl || null,
+      })
       break
     case 'state':
       useOnlineStore.setState({ view: msg.view, selectedCardIndices: [] })
@@ -142,6 +165,7 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
   view: null,
   log: [],
   errorMsg: null,
+  serverUrl: null,
   selectedCardIndices: [],
 
   create: (name, difficulty) => {
@@ -183,6 +207,7 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
       view: null,
       log: [],
       errorMsg: null,
+      serverUrl: null,
       selectedCardIndices: [],
     })
   },
