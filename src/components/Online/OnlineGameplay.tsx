@@ -25,37 +25,34 @@ export default function OnlineGameplay({ onBackToMenu }: OnlineGameplayProps) {
     return <OnlineResult view={view} onBackToMenu={onBackToMenu} />
   }
 
-  const recentLog = log.slice(-6)
+  const lastLog = log[log.length - 1]
 
   return (
-    <div className="flex flex-col gap-4 pb-32">
-      <div className="sticky top-0 z-40 -mx-4 border-b border-card-gold/40 bg-gradient-to-b from-black/85 to-black/60 px-4 py-2 shadow-[0_4px_16px_rgba(0,0,0,0.35)] backdrop-blur-md sm:mx-0 sm:rounded-2xl sm:border">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-3 sm:gap-6">
+    <div className="flex h-full min-h-0 flex-col gap-2">
+      {/* Placar (topo compacto, uma linha) */}
+      <div className="z-40 shrink-0 rounded-xl border border-card-gold/30 bg-black/40 px-2 py-1 shadow-[0_4px_16px_rgba(0,0,0,0.35)] backdrop-blur-md">
+        <div className="mx-auto flex max-w-7xl flex-nowrap items-center justify-center gap-2">
           {view.teams.map((team) => (
             <div
               key={team.id}
-              className={`flex items-center gap-2 rounded-xl px-3 py-1.5 sm:gap-3 sm:px-4 ${
+              className={`flex min-w-0 items-center gap-1.5 rounded-lg px-2 py-0.5 ${
                 team.id === 'A'
                   ? 'border border-card-gold/50 bg-card-gold/10'
                   : 'border border-fuchsia-400/40 bg-fuchsia-500/10'
               }`}
             >
-              <span
-                className={`font-display text-xs sm:text-sm ${team.id === 'A' ? 'text-card-gold' : 'text-fuchsia-300'}`}
-              >
+              <span className={`font-display text-xs ${team.id === 'A' ? 'text-card-gold' : 'text-fuchsia-300'}`}>
                 {TEAM_LABEL[team.id]}
               </span>
-              <span className="text-base font-bold text-white sm:text-lg">{team.score}</span>
-              <span className="text-[10px] text-gray-300 sm:text-xs">
-                {team.melds.length} canastra{team.melds.length === 1 ? '' : 's'}
-              </span>
+              <span className="text-base font-bold text-white">{team.score}</span>
+              <span className="whitespace-nowrap text-[10px] text-gray-300">{team.melds.length}c</span>
             </div>
           ))}
         </div>
       </div>
 
       {errorMsg && (
-        <p className="rounded-xl bg-red-500/15 px-4 py-2 text-center text-sm text-red-200">
+        <p className="shrink-0 rounded-xl bg-red-500/15 px-4 py-2 text-center text-sm text-red-200">
           {errorMsg}
           <button type="button" onClick={clearError} className="ml-2 underline">
             ok
@@ -63,25 +60,25 @@ export default function OnlineGameplay({ onBackToMenu }: OnlineGameplayProps) {
         </p>
       )}
 
-      <OnlineGameBoard view={view} />
-      <OnlinePlayerHand view={view} />
-
-      <div className="space-y-2 rounded-2xl border border-white/10 bg-black/20 p-4 shadow-lg backdrop-blur-sm">
-        <h3 className="font-display text-base text-card-gold">Registro</h3>
-        <div className="max-h-40 space-y-1.5 overflow-y-auto text-xs text-gray-300 sm:text-sm">
-          {recentLog.length === 0 ? (
-            <p className="text-gray-500">Nenhuma ação ainda.</p>
-          ) : (
-            recentLog.map((entry, i) => (
-              <div key={i} className="border-b border-white/5 pb-1.5 last:border-0 last:pb-0">
-                {entry}
-              </div>
-            ))
-          )}
-        </div>
+      {/* Mesa — meio flexível, rola internamente só se precisar */}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <OnlineGameBoard view={view} />
       </div>
 
-      <OnlineActionPanel view={view} />
+      {/* Registro em uma linha */}
+      <div className="shrink-0 truncate rounded-lg border border-white/10 bg-black/25 px-3 py-1.5 text-center text-xs text-gray-300">
+        <span className="text-card-gold">Registro:</span> {lastLog ?? 'Nenhuma ação ainda.'}
+      </div>
+
+      {/* Mão (fixa, embaixo) */}
+      <div className="shrink-0">
+        <OnlinePlayerHand view={view} />
+      </div>
+
+      {/* Ações (fixas, rodapé) */}
+      <div className="shrink-0">
+        <OnlineActionPanel view={view} />
+      </div>
     </div>
   )
 }

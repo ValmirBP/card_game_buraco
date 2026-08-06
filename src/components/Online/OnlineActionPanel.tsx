@@ -42,7 +42,7 @@ export default function OnlineActionPanel({ view }: OnlineActionPanelProps) {
   }
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-30 border-t border-card-gold/40 bg-card-green-dark/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-4px_20px_rgba(0,0,0,0.4)] backdrop-blur-md">
+    <div className="z-30 rounded-xl border border-card-gold/40 bg-card-green-dark/95 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-4px_20px_rgba(0,0,0,0.4)] backdrop-blur-md">
       {hint && <p className="mx-auto mb-2 max-w-7xl text-center text-xs text-gray-300">{hint}</p>}
       <div className="mx-auto flex max-w-7xl flex-wrap gap-2 sm:gap-3">
         <motion.button
