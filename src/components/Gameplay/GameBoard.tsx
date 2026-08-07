@@ -131,6 +131,9 @@ export default function GameBoard({
     meldIndex: number,
     meldCards: import('../../engine/card').Card[]
   ) => {
+    // Clicar num jogo existente é "estender"; não deve borbulhar para o
+    // painel "Nós" (que baixaria um jogo novo).
+    event.stopPropagation()
     if (teamId !== 'A') return // only the human (seat 0) acts; only Team A melds are extendable by them
     if (!isHumanTurn || phase !== 'play' || selectedCardIndices.length === 0) return
 
@@ -357,38 +360,42 @@ export default function GameBoard({
         )}
       </AnimatePresence>
 
-      {/* Zona de baixar: clicável só na fase 'play' com 3+ cartas
-          selecionadas — forma uma canastra NOVA. Estender um jogo já
-          existente continua sendo clicar diretamente nele (abaixo). */}
-      <div
-        id="meld-drop-zone"
-        onClick={handleDropZoneClick}
-        className={`flex items-center justify-center rounded-xl border-2 border-dashed px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide transition-all ${
-          canClickDropZone
-            ? 'cursor-pointer border-card-gold bg-card-gold/10 text-card-gold shadow-[0_0_16px_rgba(212,175,55,0.5)]'
-            : 'border-white/10 text-gray-500'
-        }`}
-      >
-        {canClickDropZone ? '⬇ Baixar jogo aqui' : 'Baixar jogo aqui'}
-      </div>
-
-      {/* Jogos baixados por dupla */}
+      {/* Jogos baixados por dupla. O painel do SEU time ("Nós", Time A) é a
+          zona de baixar: com 3+ cartas selecionadas, clicar na área do painel
+          (fora de um jogo existente) forma uma canastra NOVA; clicar num jogo
+          já baixado estende aquele jogo. */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {teams.map(team => {
           const canClickToExtend =
             team.id === 'A' && isHumanTurn && phase === 'play' && selectedCardIndices.length > 0
+          // O painel "Nós" vira alvo de baixar quando há 3+ cartas selecionadas.
+          const isDropTarget = team.id === 'A' && canClickDropZone
 
           return (
-            <div key={team.id} className={`space-y-2 rounded-xl border p-3 ${TEAM_PANEL_CLASS[team.id]}`}>
+            <div
+              key={team.id}
+              id={team.id === 'A' ? 'meld-drop-zone' : undefined}
+              onClick={team.id === 'A' ? handleDropZoneClick : undefined}
+              className={`space-y-2 rounded-xl border p-3 transition-all ${TEAM_PANEL_CLASS[team.id]} ${
+                isDropTarget
+                  ? 'cursor-pointer border-card-gold shadow-[0_0_16px_rgba(212,175,55,0.5)]'
+                  : ''
+              }`}
+            >
               <div className="flex items-center justify-between">
-                <h4 className={`font-display text-sm ${TEAM_TEXT_CLASS[team.id]}`}>{TEAM_LABEL[team.id]}</h4>
+                <h4 className={`font-display text-sm ${TEAM_TEXT_CLASS[team.id]}`}>
+                  {TEAM_LABEL[team.id]}
+                  {isDropTarget && <span className="ml-2 text-[10px] font-normal">⬇ clique para baixar</span>}
+                </h4>
                 <span className="text-xs text-gray-200">
                   {team.score} pts · {team.melds.length} canastra{team.melds.length === 1 ? '' : 's'}
                   {team.hasTakenMorto ? ' · morto pego' : ''}
                 </span>
               </div>
               {team.melds.length === 0 ? (
-                <span className="text-sm text-gray-400">Nenhum jogo baixado ainda</span>
+                <span className="text-sm text-gray-400">
+                  {isDropTarget ? 'Clique aqui para baixar as cartas selecionadas' : 'Nenhum jogo baixado ainda'}
+                </span>
               ) : (
                 <div className="flex flex-wrap gap-3">
                   <AnimatePresence>
