@@ -112,6 +112,10 @@ export interface GameStore {
   /** Set once a team's `matchScores` reaches MATCH_TARGET; undefined while
    * the match is still in progress. */
   matchWinner?: TeamId
+  /** Final `matchScores` of the PREVIOUS match (before the current one was
+   * started via `initGame`). Undefined on the very first match. Shown next to
+   * the current totals as "atual / partida anterior". */
+  previousMatchScores?: Record<TeamId, number>
   /** Remembers the settings `initGame()` was last called with, so
    * `startNextRound()` can rebuild a fresh `Game` with the same 4 players. */
   matchConfig?: MatchConfig
@@ -262,12 +266,19 @@ export const useGameStore = create<GameStore>((set, get) => {
   round: 1,
   matchWinner: undefined,
   matchConfig: undefined,
+  previousMatchScores: undefined,
   roundFinalized: false,
 
   initGame: (playerName, aiDifficulty, names) => {
     const partnerName = names?.partner?.trim() || 'Parceiro'
     const opponent1Name = names?.opponent1?.trim() || 'Adversário 1'
     const opponent2Name = names?.opponent2?.trim() || 'Adversário 2'
+
+    // Guarda a pontuação final da partida que está terminando (se houver uma
+    // em andamento com pontos) para exibir como "partida anterior".
+    const prev = get().matchScores
+    const previousMatchScores =
+      prev.A !== 0 || prev.B !== 0 ? { A: prev.A, B: prev.B } : get().previousMatchScores
 
     const human = new HumanPlayer(playerName)
     const opponent1 = new AIPlayer(opponent1Name, aiDifficulty)
@@ -289,6 +300,7 @@ export const useGameStore = create<GameStore>((set, get) => {
       round: 1,
       matchWinner: undefined,
       matchConfig: { playerName, aiDifficulty, names },
+      previousMatchScores,
       roundFinalized: false,
     })
   },

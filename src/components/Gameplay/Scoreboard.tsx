@@ -14,6 +14,8 @@ export default function Scoreboard() {
   // `game` keeps a stable reference across mutations.
   useGameStore(s => s.version)
   const game = useGameStore(s => s.game)
+  const matchScores = useGameStore(s => s.matchScores)
+  const previousMatchScores = useGameStore(s => s.previousMatchScores)
 
   if (!game) return null
 
@@ -23,6 +25,10 @@ export default function Scoreboard() {
     <div className="z-40 rounded-xl border border-card-gold/30 bg-black/40 px-2 py-1 shadow-[0_4px_16px_rgba(0,0,0,0.35)] backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl flex-nowrap items-center justify-center gap-2">
         {teams.map(team => {
+          // "Pontos atuais" da partida = rodadas já fechadas (matchScores) +
+          // a rodada em andamento (team.score).
+          const matchTotal = matchScores[team.id] + team.score
+          const prev = previousMatchScores?.[team.id]
           return (
             <div
               key={team.id}
@@ -39,10 +45,15 @@ export default function Scoreboard() {
               >
                 {TEAM_LABEL[team.id]}
               </span>
-              <span className="text-base font-bold text-white">{team.score}</span>
-              <span className="whitespace-nowrap text-[10px] text-gray-300">
-                {team.melds.length}c
+              <span className="text-base font-bold text-white" title="Pontos da partida atual">
+                {matchTotal}
               </span>
+              {prev !== undefined && (
+                <span className="whitespace-nowrap text-[10px] text-gray-400" title="Partida anterior">
+                  / {prev}
+                </span>
+              )}
+              <span className="whitespace-nowrap text-[10px] text-gray-300">{team.melds.length}c</span>
               <span
                 className={`text-[10px] ${team.hasTakenMorto ? 'text-green-300' : 'text-gray-500'}`}
                 title="Morto pego?"

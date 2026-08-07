@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/gameStore'
 import GameBoard from './GameBoard'
 import PlayerHand from './PlayerHand'
@@ -41,6 +42,10 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
   const [discardAnim, setDiscardAnim] = useState<FlyAnimState | null>(null)
   const [tableAnim, setTableAnim] = useState<FlyAnimState | null>(null)
 
+  // Banner de destaque para eventos do MORTO (pegou / virou monte), que antes
+  // passavam despercebidos (o morto fica no canto e a pega é automática).
+  const [mortoBanner, setMortoBanner] = useState<string | null>(null)
+
   // Schedule one AI seat's turn whenever it becomes an AI's turn
   // (currentPlayerIndex !== 0) and the game is still playing. The effect
   // re-fires after every aiTurn() call (version bumps, currentPlayerIndex
@@ -78,6 +83,22 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
       onGameEnd()
     }
   }, [version, game, onGameEnd])
+
+  // Sempre que a última linha do registro anunciar a pega do morto (ou o
+  // morto virar monte), mostra um banner de destaque por alguns segundos.
+  const lastLogEntry = gameLog[gameLog.length - 1]
+  useEffect(() => {
+    if (!lastLogEntry) return
+    if (/pegou o morto/i.test(lastLogEntry)) {
+      setMortoBanner(`🎴 ${lastLogEntry}`)
+    } else if (/virou o novo monte/i.test(lastLogEntry)) {
+      setMortoBanner('🔄 O morto virou o novo monte!')
+    } else {
+      return
+    }
+    const t = window.setTimeout(() => setMortoBanner(null), 2600)
+    return () => window.clearTimeout(t)
+  }, [lastLogEntry])
 
   const canTakeDiscard = useMemo(() => {
     if (!game) return false
@@ -221,6 +242,24 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
       <CardFlyAnimation anim={pickupAnim} />
       <CardFlyAnimation anim={discardAnim} />
       <CardFlyAnimation anim={tableAnim} />
+
+      {/* Banner de destaque do morto (pega / virou monte) */}
+      <AnimatePresence>
+        {mortoBanner && (
+          <motion.div
+            key={mortoBanner}
+            initial={{ opacity: 0, scale: 0.7, y: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+            className="pointer-events-none fixed inset-x-0 top-1/3 z-[120] flex justify-center px-4"
+          >
+            <span className="rounded-2xl border-2 border-card-gold bg-black/80 px-6 py-3 text-center font-display text-lg text-card-gold shadow-[0_0_30px_rgba(212,175,55,0.7)] backdrop-blur-sm sm:text-2xl">
+              {mortoBanner}
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Registro em uma linha só */}
       <div className="shrink-0 truncate rounded-lg border border-white/10 bg-black/25 px-3 py-1.5 text-center text-xs text-gray-300">
