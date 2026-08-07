@@ -72,6 +72,7 @@ export default function PlayerHand({ phase }: PlayerHandProps) {
         {orderedHand(hand).map(({ card, index }, position) => (
           <div
             key={`${card.suit}-${card.rank}-${index}`}
+            data-hand-index={index}
             className="relative flex-shrink-0 hover:z-30"
           >
             <CardComponent

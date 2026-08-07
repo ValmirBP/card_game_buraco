@@ -134,12 +134,18 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
     const { selectedCardIndices } = useGameStore.getState()
     if (selectedCardIndices.length !== 1) return
 
+    const idx = selectedCardIndices[0]
+    // Origem: a própria carta selecionada na mão (não a mão inteira), pra a
+    // carta-fantasma sair de onde a carta está. Fallback: a mão.
+    const cardEl = document.querySelector(`[data-hand-index="${idx}"]`)
     const handEl = document.getElementById('player-hand-anchor')
-    const discardEl = document.getElementById('discard-pile')
-    const fromRect = handEl?.getBoundingClientRect()
-    const card = game.state.players[0].hand.getCards()[selectedCardIndices[0]]
+    const fromRect = (cardEl ?? handEl)?.getBoundingClientRect()
+    // Destino: a âncora do topo do descarte (tamanho de carta), no ponto exato
+    // onde a carta pousa — não a caixa larga do #discard-pile (que inclui o leque).
+    const discardEl = document.getElementById('discard-top') ?? document.getElementById('discard-pile')
+    const card = game.state.players[0].hand.getCards()[idx]
 
-    useGameStore.getState().discard(selectedCardIndices[0])
+    useGameStore.getState().discard(idx)
     // Turn moves on; reset phase so it's ready for the next human turn.
     setPhase('draw')
 

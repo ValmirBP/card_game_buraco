@@ -308,6 +308,7 @@ export default function GameBoard({
                   {topDiscard ? (
                     <motion.div
                       key={discardPile.length}
+                      id="discard-top"
                       initial={{ opacity: 0, y: -12, rotate: -6 }}
                       animate={{ opacity: 1, y: 0, rotate: 0 }}
                       className="relative z-10"
@@ -315,7 +316,10 @@ export default function GameBoard({
                       <CardComponent card={topDiscard} />
                     </motion.div>
                   ) : (
-                    <div className="flex h-24 w-16 items-center justify-center rounded-xl border border-dashed border-white/20 text-[10px] text-gray-400 sm:h-28 sm:w-20">
+                    <div
+                      id="discard-top"
+                      className="flex h-24 w-16 items-center justify-center rounded-xl border border-dashed border-white/20 text-[10px] text-gray-400 sm:h-28 sm:w-20"
+                    >
                       Vazio
                     </div>
                   )}
