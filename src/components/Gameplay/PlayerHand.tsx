@@ -44,10 +44,14 @@ export default function PlayerHand({ phase }: PlayerHandProps) {
   const isHumanTurn = game.state.status === 'playing' && game.state.currentPlayerIndex === 0
 
   const hint = !isHumanTurn
-    ? null
+    ? 'IA jogando…'
     : phase === 'draw'
-      ? 'Compre uma carta para começar sua jogada.'
-      : 'Selecione 1 carta para descartar ou 3+ para formar uma canasta.'
+      ? 'Clique no monte para comprar (ou no descarte, se houver).'
+      : selectedCardIndices.length === 1
+        ? 'Selecione 1 carta e clique no descarte para descartar.'
+        : selectedCardIndices.length >= 3
+          ? 'Selecione cartas e clique na mesa para baixar, ou num jogo do time para estender.'
+          : 'Selecione cartas: 1 para descartar, 3+ para baixar um jogo.'
 
   return (
     <div className="space-y-1 rounded-xl border border-white/10 bg-black/25 px-3 py-1.5 shadow-lg backdrop-blur-sm">
@@ -74,7 +78,7 @@ export default function PlayerHand({ phase }: PlayerHandProps) {
               card={card}
               index={position}
               selected={selectedCardIndices.includes(index)}
-              onClick={() => toggleCardSelection(index)}
+              onClick={isHumanTurn ? () => toggleCardSelection(index) : undefined}
             />
           </div>
         ))}

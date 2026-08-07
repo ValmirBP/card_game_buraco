@@ -1,14 +1,22 @@
-import { useState } from 'react'
+import { useState, type MouseEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/gameStore'
 import { CardComponent, CardBack } from '../Card'
 import { teamIdOfSeat, type TeamId } from '../../engine/gameState'
-import { canExtendMeld } from '../../engine/utils'
+import { canExtendMeld, isValidCanasta } from '../../engine/utils'
 import Seat from './Seat'
 import type { TurnPhase } from './Gameplay'
 
 interface GameBoardProps {
   phase: TurnPhase
+  /** Whether "pegar o descarte" is currently a legal move (pile non-empty
+   * and it's the human's turn to draw) — drives the discard-pile glow. */
+  canTakeDiscard: boolean
+  onDraw: () => void
+  onTakeDiscardPile: () => void
+  onDiscardSelected: () => void
+  onPlayCanastaSelected: () => void
+  onExtendMeld: (meldIndex: number, cardIndices: number[], targetRect: DOMRect) => void
 }
 
 const TEAM_LABEL: Record<TeamId, string> = { A: 'Nós', B: 'Eles' }
@@ -24,7 +32,15 @@ const TEAM_TEXT_CLASS: Record<TeamId, string> = {
 /** The 4-seat table: opponents/partner around a center that shows the draw
  * pile, discard pile (with a small fan of the last few cards), the two
  * mortos (crossed face-down cards until taken), and the two teams' melds. */
-export default function GameBoard({ phase }: GameBoardProps) {
+export default function GameBoard({
+  phase,
+  canTakeDiscard,
+  onDraw,
+  onTakeDiscardPile,
+  onDiscardSelected,
+  onPlayCanastaSelected,
+  onExtendMeld,
+}: GameBoardProps) {
   // Subscribed so the board re-renders whenever any part of `game` mutates
   // (see the REACTIVITY CONTRACT comment on GameStore.game).
   useGameStore(s => s.version)
@@ -43,7 +59,78 @@ export default function GameBoard({ phase }: GameBoardProps) {
   const isHumanTurn = status === 'playing' && currentPlayerIndex === 0
   const currentTurnName = players[currentPlayerIndex]?.name
 
-  const handleMeldClick = (teamId: TeamId, meldIndex: number, meldCards: import('../../engine/card').Card[]) => {
+  const flashHint = (message: string) => {
+    setHint(message)
+    window.setTimeout(() => setHint(current => (current === message ? null : current)), 2600)
+  }
+
+  // ---- Manipulação direta: monte / descarte / mesa (sem botões) ----------
+
+  const canClickDeck = isHumanTurn && phase === 'draw'
+  const canClickDiscardToDraw = isHumanTurn && phase === 'draw' && canTakeDiscard
+  const canClickDiscardToDiscard = isHumanTurn && phase === 'play' && selectedCardIndices.length === 1
+  const canClickDropZone = isHumanTurn && phase === 'play' && selectedCardIndices.length >= 3
+
+  const handleDeckClick = () => {
+    if (!isHumanTurn) return
+    if (phase !== 'draw') {
+      flashHint('Descarte uma carta antes de comprar de novo.')
+      return
+    }
+    onDraw()
+  }
+
+  const handleDiscardPileClick = () => {
+    if (!isHumanTurn) return
+    if (phase === 'draw') {
+      if (!canTakeDiscard) {
+        flashHint('O descarte está vazio.')
+        return
+      }
+      onTakeDiscardPile()
+      return
+    }
+    // phase === 'play'
+    if (selectedCardIndices.length === 0) {
+      flashHint('Selecione 1 carta para descartar.')
+      return
+    }
+    if (selectedCardIndices.length > 1) {
+      flashHint('Selecione apenas 1 carta para descartar.')
+      return
+    }
+    onDiscardSelected()
+  }
+
+  const handleDropZoneClick = () => {
+    if (!isHumanTurn || phase !== 'play') return
+    if (selectedCardIndices.length < 3) {
+      flashHint('Selecione 3 ou mais cartas para baixar uma canastra.')
+      return
+    }
+
+    const handCards = players[0].hand.getCards()
+    const selectedCards = selectedCardIndices.map(i => handCards[i]).filter(Boolean)
+
+    if (!isValidCanasta(selectedCards)) {
+      flashHint('Essa seleção não forma um jogo válido (sequência do mesmo naipe ou trinca de Áses).')
+      return
+    }
+
+    if (game.wouldPlayCanastaEmptyHandIllegally(selectedCards)) {
+      flashHint('Você não pode baixar todas as cartas sem poder bater.')
+      return
+    }
+
+    onPlayCanastaSelected()
+  }
+
+  const handleMeldClick = (
+    event: MouseEvent,
+    teamId: TeamId,
+    meldIndex: number,
+    meldCards: import('../../engine/card').Card[]
+  ) => {
     if (teamId !== 'A') return // only the human (seat 0) acts; only Team A melds are extendable by them
     if (!isHumanTurn || phase !== 'play' || selectedCardIndices.length === 0) return
 
@@ -51,23 +138,67 @@ export default function GameBoard({ phase }: GameBoardProps) {
     const selectedCards = selectedCardIndices.map(i => handCards[i]).filter(Boolean)
 
     if (!canExtendMeld(meldCards, selectedCards)) {
-      setHint('Essa seleção não estende esse jogo. Escolha cartas que continuem a sequência (ou mais Áses).')
-      window.setTimeout(() => setHint(null), 2600)
+      flashHint('Essa seleção não estende esse jogo. Escolha cartas que continuem a sequência (ou mais Áses).')
       return
     }
 
     if (game.wouldExtendMeldEmptyHandIllegally(meldIndex, selectedCards)) {
-      setHint('Você não pode baixar todas as cartas sem poder bater.')
-      window.setTimeout(() => setHint(null), 2600)
+      flashHint('Você não pode baixar todas as cartas sem poder bater.')
       return
     }
 
-    useGameStore.getState().extendMeld(meldIndex, selectedCardIndices)
+    const targetRect = event.currentTarget.getBoundingClientRect()
+    onExtendMeld(meldIndex, selectedCardIndices, targetRect)
   }
 
   return (
-    <div className="space-y-4 rounded-2xl border border-white/10 bg-black/25 p-4 shadow-lg backdrop-blur-sm sm:p-5">
-      <div className="flex items-center justify-between">
+    <div className="relative space-y-4 rounded-2xl border border-white/10 bg-black/25 p-4 shadow-lg backdrop-blur-sm sm:p-5">
+      {/* Morto(s): movidos para o canto superior-esquerdo da mesa, pequenos,
+          ainda em cruz (✚) com o badge de contagem, sem atrapalhar os
+          cliques do monte/descarte/jogos no centro. */}
+      <div className="absolute left-2 top-2 z-10 flex origin-top-left scale-[0.65] flex-col items-center gap-0.5 sm:scale-75">
+        <span className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">
+          Morto{mortos.length !== 1 ? 's' : ''}
+        </span>
+        {mortos.length > 0 ? (
+          <div className="relative flex h-16 w-16 items-center justify-center">
+            <AnimatePresence>
+              {mortos.map((morto, i) => {
+                // i === 0 -> morto 1, laid horizontally on top; i === 1 ->
+                // morto 2, upright underneath. If only one morto remains
+                // (the other already taken) it just sits upright, centered.
+                const isCrossed = mortos.length === 2
+                const rotate = isCrossed && i === 0 ? 90 : 0
+                return (
+                  <motion.div
+                    key={i}
+                    layout
+                    initial={{ opacity: 0, scale: 0.85, rotate }}
+                    animate={{ opacity: 1, scale: 1, rotate }}
+                    exit={{ opacity: 0, scale: 0.7 }}
+                    style={{ zIndex: i === 0 ? 2 : 1 }}
+                    className="absolute flex flex-col items-center gap-1"
+                  >
+                    <div className="relative">
+                      <CardBack variant={i === 0 ? 'blue' : 'red'} />
+                      <span
+                        className="absolute -right-3 -top-3 flex h-5 min-w-5 items-center justify-center rounded-full bg-card-gold px-1 text-[9px] font-bold text-black shadow"
+                        style={{ transform: rotate ? `rotate(-${rotate}deg)` : undefined }}
+                      >
+                        {morto.length}
+                      </span>
+                    </div>
+                  </motion.div>
+                )
+              })}
+            </AnimatePresence>
+          </div>
+        ) : (
+          <span className="rounded-full bg-white/10 px-2 py-0.5 text-[9px] text-gray-300">Ambos pegos</span>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between pl-14 sm:pl-16">
         <h3 className="font-display text-lg text-card-gold">Mesa</h3>
         <AnimatePresence>
           {!isHumanTurn && status === 'playing' && (
@@ -116,7 +247,17 @@ export default function GameBoard({ phase }: GameBoardProps) {
                 Monte
               </span>
               {deck.length > 0 ? (
-                <div id="deck-pile" className="relative">
+                <motion.div
+                  id="deck-pile"
+                  onClick={handleDeckClick}
+                  animate={canClickDeck ? { scale: [1, 1.05, 1] } : { scale: 1 }}
+                  transition={canClickDeck ? { duration: 1.4, repeat: Infinity, ease: 'easeInOut' } : undefined}
+                  className={`relative rounded-lg ${
+                    canClickDeck
+                      ? 'cursor-pointer ring-2 ring-card-gold shadow-[0_0_16px_rgba(212,175,55,0.6)]'
+                      : ''
+                  }`}
+                >
                   <div className="absolute left-1.5 top-1.5 -z-10">
                     <CardBack variant="red" />
                   </div>
@@ -124,9 +265,15 @@ export default function GameBoard({ phase }: GameBoardProps) {
                   <span className="absolute -right-3 -top-3 flex h-6 min-w-6 items-center justify-center rounded-full bg-card-gold px-1.5 text-xs font-bold text-black shadow">
                     {deck.length}
                   </span>
-                </div>
+                </motion.div>
               ) : (
-                <div className="flex h-24 w-16 items-center justify-center rounded-xl border border-dashed border-white/20 text-[10px] text-gray-400 sm:h-28 sm:w-20">
+                <div
+                  id="deck-pile"
+                  onClick={handleDeckClick}
+                  className={`flex h-24 w-16 items-center justify-center rounded-xl border border-dashed border-white/20 text-[10px] text-gray-400 sm:h-28 sm:w-20 ${
+                    canClickDeck ? 'cursor-pointer ring-2 ring-card-gold' : ''
+                  }`}
+                >
                   Vazio
                 </div>
               )}
@@ -136,7 +283,15 @@ export default function GameBoard({ phase }: GameBoardProps) {
               <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-300 sm:text-xs">
                 Descarte
               </span>
-              <div className="relative flex items-center">
+              <div
+                id="discard-pile"
+                onClick={handleDiscardPileClick}
+                className={`relative flex items-center rounded-lg ${
+                  canClickDiscardToDraw || canClickDiscardToDiscard
+                    ? 'cursor-pointer ring-2 ring-card-gold shadow-[0_0_16px_rgba(212,175,55,0.6)]'
+                    : ''
+                }`}
+              >
                 {fanDiscard.length > 0 && (
                   <div className="scrollbar-gold mr-[-2.4rem] flex max-w-[40vw] -space-x-8 overflow-x-auto py-1 opacity-70 sm:mr-[-2.8rem] sm:max-w-[24rem]">
                     {fanDiscard.map((card, i) => (
@@ -163,62 +318,6 @@ export default function GameBoard({ phase }: GameBoardProps) {
                   )}
                 </AnimatePresence>
               </div>
-            </div>
-          </div>
-
-          {/* Mortos: the two mortos overlap in a cross (✚) — morto 1 laid
-              horizontally (rotated 90°) on top of morto 2 standing upright,
-              crossed at the center — each with its own "N cartas" badge. Once
-              a team picks one up it's removed from `mortos` and the cross
-              resolves back to a single upright card (or "ambos pegos"). */}
-          <div className="flex flex-col items-center gap-1.5">
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-300 sm:text-xs">
-              Morto{mortos.length !== 1 ? 's' : ''}
-            </span>
-            {mortos.length > 0 ? (
-              <div className="relative flex h-20 w-20 items-center justify-center sm:h-24 sm:w-24">
-                <AnimatePresence>
-                  {mortos.map((morto, i) => {
-                    // i === 0 -> morto 1, laid horizontally on top; i === 1 ->
-                    // morto 2, upright underneath. If only one morto remains
-                    // (the other already taken) it just sits upright, centered.
-                    const isCrossed = mortos.length === 2
-                    const rotate = isCrossed && i === 0 ? 90 : 0
-                    return (
-                      <motion.div
-                        key={i}
-                        layout
-                        initial={{ opacity: 0, scale: 0.85, rotate }}
-                        animate={{ opacity: 1, scale: 1, rotate }}
-                        exit={{ opacity: 0, scale: 0.7 }}
-                        style={{ zIndex: i === 0 ? 2 : 1 }}
-                        className="absolute flex flex-col items-center gap-1"
-                      >
-                        <div className="relative scale-75 sm:scale-90">
-                          <CardBack variant={i === 0 ? 'blue' : 'red'} />
-                          <span
-                            className="absolute -right-3 -top-3 flex h-6 min-w-6 items-center justify-center rounded-full bg-card-gold px-1.5 text-[10px] font-bold text-black shadow"
-                            style={{ transform: rotate ? `rotate(-${rotate}deg)` : undefined }}
-                          >
-                            {morto.length}
-                          </span>
-                        </div>
-                      </motion.div>
-                    )
-                  })}
-                </AnimatePresence>
-              </div>
-            ) : (
-              <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-gray-300">
-                Ambos os mortos já foram pegos
-              </span>
-            )}
-            <div className="flex gap-3 text-[10px] text-gray-400">
-              {mortos.map((morto, i) => (
-                <span key={i}>
-                  Morto {i + 1}: {morto.length} cartas
-                </span>
-              ))}
             </div>
           </div>
         </div>
@@ -258,6 +357,21 @@ export default function GameBoard({ phase }: GameBoardProps) {
         )}
       </AnimatePresence>
 
+      {/* Zona de baixar: clicável só na fase 'play' com 3+ cartas
+          selecionadas — forma uma canastra NOVA. Estender um jogo já
+          existente continua sendo clicar diretamente nele (abaixo). */}
+      <div
+        id="meld-drop-zone"
+        onClick={handleDropZoneClick}
+        className={`flex items-center justify-center rounded-xl border-2 border-dashed px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide transition-all ${
+          canClickDropZone
+            ? 'cursor-pointer border-card-gold bg-card-gold/10 text-card-gold shadow-[0_0_16px_rgba(212,175,55,0.5)]'
+            : 'border-white/10 text-gray-500'
+        }`}
+      >
+        {canClickDropZone ? '⬇ Baixar jogo aqui' : 'Baixar jogo aqui'}
+      </div>
+
       {/* Jogos baixados por dupla */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {teams.map(team => {
@@ -288,7 +402,7 @@ export default function GameBoard({ phase }: GameBoardProps) {
                           key={ci}
                           initial={{ opacity: 0, scale: 0.85 }}
                           animate={{ opacity: 1, scale: 1 }}
-                          onClick={() => handleMeldClick(team.id, ci, canasta.cards)}
+                          onClick={event => handleMeldClick(event, team.id, ci, canasta.cards)}
                           className={`space-y-1 rounded-lg p-1 transition-shadow ${
                             canClickToExtend
                               ? compatible
