@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Buraco Jogatina</string>
+    <string name="title_activity_main">Buraco Jogatina</string>
+    <string name="package_name">com.buraco.jogatina</string>
+    <string name="custom_url_scheme">com.buraco.jogatina</string>
+</resources>
