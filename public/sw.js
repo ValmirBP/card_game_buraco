@@ -1,60 +1,41 @@
-// Service worker do Buraco Jogatina — cache-first, vanilla (sem workbox/CDN).
+// KILL-SWITCH service worker.
 //
-// Bump esta versão sempre que o app shell mudar de forma significativa;
-// o activate limpa qualquer cache de versão anterior automaticamente.
-const CACHE_VERSION = 'buraco-jogatina-v1'
-const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest']
+// Versões antigas (v1/v2) registravam um SW cache-first que, dentro do WebView
+// do Capacitor (APK), passou a servir um "shell" velho/quebrado — resultando em
+// tela verde (WebView em branco). Este SW substitui aquele: ele NÃO intercepta
+// nada; ao ativar, apaga todos os caches, se desregistra e recarrega as abas,
+// devolvendo o controle ao carregamento normal dos assets embutidos no app.
+//
+// O navegador/WebView busca o script do SW pela rede ao reabrir, encontra este
+// kill-switch, e a limpeza acontece automaticamente.
+self.addEventListener('install', () => {
+  self.skipWaiting()
+})
 
-self.addEventListener('install', event => {
+self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches
-      .open(CACHE_VERSION)
-      .then(cache => cache.addAll(APP_SHELL))
-      .then(() => self.skipWaiting())
+    (async () => {
+      try {
+        const keys = await caches.keys()
+        await Promise.all(keys.map((k) => caches.delete(k)))
+      } catch {
+        /* ignore */
+      }
+      try {
+        await self.registration.unregister()
+      } catch {
+        /* ignore */
+      }
+      const clients = await self.clients.matchAll({ type: 'window' })
+      clients.forEach((client) => {
+        try {
+          client.navigate(client.url)
+        } catch {
+          /* ignore */
+        }
+      })
+    })()
   )
 })
-
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches
-      .keys()
-      .then(keys => Promise.all(keys.filter(key => key !== CACHE_VERSION).map(key => caches.delete(key))))
-      .then(() => self.clients.claim())
-  )
-})
-
-self.addEventListener('fetch', event => {
-  const { request } = event
-  if (request.method !== 'GET') return
-
-  const url = new URL(request.url)
-  if (url.origin !== self.location.origin) return
-
-  // Cache-first: assets do build (hashed em /assets/*) e o app shell.
-  event.respondWith(
-    caches.match(request).then(cached => {
-      if (cached) return cached
-
-      return fetch(request)
-        .then(response => {
-          if (!response || response.status !== 200 || response.type !== 'basic') {
-            return response
-          }
-          const responseToCache = response.clone()
-          const isRuntimeCacheable =
-            url.pathname.startsWith('/assets/') || APP_SHELL.includes(url.pathname)
-          if (isRuntimeCacheable) {
-            caches.open(CACHE_VERSION).then(cache => cache.put(request, responseToCache))
-          }
-          return response
-        })
-        .catch(() => {
-          // Offline e sem cache: para navegações, cai de volta ao shell.
-          if (request.mode === 'navigate') {
-            return caches.match('/index.html')
-          }
-          return undefined
-        })
-    })
-  )
-})
+// Sem handler de 'fetch': o SW não intercepta requisições — os assets carregam
+// direto (embutidos no APK ou servidos pelo servidor no navegador).

@@ -5,13 +5,35 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#0f5132">
   <meta name="description" content="Buraco Jogatina - Jogo de Cartas">
-  <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
   <title>Buraco Jogatina</title>
 </head>
 <body>
-  <div id="root"></div>
+  <div id="root">
+    <!-- Fallback visível até o React montar. Se ele ficar preso na tela, é
+         sinal de que o JS não carregou/rodou. Se aparecer um erro em vermelho,
+         é o erro real do WebView (diagnóstico direto, em vez de tela verde). -->
+    <div id="boot-fallback" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0f5132;color:#d4af37;font-family:sans-serif;text-align:center;padding:16px">
+      <div>
+        <div style="font-size:24px;font-weight:bold">Buraco Jogatina</div>
+        <div style="font-size:13px;color:#cbd5e1;margin-top:8px">carregando…</div>
+      </div>
+    </div>
+  </div>
+  <script>
+    // Mostra qualquer erro de carregamento na própria tela (para diagnóstico
+    // dentro do APK, onde não dá pra ver o console facilmente).
+    window.addEventListener('error', function (e) {
+      var el = document.getElementById('boot-fallback')
+      if (!el) return
+      el.innerHTML =
+        '<div style="color:#fca5a5;font-family:sans-serif;font-size:13px;padding:16px;max-width:90vw">' +
+        '<b>Erro ao carregar o app:</b><br>' +
+        String((e && (e.message || e.filename)) || e) + '</div>'
+    })
+  </script>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 </html>

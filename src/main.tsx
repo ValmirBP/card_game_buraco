@@ -10,13 +10,16 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   </React.StrictMode>,
 )
 
-// Registra o service worker apenas no navegador (PWA) em produção. DENTRO do
-// APK (Capacitor) o SW NÃO é registrado: os assets já vêm embutidos no app e o
-// SW interceptando o WebView causava tela em branco (só o fundo verde). Em dev
-// o SW também não entra (atrapalharia o HMR do Vite).
-const isCapacitor = typeof (window as unknown as { Capacitor?: unknown }).Capacitor !== 'undefined'
-if (import.meta.env.PROD && !isCapacitor && 'serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {})
-  })
+// NÃO registramos mais service worker (ele causava tela verde no APK, servindo
+// um shell velho do cache). Ao contrário: LIMPAMOS qualquer SW/cache que tenha
+// ficado registrado por versões anteriores — assim o app volta a carregar os
+// assets embutidos direto, sem intermediário. Roda em todo contexto (APK e
+// navegador), de forma silenciosa.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then((regs) => {
+    regs.forEach((reg) => reg.unregister().catch(() => {}))
+  }).catch(() => {})
+}
+if (typeof caches !== 'undefined' && caches.keys) {
+  caches.keys().then((keys) => keys.forEach((k) => caches.delete(k).catch(() => {}))).catch(() => {})
 }
