@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/gameStore'
 import GameBoard from './GameBoard'
@@ -84,21 +84,22 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
     }
   }, [version, game, onGameEnd])
 
-  // Sempre que a última linha do registro anunciar a pega do morto (ou o
-  // morto virar monte), mostra um banner de destaque por alguns segundos.
-  const lastLogEntry = gameLog[gameLog.length - 1]
+  // Banner do morto: varre as linhas NOVAS do registro a cada mudança (o
+  // turno da IA adiciona várias de uma vez) e, se alguma anunciar a pega do
+  // morto / virar monte, mostra o banner. O timeout que limpa fica num ref —
+  // não é cancelado quando chegam outras linhas de log — senão o aviso ficava
+  // preso na tela (bug quando o parceiro/adversário pegava o morto).
+  const bannerTimeoutRef = useRef<number | null>(null)
+  const seenLogLenRef = useRef(0)
   useEffect(() => {
-    if (!lastLogEntry) return
-    if (/pegou o morto/i.test(lastLogEntry)) {
-      setMortoBanner(`🎴 ${lastLogEntry}`)
-    } else if (/virou o novo monte/i.test(lastLogEntry)) {
-      setMortoBanner('🔄 O morto virou o novo monte!')
-    } else {
-      return
-    }
-    const t = window.setTimeout(() => setMortoBanner(null), 2600)
-    return () => window.clearTimeout(t)
-  }, [lastLogEntry])
+    const newEntries = gameLog.slice(seenLogLenRef.current)
+    seenLogLenRef.current = gameLog.length
+    const mortoEntry = [...newEntries].reverse().find(e => /pegou o morto|virou o novo monte/i.test(e))
+    if (!mortoEntry) return
+    setMortoBanner(/virou o novo monte/i.test(mortoEntry) ? '🔄 O morto virou o novo monte!' : `🎴 ${mortoEntry}`)
+    if (bannerTimeoutRef.current) window.clearTimeout(bannerTimeoutRef.current)
+    bannerTimeoutRef.current = window.setTimeout(() => setMortoBanner(null), 2600)
+  }, [gameLog])
 
   const canTakeDiscard = useMemo(() => {
     if (!game) return false
