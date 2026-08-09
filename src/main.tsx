@@ -10,10 +10,13 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   </React.StrictMode>,
 )
 
-// Registra o service worker apenas em build de produção — em dev o SW
-// atrapalharia HMR/cache do Vite.
-if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+// Registra o service worker apenas no navegador (PWA) em produção. DENTRO do
+// APK (Capacitor) o SW NÃO é registrado: os assets já vêm embutidos no app e o
+// SW interceptando o WebView causava tela em branco (só o fundo verde). Em dev
+// o SW também não entra (atrapalharia o HMR do Vite).
+const isCapacitor = typeof (window as unknown as { Capacitor?: unknown }).Capacitor !== 'undefined'
+if (import.meta.env.PROD && !isCapacitor && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
+    navigator.serviceWorker.register('/sw.js').catch(() => {})
   })
 }
