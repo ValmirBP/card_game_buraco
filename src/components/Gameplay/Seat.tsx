@@ -32,28 +32,31 @@ export default function Seat({ name, cardCount, isCurrentTurn, teamId, compact, 
     <motion.div
       animate={{ scale: isCurrentTurn ? 1.05 : 1 }}
       transition={{ duration: 0.25 }}
-      className={`flex flex-col items-center gap-1.5 rounded-xl border-2 p-2 sm:p-3 ${
+      className={`flex flex-col items-center gap-1.5 rounded-xl border-2 p-2 sm:p-3 landscape:gap-0.5 landscape:p-1 ${
         isCurrentTurn ? TEAM_RING[teamId] : 'border-transparent bg-white/5'
       }`}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 landscape:gap-1">
         <div
-          className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full font-display text-xs sm:h-10 sm:w-10 sm:text-sm ${TEAM_AVATAR[teamId]}`}
+          className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full font-display text-xs sm:h-10 sm:w-10 sm:text-sm landscape:h-5 landscape:w-5 landscape:text-[9px] ${TEAM_AVATAR[teamId]}`}
         >
           {name.charAt(0).toUpperCase()}
         </div>
         <div className="min-w-0 text-left">
-          <div className="truncate text-xs font-bold sm:text-sm">{name}</div>
+          <div className="truncate text-xs font-bold sm:text-sm landscape:text-[9px]">{name}</div>
           {isCurrentTurn && (
-            <span className="inline-block rounded-full bg-card-gold px-1.5 py-0.5 text-[9px] font-bold text-black sm:text-[10px]">
+            <span className="inline-block rounded-full bg-card-gold px-1.5 py-0.5 text-[9px] font-bold text-black sm:text-[10px] landscape:px-1 landscape:py-0 landscape:text-[7px]">
               {isThinking ? '🤖 jogando…' : 'Sua vez'}
             </span>
           )}
         </div>
       </div>
 
+      {/* Leque de versos: oculto em paisagem (economiza altura) — só o
+          avatar + contagem de cartas importam ali; a fileira completa
+          continua visível em retrato. */}
       {!compact && (
-        <div className="flex -space-x-4 pt-1 sm:-space-x-5">
+        <div className="flex -space-x-4 pt-1 sm:-space-x-5 landscape:hidden">
           {Array.from({ length: fanSize }).map((_, i) => (
             <div
               key={i}
@@ -66,7 +69,9 @@ export default function Seat({ name, cardCount, isCurrentTurn, teamId, compact, 
         </div>
       )}
       {!compact && (
-        <span className="text-[10px] text-gray-300 sm:text-xs">{cardCount} carta{cardCount === 1 ? '' : 's'}</span>
+        <span className="text-[10px] text-gray-300 sm:text-xs landscape:text-[8px]">
+          {cardCount} carta{cardCount === 1 ? '' : 's'}
+        </span>
       )}
     </motion.div>
   )

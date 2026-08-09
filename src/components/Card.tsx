@@ -6,6 +6,18 @@ interface CardProps {
   onClick?: () => void
   selected?: boolean
   index?: number
+  /** Overrides the default footprint (see CARD_SIZE_CLASSES). Used by the
+   * single-player landscape table layout to shrink table cards while
+   * leaving every other caller (Online, the player's hand) untouched. */
+  sizeClassName?: string
+  /** Opt-in: shrinks the rank/suit glyphs and jester illustration ONLY in
+   * landscape orientation (via a `landscape:` Tailwind variant baked into
+   * the class strings below), to match a `sizeClassName` that also shrinks
+   * only in landscape. Left `undefined`/false everywhere except the
+   * single-player table/melds, so Online (which never passes this prop)
+   * and the player's hand keep their normal glyph size in every
+   * orientation. */
+  compactOnLandscape?: boolean
 }
 
 const SUIT_SYMBOLS: Record<CardType['suit'], string> = {
@@ -30,11 +42,11 @@ export const CARD_SIZE_CLASSES = 'w-16 h-24 sm:w-20 sm:h-28'
 /** Small illustrated jester — cap with three bell-tipped points over a
  * simple masked face — used on wild cards instead of a plain star so the
  * card reads as an actual illustrated Joker. */
-function JesterIllustration() {
+function JesterIllustration({ compactOnLandscape }: { compactOnLandscape?: boolean }) {
   return (
     <svg
       viewBox="0 0 48 56"
-      className="h-9 w-9 sm:h-11 sm:w-11"
+      className={compactOnLandscape ? 'h-9 w-9 landscape:h-4 landscape:w-4 sm:h-11 sm:w-11' : 'h-9 w-9 sm:h-11 sm:w-11'}
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
     >
@@ -55,8 +67,18 @@ function JesterIllustration() {
   )
 }
 
-export function CardComponent({ card, onClick, selected, index }: CardProps) {
+export function CardComponent({ card, onClick, selected, index, sizeClassName, compactOnLandscape }: CardProps) {
   const suitClass = SUIT_COLOR_CLASS[card.suit]
+  const cornerTextClass = compactOnLandscape
+    ? 'text-sm sm:text-base landscape:text-[7px]'
+    : 'text-sm sm:text-base'
+  const centerTextClass = compactOnLandscape
+    ? 'text-4xl sm:text-5xl landscape:text-base'
+    : 'text-4xl sm:text-5xl'
+  const cornerGap = compactOnLandscape ? 'left-2 top-1.5 landscape:left-1 landscape:top-0.5' : 'left-2 top-1.5'
+  const cornerGapBottom = compactOnLandscape
+    ? 'bottom-1.5 right-2 landscape:bottom-0.5 landscape:right-1'
+    : 'bottom-1.5 right-2'
 
   return (
     <motion.div
@@ -75,7 +97,7 @@ export function CardComponent({ card, onClick, selected, index }: CardProps) {
       role={onClick ? 'button' : undefined}
       aria-pressed={onClick ? Boolean(selected) : undefined}
       className={[
-        CARD_SIZE_CLASSES,
+        sizeClassName ?? CARD_SIZE_CLASSES,
         'relative select-none rounded-xl border shadow-md',
         onClick ? 'cursor-pointer' : '',
         card.isWild
@@ -86,24 +108,30 @@ export function CardComponent({ card, onClick, selected, index }: CardProps) {
     >
       {card.isWild ? (
         <div className="flex h-full w-full flex-col items-center justify-center gap-1 p-1">
-          <JesterIllustration />
-          <span className="text-[10px] font-black leading-none tracking-wide text-white drop-shadow sm:text-xs">
+          <JesterIllustration compactOnLandscape={compactOnLandscape} />
+          <span
+            className={
+              compactOnLandscape
+                ? 'text-[10px] font-black leading-none tracking-wide text-white drop-shadow sm:text-xs landscape:hidden'
+                : 'text-[10px] font-black leading-none tracking-wide text-white drop-shadow sm:text-xs'
+            }
+          >
             CURINGA
           </span>
         </div>
       ) : (
         <>
-          <div className={`absolute left-2 top-1.5 flex flex-col items-center leading-none ${suitClass}`}>
-            <span className="text-sm font-black sm:text-base">{card.rank}</span>
-            <span className="text-sm sm:text-base">{SUIT_SYMBOLS[card.suit]}</span>
+          <div className={`absolute flex flex-col items-center leading-none ${cornerGap} ${suitClass}`}>
+            <span className={`font-black ${cornerTextClass}`}>{card.rank}</span>
+            <span className={cornerTextClass}>{SUIT_SYMBOLS[card.suit]}</span>
           </div>
           <div
-            className={`absolute bottom-1.5 right-2 flex rotate-180 flex-col items-center leading-none ${suitClass}`}
+            className={`absolute flex rotate-180 flex-col items-center leading-none ${cornerGapBottom} ${suitClass}`}
           >
-            <span className="text-sm font-black sm:text-base">{card.rank}</span>
-            <span className="text-sm sm:text-base">{SUIT_SYMBOLS[card.suit]}</span>
+            <span className={`font-black ${cornerTextClass}`}>{card.rank}</span>
+            <span className={cornerTextClass}>{SUIT_SYMBOLS[card.suit]}</span>
           </div>
-          <div className={`flex h-full w-full items-center justify-center text-4xl sm:text-5xl ${suitClass}`}>
+          <div className={`flex h-full w-full items-center justify-center ${centerTextClass} ${suitClass}`}>
             {SUIT_SYMBOLS[card.suit]}
           </div>
         </>
@@ -120,21 +148,32 @@ export function CardComponent({ card, onClick, selected, index }: CardProps) {
 export function CardBack({
   className = '',
   variant = 'blue',
+  sizeClassName,
+  compactOnLandscape,
 }: {
   className?: string
   variant?: 'blue' | 'red'
+  /** See CardComponent's `sizeClassName` — overrides the default footprint. */
+  sizeClassName?: string
+  /** See CardComponent's `compactOnLandscape` — shrinks the "B" glyph to
+   * match, only in landscape orientation. */
+  compactOnLandscape?: boolean
 }) {
   return (
     <div
       className={[
-        CARD_SIZE_CLASSES,
+        sizeClassName ?? CARD_SIZE_CLASSES,
         variant === 'blue' ? 'card-back-pattern-blue' : 'card-back-pattern-red',
         'rounded-xl border border-white/40 shadow-md',
         'flex items-center justify-center',
         className,
       ].join(' ')}
     >
-      <span className="font-display text-lg text-white/80 drop-shadow-sm">B</span>
+      <span
+        className={`font-display text-lg text-white/80 drop-shadow-sm ${compactOnLandscape ? 'landscape:text-xs' : ''}`}
+      >
+        B
+      </span>
     </div>
   )
 }

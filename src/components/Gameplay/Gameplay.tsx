@@ -219,16 +219,19 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
   const lastLog = gameLog[gameLog.length - 1]
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-2">
+    <div className="flex h-full min-h-0 flex-col gap-2 landscape:gap-1">
       {/* Placar (topo, altura automática) */}
       <div className="shrink-0">
         <Scoreboard />
       </div>
 
-      {/* Mesa — ocupa o espaço flexível do meio; rola internamente só se
-          precisar, sem rolar a página. Manipulação direta: clicar no monte,
-          no descarte ou na mesa substitui os antigos botões de ação. */}
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      {/* Mesa — ocupa o espaço flexível do meio. Em retrato rola
+          internamente só se precisar, sem rolar a página; em paisagem NÃO
+          rola — o GameBoard se redimensiona (assentos/monte/descarte
+          menores, painéis "Nós"/"Eles" nas laterais) pra caber inteiro na
+          altura disponível. Manipulação direta: clicar no monte, no
+          descarte ou na mesa substitui os antigos botões de ação. */}
+      <div className="min-h-0 flex-1 overflow-y-auto landscape:overflow-hidden">
         <GameBoard
           phase={phase}
           canTakeDiscard={canTakeDiscard}
@@ -262,8 +265,10 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
         )}
       </AnimatePresence>
 
-      {/* Registro em uma linha só */}
-      <div className="shrink-0 truncate rounded-lg border border-white/10 bg-black/25 px-3 py-1.5 text-center text-xs text-gray-300">
+      {/* Registro em uma linha só — escondido em paisagem pra liberar altura
+          pra mesa/mão (a mesa já mostra os eventos importantes via banner do
+          morto e destaques na própria mesa). */}
+      <div className="shrink-0 truncate rounded-lg border border-white/10 bg-black/25 px-3 py-1.5 text-center text-xs text-gray-300 landscape:hidden">
         <span className="text-card-gold">Registro:</span>{' '}
         {lastLog ?? 'Nenhuma ação ainda.'}
       </div>
