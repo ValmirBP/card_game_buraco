@@ -49,6 +49,7 @@ export default function PlayerHand({ phase }: PlayerHandProps) {
 
   const hand = game.state.players[0].hand.getCards()
   const isHumanTurn = game.state.status === 'playing' && game.state.currentPlayerIndex === 0
+  const hasSelection = selectedCardIndices.length > 0
 
   const hint = !isHumanTurn
     ? 'IA jogando…'
@@ -61,20 +62,32 @@ export default function PlayerHand({ phase }: PlayerHandProps) {
           : 'Selecione cartas: 1 para descartar, 3+ para baixar um jogo.'
 
   return (
-    <div className="space-y-1 rounded-xl border border-white/10 bg-black/25 px-3 py-1.5 shadow-lg backdrop-blur-sm landscape:px-2 landscape:py-1">
+    <div className="space-y-1 rounded-xl border border-white/10 bg-black/25 px-3 py-1.5 shadow-lg backdrop-blur-sm landscape:space-y-0 landscape:px-2 landscape:py-0.5">
       <div className="flex flex-nowrap items-baseline justify-between gap-x-3">
-        <h3 className="shrink-0 font-display text-sm text-card-gold landscape:text-xs">
-          Sua Mão <span className="text-[10px] font-normal text-gray-400">({hand.length})</span>
+        <h3 className="shrink-0 font-display text-sm text-card-gold landscape:text-[10px]">
+          Sua Mão <span className="text-[10px] font-normal text-gray-400 landscape:text-[8px]">({hand.length})</span>
         </h3>
-        {hint && <span className="truncate text-[10px] text-gray-300 sm:text-xs landscape:text-[9px]">{hint}</span>}
+        {hint && <span className="truncate text-[10px] text-gray-300 sm:text-xs landscape:text-[8px]">{hint}</span>}
       </div>
       {/* Seleção NÃO eleva o z-index — a carta selecionada sobe
           verticalmente mas mantém o empilhamento natural do leque, sem
           cobrir o canto (rank/naipe) da carta vizinha. Só o hover traz a
-          carta pra frente, temporariamente, pra leitura. */}
+          carta pra frente, temporariamente, pra leitura.
+
+          "Meia carta" em paisagem: pra sobrar espaço pra mesa (a vista
+          principal), a faixa da mão fica baixa e corta a metade inferior
+          das cartas (overflow-y-hidden + max-height reduzido) — só a
+          metade de cima "espia" (rank/naipe do canto continuam legíveis).
+          Ao selecionar alguma carta, a faixa cresce (max-height maior) pra
+          revelar as cartas inteiras — a seleção já eleva a carta (ver
+          Card.tsx), então ela sobe e aparece por completo. Sem seleção,
+          volta a encolher pro modo "peek". O eixo X continua rolável se a
+          mão não couber. */}
       <div
         id="player-hand-anchor"
-        className="scrollbar-gold flex -space-x-8 overflow-x-auto px-1 pb-3 pt-3 sm:-space-x-10 landscape:-space-x-6 landscape:pb-1 landscape:pt-2"
+        className={`scrollbar-gold flex -space-x-8 overflow-x-auto px-1 pb-3 pt-3 transition-[max-height] duration-200 sm:-space-x-10 landscape:-space-x-6 landscape:overflow-y-hidden landscape:pb-0.5 ${
+          hasSelection ? 'landscape:max-h-[5rem] landscape:pt-3' : 'landscape:max-h-[1.9rem] landscape:pt-1'
+        }`}
       >
         {orderedHand(hand).map(({ card, index }, position) => (
           <div

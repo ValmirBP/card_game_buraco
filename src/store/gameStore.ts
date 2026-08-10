@@ -126,9 +126,8 @@ export interface GameStore {
 
   /** Seat 0 = human (`playerName`); seat 2 = human's AI partner (`names.partner`);
    * seat 1 = `names.opponent1`; seat 3 = `names.opponent2`. All three AIs play
-   * at `aiDifficulty`. `names` is optional and defaults to the traditional
-   * "Parceiro" / "Adversário 1" / "Adversário 2" labels for backward
-   * compatibility with existing callers/tests. */
+   * at `aiDifficulty`. `names` is optional and defaults to "Bruno" (partner) /
+   * "Ana" (opponent1) / "Carlos" (opponent2) when omitted or blank. */
   initGame: (
     playerName: string,
     aiDifficulty: AIDifficulty,
@@ -270,9 +269,9 @@ export const useGameStore = create<GameStore>((set, get) => {
   roundFinalized: false,
 
   initGame: (playerName, aiDifficulty, names) => {
-    const partnerName = names?.partner?.trim() || 'Parceiro'
-    const opponent1Name = names?.opponent1?.trim() || 'Adversário 1'
-    const opponent2Name = names?.opponent2?.trim() || 'Adversário 2'
+    const partnerName = names?.partner?.trim() || 'Bruno'
+    const opponent1Name = names?.opponent1?.trim() || 'Ana'
+    const opponent2Name = names?.opponent2?.trim() || 'Carlos'
 
     // Guarda a pontuação final da partida que está terminando (se houver uma
     // em andamento com pontos) para exibir como "partida anterior".
@@ -579,9 +578,9 @@ export const useGameStore = create<GameStore>((set, get) => {
     if (matchWinner) return // match already over — nothing to do.
     if (!matchConfig) return // no round to rebuild from (shouldn't happen once a match is running).
 
-    const partnerName = matchConfig.names?.partner?.trim() || 'Parceiro'
-    const opponent1Name = matchConfig.names?.opponent1?.trim() || 'Adversário 1'
-    const opponent2Name = matchConfig.names?.opponent2?.trim() || 'Adversário 2'
+    const partnerName = matchConfig.names?.partner?.trim() || 'Bruno'
+    const opponent1Name = matchConfig.names?.opponent1?.trim() || 'Ana'
+    const opponent2Name = matchConfig.names?.opponent2?.trim() || 'Carlos'
 
     const human = new HumanPlayer(matchConfig.playerName)
     const opponent1 = new AIPlayer(opponent1Name, matchConfig.aiDifficulty)

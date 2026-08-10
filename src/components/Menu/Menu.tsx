@@ -19,9 +19,9 @@ interface MenuProps {
 }
 
 const DEFAULT_BOT_NAMES: BotNames = {
-  partner: 'Parceiro',
-  opponent1: 'Adversário 1',
-  opponent2: 'Adversário 2',
+  partner: 'Bruno',
+  opponent1: 'Ana',
+  opponent2: 'Carlos',
 }
 
 /** Purely decorative fan of cards shown behind the title. */
@@ -53,9 +53,9 @@ export default function Menu({ onStart, onPlayOnline }: MenuProps) {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-8">
-      <div className="relative flex flex-col items-center pt-8 text-center">
-        <div className="pointer-events-none absolute -top-2 flex h-20 items-end justify-center sm:-top-4 sm:h-24">
+    <div className="flex h-full min-h-0 w-full flex-col items-center justify-center gap-4 overflow-y-auto px-3 py-2 landscape:justify-center landscape:gap-1.5 landscape:overflow-hidden">
+      <div className="relative flex flex-col items-center pt-4 text-center landscape:pt-0">
+        <div className="pointer-events-none absolute -top-2 flex h-20 items-end justify-center sm:-top-4 sm:h-24 landscape:hidden">
           {FAN_CARDS.map((f, i) => (
             <div
               key={i}
@@ -66,112 +66,118 @@ export default function Menu({ onStart, onPlayOnline }: MenuProps) {
             </div>
           ))}
         </div>
-        <h1 className="relative z-10 mt-16 mb-2 font-display text-5xl tracking-wide text-card-gold drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)] sm:mt-20 md:text-6xl">
+        <h1 className="relative z-10 mt-16 mb-1 font-display text-4xl tracking-wide text-card-gold drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)] sm:mt-20 md:text-6xl landscape:mt-0 landscape:text-xl">
           Buraco
         </h1>
-        <p className="relative z-10 text-xl text-gray-200 md:text-2xl">Jogatina</p>
+        <p className="relative z-10 text-lg text-gray-200 md:text-2xl landscape:text-xs">Jogatina</p>
       </div>
 
-      <div className="w-full max-w-sm px-4">
-        <label htmlFor="player-name" className="sr-only">
-          Nome do jogador
-        </label>
-        <input
-          id="player-name"
-          type="text"
-          placeholder="Seu nome"
-          value={playerName}
-          onChange={e => setPlayerName(e.target.value)}
-          className="min-h-[44px] w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-center text-white placeholder-gray-400 shadow-inner outline-none backdrop-blur-sm transition focus:ring-4 focus:ring-card-gold/70"
-        />
-      </div>
+      <div className="grid w-full max-w-3xl grid-cols-1 gap-4 px-2 landscape:grid-cols-2 landscape:items-start landscape:gap-4 landscape:px-4">
+        {/* Coluna esquerda (paisagem): nome + edição de nomes */}
+        <div className="flex flex-col gap-2 landscape:gap-1">
+          <div className="w-full">
+            <label htmlFor="player-name" className="sr-only">
+              Nome do jogador
+            </label>
+            <input
+              id="player-name"
+              type="text"
+              placeholder="Seu nome"
+              value={playerName}
+              onChange={e => setPlayerName(e.target.value)}
+              className="min-h-[44px] w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-center text-white placeholder-gray-400 shadow-inner outline-none backdrop-blur-sm transition focus:ring-4 focus:ring-card-gold/70 landscape:min-h-0 landscape:py-1.5 landscape:text-sm"
+            />
+          </div>
 
-      <div className="w-full max-w-sm px-4">
-        <button
-          type="button"
-          onClick={() => setShowNameEditor(v => !v)}
-          className="w-full text-center text-sm text-gray-300 underline decoration-dotted underline-offset-4 transition-colors hover:text-card-gold"
-        >
-          {showNameEditor ? 'Ocultar edição de nomes' : 'Editar nomes'}
-        </button>
-        {showNameEditor && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="mt-3 flex flex-col gap-3 overflow-hidden"
+          <div className="w-full">
+            <button
+              type="button"
+              onClick={() => setShowNameEditor(v => !v)}
+              className="w-full text-center text-sm text-gray-300 underline decoration-dotted underline-offset-4 transition-colors hover:text-card-gold landscape:text-[11px]"
+            >
+              {showNameEditor ? 'Ocultar edição de nomes' : 'Editar nomes'}
+            </button>
+            {showNameEditor && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mt-2 flex flex-col gap-2 overflow-hidden landscape:mt-1 landscape:gap-1"
+              >
+                <div>
+                  <label htmlFor="partner-name" className="mb-0.5 block text-xs text-gray-300 landscape:text-[10px]">
+                    Parceiro
+                  </label>
+                  <input
+                    id="partner-name"
+                    type="text"
+                    placeholder={DEFAULT_BOT_NAMES.partner}
+                    value={botNames.partner}
+                    onChange={e => setBotNames(n => ({ ...n, partner: e.target.value }))}
+                    className="min-h-[44px] w-full rounded-xl border border-white/10 bg-black/30 px-4 py-2 text-center text-white placeholder-gray-400 shadow-inner outline-none backdrop-blur-sm transition focus:ring-4 focus:ring-card-gold/70 landscape:min-h-0 landscape:py-1 landscape:text-xs"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="opponent1-name" className="mb-0.5 block text-xs text-gray-300 landscape:text-[10px]">
+                    Adversário 1
+                  </label>
+                  <input
+                    id="opponent1-name"
+                    type="text"
+                    placeholder={DEFAULT_BOT_NAMES.opponent1}
+                    value={botNames.opponent1}
+                    onChange={e => setBotNames(n => ({ ...n, opponent1: e.target.value }))}
+                    className="min-h-[44px] w-full rounded-xl border border-white/10 bg-black/30 px-4 py-2 text-center text-white placeholder-gray-400 shadow-inner outline-none backdrop-blur-sm transition focus:ring-4 focus:ring-card-gold/70 landscape:min-h-0 landscape:py-1 landscape:text-xs"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="opponent2-name" className="mb-0.5 block text-xs text-gray-300 landscape:text-[10px]">
+                    Adversário 2
+                  </label>
+                  <input
+                    id="opponent2-name"
+                    type="text"
+                    placeholder={DEFAULT_BOT_NAMES.opponent2}
+                    value={botNames.opponent2}
+                    onChange={e => setBotNames(n => ({ ...n, opponent2: e.target.value }))}
+                    className="min-h-[44px] w-full rounded-xl border border-white/10 bg-black/30 px-4 py-2 text-center text-white placeholder-gray-400 shadow-inner outline-none backdrop-blur-sm transition focus:ring-4 focus:ring-card-gold/70 landscape:min-h-0 landscape:py-1 landscape:text-xs"
+                  />
+                </div>
+              </motion.div>
+            )}
+          </div>
+        </div>
+
+        {/* Coluna direita (paisagem): ações principais */}
+        <div className="flex w-full flex-col gap-3 landscape:gap-1.5">
+          <motion.button
+            type="button"
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => setShowDifficulty(true)}
+            className="min-h-[44px] w-full rounded-xl bg-gradient-to-b from-card-gold-light to-card-gold px-6 py-3 font-bold text-black shadow-lg shadow-black/30 transition-colors hover:from-card-gold hover:to-card-gold-dark landscape:min-h-0 landscape:py-1.5 landscape:text-sm"
           >
-            <div>
-              <label htmlFor="partner-name" className="mb-1 block text-xs text-gray-300">
-                Parceiro
-              </label>
-              <input
-                id="partner-name"
-                type="text"
-                placeholder={DEFAULT_BOT_NAMES.partner}
-                value={botNames.partner}
-                onChange={e => setBotNames(n => ({ ...n, partner: e.target.value }))}
-                className="min-h-[44px] w-full rounded-xl border border-white/10 bg-black/30 px-4 py-2 text-center text-white placeholder-gray-400 shadow-inner outline-none backdrop-blur-sm transition focus:ring-4 focus:ring-card-gold/70"
-              />
-            </div>
-            <div>
-              <label htmlFor="opponent1-name" className="mb-1 block text-xs text-gray-300">
-                Adversário 1
-              </label>
-              <input
-                id="opponent1-name"
-                type="text"
-                placeholder={DEFAULT_BOT_NAMES.opponent1}
-                value={botNames.opponent1}
-                onChange={e => setBotNames(n => ({ ...n, opponent1: e.target.value }))}
-                className="min-h-[44px] w-full rounded-xl border border-white/10 bg-black/30 px-4 py-2 text-center text-white placeholder-gray-400 shadow-inner outline-none backdrop-blur-sm transition focus:ring-4 focus:ring-card-gold/70"
-              />
-            </div>
-            <div>
-              <label htmlFor="opponent2-name" className="mb-1 block text-xs text-gray-300">
-                Adversário 2
-              </label>
-              <input
-                id="opponent2-name"
-                type="text"
-                placeholder={DEFAULT_BOT_NAMES.opponent2}
-                value={botNames.opponent2}
-                onChange={e => setBotNames(n => ({ ...n, opponent2: e.target.value }))}
-                className="min-h-[44px] w-full rounded-xl border border-white/10 bg-black/30 px-4 py-2 text-center text-white placeholder-gray-400 shadow-inner outline-none backdrop-blur-sm transition focus:ring-4 focus:ring-card-gold/70"
-              />
-            </div>
-          </motion.div>
-        )}
-      </div>
-
-      <div className="flex w-full max-w-sm flex-col gap-4 px-4">
-        <motion.button
-          type="button"
-          whileHover={{ scale: 1.03 }}
-          whileTap={{ scale: 0.97 }}
-          onClick={() => setShowDifficulty(true)}
-          className="min-h-[44px] w-full rounded-xl bg-gradient-to-b from-card-gold-light to-card-gold px-6 py-3 font-bold text-black shadow-lg shadow-black/30 transition-colors hover:from-card-gold hover:to-card-gold-dark"
-        >
-          Jogar vs IA
-        </motion.button>
-        <motion.button
-          type="button"
-          whileHover={{ scale: 1.03 }}
-          whileTap={{ scale: 0.97 }}
-          onClick={onPlayOnline}
-          className="min-h-[44px] w-full rounded-xl border-2 border-card-gold/70 bg-black/20 px-6 py-3 font-bold text-card-gold backdrop-blur-sm transition-colors hover:bg-card-gold/10"
-        >
-          Jogar Online
-        </motion.button>
-        <motion.button
-          type="button"
-          whileHover={{ scale: 1.03 }}
-          whileTap={{ scale: 0.97 }}
-          onClick={() => setShowRules(true)}
-          className="min-h-[44px] w-full rounded-xl border-2 border-card-gold/70 bg-black/20 px-6 py-3 font-bold text-card-gold backdrop-blur-sm transition-colors hover:bg-card-gold/10"
-        >
-          Regras
-        </motion.button>
+            Jogar vs IA
+          </motion.button>
+          <motion.button
+            type="button"
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={onPlayOnline}
+            className="min-h-[44px] w-full rounded-xl border-2 border-card-gold/70 bg-black/20 px-6 py-3 font-bold text-card-gold backdrop-blur-sm transition-colors hover:bg-card-gold/10 landscape:min-h-0 landscape:py-1.5 landscape:text-sm"
+          >
+            Jogar Online
+          </motion.button>
+          <motion.button
+            type="button"
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => setShowRules(true)}
+            className="min-h-[44px] w-full rounded-xl border-2 border-card-gold/70 bg-black/20 px-6 py-3 font-bold text-card-gold backdrop-blur-sm transition-colors hover:bg-card-gold/10 landscape:min-h-0 landscape:py-1.5 landscape:text-sm"
+          >
+            Regras
+          </motion.button>
+        </div>
       </div>
 
       {showDifficulty && (

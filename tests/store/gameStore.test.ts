@@ -50,9 +50,9 @@ describe('useGameStore', () => {
     useGameStore.getState().initGame('Alice', 'easy')
     const { game } = useGameStore.getState()
 
-    expect(game!.state.players[1].name).toBe('Adversário 1')
-    expect(game!.state.players[2].name).toBe('Parceiro')
-    expect(game!.state.players[3].name).toBe('Adversário 2')
+    expect(game!.state.players[1].name).toBe('Ana')
+    expect(game!.state.players[2].name).toBe('Bruno')
+    expect(game!.state.players[3].name).toBe('Carlos')
   })
 
   test('drawFromDeck adds a card to the current player hand and bumps version', () => {
@@ -184,7 +184,7 @@ describe('useGameStore', () => {
 
   test('aiTurn runs one AI seat and advances currentPlayerIndex, logging the AI name', () => {
     useGameStore.getState().initGame('Alice', 'easy')
-    useGameStore.getState().discard(0) // human's turn -> seat 1 (AI, "Adversário 1")
+    useGameStore.getState().discard(0) // human's turn -> seat 1 (AI, "Ana")
     expect(useGameStore.getState().game!.state.currentPlayerIndex).toBe(1)
 
     const versionBefore = useGameStore.getState().version
@@ -193,12 +193,12 @@ describe('useGameStore', () => {
     const state = useGameStore.getState()
     expect(state.game!.state.currentPlayerIndex).toBe(2)
     expect(state.version).toBeGreaterThan(versionBefore)
-    expect(state.gameLog.some(l => l.includes('Adversário 1'))).toBe(true)
+    expect(state.gameLog.some(l => l.includes('Ana'))).toBe(true)
   })
 
   test('aiTurn does not get stuck when the engine rejects a hand-emptying meld (team already took morto, no clean canastra): falls back to discard and ends the turn', () => {
     useGameStore.getState().initGame('Alice', 'easy')
-    useGameStore.getState().discard(0) // human's turn -> seat 1 (AI, "Adversário 1")
+    useGameStore.getState().discard(0) // human's turn -> seat 1 (AI, "Ana")
     const game = useGameStore.getState().game!
     expect(game.state.currentPlayerIndex).toBe(1)
 
