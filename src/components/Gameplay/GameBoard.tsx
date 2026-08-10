@@ -32,8 +32,8 @@ const TEAM_TEXT_CLASS: Record<TeamId, string> = {
 // portrait (the existing "fallback decente"), left/right sidebars flanking
 // the table in landscape (so the whole table fits without scrolling).
 const TEAM_GRID_CLASS: Record<TeamId, string> = {
-  A: 'col-start-1 row-start-2 landscape:col-start-1 landscape:row-start-1',
-  B: 'col-start-2 row-start-2 landscape:col-start-3 landscape:row-start-1',
+  A: 'col-start-1 row-start-2 landscape:col-start-1 landscape:row-start-2',
+  B: 'col-start-2 row-start-2 landscape:col-start-2 landscape:row-start-2',
 }
 
 /** Shared footprint for the deck/discard/melds cards on the table — same
@@ -41,7 +41,7 @@ const TEAM_GRID_CLASS: Record<TeamId, string> = {
  * landscape (via the `landscape:` variant) so the whole table fits the
  * screen height without scrolling. Opt-in (passed explicitly to
  * CardComponent/CardBack), so it never affects Online or the player's hand. */
-const TABLE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-10 landscape:h-14'
+const TABLE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-7 landscape:h-10'
 
 /** The 4-seat table: opponents/partner around a center that shows the draw
  * pile, discard pile (with a small fan of the last few cards), the two
@@ -172,14 +172,19 @@ export default function GameBoard({
     <div className="relative h-full min-h-0 rounded-2xl border border-white/10 bg-black/25 p-2 shadow-lg backdrop-blur-sm sm:p-4 landscape:overflow-hidden">
       {/* Grid: empilhado (mesa em cima, "Nós"/"Eles" lado a lado embaixo) em
           retrato — layout original preservado como fallback. Em paisagem,
-          3 colunas lado a lado: "Nós" | mesa central | "Eles", tudo numa
-          única linha que ocupa a altura toda, sem rolagem. */}
-      <div className="grid grid-cols-2 grid-rows-[auto_auto] gap-3 sm:gap-4 landscape:h-full landscape:grid-cols-[minmax(84px,110px)_minmax(0,1fr)_minmax(84px,110px)] landscape:grid-rows-1 landscape:items-stretch landscape:gap-1.5">
-        {/* ---- Centro: morto, cabeçalho, 4 assentos, monte/descarte ---- */}
-        <div className="relative col-span-2 row-start-1 flex flex-col gap-2 landscape:col-span-1 landscape:col-start-2 landscape:row-start-1 landscape:h-full landscape:min-h-0 landscape:justify-center landscape:gap-1">
+          2 linhas: uma faixa fina no topo (assentos/monte/descarte/morto,
+          compactos e secundários) e, ocupando toda a altura restante, os
+          painéis "Nós" | "Eles" lado a lado — a VISTA PRINCIPAL, onde se
+          baixa/estende o jogo. Nada rola na vertical. */}
+      <div className="grid grid-cols-2 grid-rows-[auto_auto] gap-3 sm:gap-4 landscape:h-full landscape:grid-cols-2 landscape:grid-rows-[auto_minmax(0,1fr)] landscape:items-stretch landscape:gap-1.5">
+        {/* ---- Faixa fina no topo: morto, cabeçalho, 4 assentos (pílulas
+            compactas), monte/descarte — tudo secundário/compacto, spans as
+            duas colunas em paisagem para não roubar espaço dos painéis
+            "Nós"/"Eles" (a vista PRINCIPAL, ver abaixo). ---- */}
+        <div className="relative col-span-2 row-start-1 flex flex-col gap-2 landscape:col-span-2 landscape:col-start-1 landscape:row-start-1 landscape:h-auto landscape:min-h-0 landscape:justify-start landscape:gap-0.5">
           {/* Morto(s): canto superior-esquerdo da mesa central, pequenos,
               em cruz (✚) com o badge de contagem. */}
-          <div className="absolute left-0 top-0 z-10 flex origin-top-left scale-[0.65] flex-col items-center gap-0.5 sm:scale-75 landscape:scale-[0.42]">
+          <div className="absolute left-0 top-0 z-10 flex origin-top-left scale-[0.65] flex-col items-center gap-0.5 sm:scale-75 landscape:scale-[0.3]">
             <span className="text-[9px] font-semibold uppercase tracking-wide text-gray-400">
               Morto{mortos.length !== 1 ? 's' : ''}
             </span>
@@ -221,8 +226,8 @@ export default function GameBoard({
             )}
           </div>
 
-          <div className="flex items-center justify-between pl-14 sm:pl-16 landscape:pl-9">
-            <h3 className="font-display text-lg text-card-gold landscape:text-xs">Mesa</h3>
+          <div className="flex items-center justify-between pl-14 sm:pl-16 landscape:pl-6">
+            <h3 className="font-display text-lg text-card-gold landscape:hidden">Mesa</h3>
             <AnimatePresence>
               {status === 'playing' && !isHumanTurn && (
                 <motion.span
@@ -253,10 +258,13 @@ export default function GameBoard({
             </AnimatePresence>
           </div>
 
-          {/* 4-seat grid: Parceiro (top), Adversário 1 (left) / Adversário 2 (right), center table, Você (bottom, compact) */}
-          <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] grid-rows-[auto_auto_auto] items-center gap-3 sm:gap-4 landscape:gap-0.5">
-            <div />
-            <div className="col-start-2 row-start-1 flex justify-center">
+          {/* 4-seat grid: Parceiro (top), Adversário 1 (left) / Adversário 2 (right), center table, Você (bottom, compact).
+              Em paisagem vira uma fileira horizontal única de "pílulas"
+              compactas (assentos + cluster monte/descarte), a faixa fina do
+              topo — os painéis "Nós"/"Eles" abaixo é que dominam a tela. */}
+          <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] grid-rows-[auto_auto_auto] items-center gap-3 sm:gap-4 landscape:flex landscape:grid-cols-none landscape:grid-rows-none landscape:flex-row landscape:flex-wrap landscape:items-center landscape:justify-center landscape:gap-1">
+            <div className="landscape:hidden" />
+            <div className="col-start-2 row-start-1 flex justify-center landscape:col-auto landscape:row-auto">
               <Seat
                 name={players[2].name}
                 cardCount={players[2].hand.getCards().length}
@@ -264,9 +272,9 @@ export default function GameBoard({
                 teamId={teamIdOfSeat(2)}
               />
             </div>
-            <div />
+            <div className="landscape:hidden" />
 
-            <div className="col-start-1 row-start-2 flex justify-start">
+            <div className="col-start-1 row-start-2 flex justify-start landscape:col-auto landscape:row-auto">
               <Seat
                 name={players[1].name}
                 cardCount={players[1].hand.getCards().length}
@@ -275,11 +283,11 @@ export default function GameBoard({
               />
             </div>
 
-            <div className="col-start-2 row-start-2 flex flex-col items-center gap-4 px-2 py-2 landscape:gap-1 landscape:px-0.5 landscape:py-0.5">
+            <div className="col-start-2 row-start-2 flex flex-col items-center gap-4 px-2 py-2 landscape:col-auto landscape:row-auto landscape:gap-0 landscape:px-0.5 landscape:py-0">
               {/* Draw pile / discard pile */}
-              <div className="flex items-center justify-center gap-4 sm:gap-6 landscape:gap-2">
-                <div className="flex flex-col items-center gap-1.5 landscape:gap-0.5">
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-300 sm:text-xs landscape:text-[8px]">
+              <div className="flex items-center justify-center gap-4 sm:gap-6 landscape:gap-1">
+                <div className="flex flex-col items-center gap-1.5 landscape:gap-0">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-300 sm:text-xs landscape:hidden">
                     Monte
                   </span>
                   {deck.length > 0 ? (
@@ -306,7 +314,7 @@ export default function GameBoard({
                     <div
                       id="deck-pile"
                       onClick={handleDeckClick}
-                      className={`flex h-24 w-16 items-center justify-center rounded-xl border border-dashed border-white/20 text-[10px] text-gray-400 sm:h-28 sm:w-20 landscape:h-14 landscape:w-10 landscape:text-[8px] ${
+                      className={`flex h-24 w-16 items-center justify-center rounded-xl border border-dashed border-white/20 text-[10px] text-gray-400 sm:h-28 sm:w-20 landscape:h-10 landscape:w-7 landscape:text-[6px] ${
                         canClickDeck ? 'cursor-pointer ring-2 ring-card-gold' : ''
                       }`}
                     >
@@ -315,8 +323,8 @@ export default function GameBoard({
                   )}
                 </div>
 
-                <div className="flex flex-col items-center gap-1.5 landscape:gap-0.5">
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-300 sm:text-xs landscape:text-[8px]">
+                <div className="flex flex-col items-center gap-1.5 landscape:gap-0">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-300 sm:text-xs landscape:hidden">
                     Descarte
                   </span>
                   <div
@@ -351,7 +359,7 @@ export default function GameBoard({
                       ) : (
                         <div
                           id="discard-top"
-                          className="flex h-24 w-16 items-center justify-center rounded-xl border border-dashed border-white/20 text-[10px] text-gray-400 sm:h-28 sm:w-20 landscape:h-14 landscape:w-10 landscape:text-[8px]"
+                          className="flex h-24 w-16 items-center justify-center rounded-xl border border-dashed border-white/20 text-[10px] text-gray-400 sm:h-28 sm:w-20 landscape:h-10 landscape:w-7 landscape:text-[6px]"
                         >
                           Vazio
                         </div>
@@ -362,7 +370,7 @@ export default function GameBoard({
               </div>
             </div>
 
-            <div className="col-start-3 row-start-2 flex justify-end">
+            <div className="col-start-3 row-start-2 flex justify-end landscape:col-auto landscape:row-auto">
               <Seat
                 name={players[3].name}
                 cardCount={players[3].hand.getCards().length}
@@ -371,7 +379,7 @@ export default function GameBoard({
               />
             </div>
 
-            <div />
+            <div className="landscape:hidden" />
             {/* O assento "Você" some em paisagem — a própria mão (embaixo,
                 em tamanho legível) já ocupa esse papel, e a dica de turno
                 aparece no cabeçalho da mesa (ver abaixo) e na própria
@@ -385,7 +393,7 @@ export default function GameBoard({
                 compact
               />
             </div>
-            <div />
+            <div className="landscape:hidden" />
           </div>
 
           {/* Dica/erro: sobreposta (não reserva altura própria), pra caber
@@ -425,7 +433,7 @@ export default function GameBoard({
               key={team.id}
               id={team.id === 'A' ? 'meld-drop-zone' : undefined}
               onClick={team.id === 'A' ? handleDropZoneClick : undefined}
-              className={`space-y-2 overflow-hidden rounded-xl border p-3 transition-all landscape:flex landscape:h-full landscape:min-h-0 landscape:flex-col landscape:space-y-1 landscape:p-1.5 ${
+              className={`space-y-2 overflow-hidden rounded-xl border p-3 transition-all landscape:flex landscape:h-full landscape:min-h-0 landscape:flex-col landscape:space-y-0.5 landscape:p-1 ${
                 TEAM_GRID_CLASS[team.id]
               } ${TEAM_PANEL_CLASS[team.id]} ${
                 isDropTarget
