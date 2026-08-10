@@ -258,13 +258,16 @@ export default function GameBoard({
             </AnimatePresence>
           </div>
 
-          {/* 4-seat grid: Parceiro (top), Adversário 1 (left) / Adversário 2 (right), center table, Você (bottom, compact).
-              Em paisagem vira uma fileira horizontal única de "pílulas"
-              compactas (assentos + cluster monte/descarte), a faixa fina do
-              topo — os painéis "Nós"/"Eles" abaixo é que dominam a tela. */}
-          <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] grid-rows-[auto_auto_auto] items-center gap-3 sm:gap-4 landscape:flex landscape:grid-cols-none landscape:grid-rows-none landscape:flex-row landscape:flex-wrap landscape:items-center landscape:justify-center landscape:gap-1">
-            <div className="landscape:hidden" />
-            <div className="col-start-2 row-start-1 flex justify-center landscape:col-auto landscape:row-auto">
+          {/* 4-seat grid (cruzeiro clássico de duplas): Parceiro (topo, de
+              frente pra você), Adversário 1 (esquerda) / Adversário 2 (direita)
+              de frente um pro outro, mesa central (monte/descarte), e Você
+              embaixo. Em paisagem o "Você" some (a própria mão embaixo faz esse
+              papel), mas o cruzeiro é PRESERVADO: parceiro em cima, adversários
+              nas laterais — só encolhido, numa faixa compacta, pra os painéis
+              "Nós"/"Eles" abaixo dominarem a tela. */}
+          <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] grid-rows-[auto_auto_auto] items-center gap-3 sm:gap-4 landscape:gap-1">
+            <div />
+            <div className="col-start-2 row-start-1 flex justify-center">
               <Seat
                 name={players[2].name}
                 cardCount={players[2].hand.getCards().length}
@@ -272,9 +275,9 @@ export default function GameBoard({
                 teamId={teamIdOfSeat(2)}
               />
             </div>
-            <div className="landscape:hidden" />
+            <div />
 
-            <div className="col-start-1 row-start-2 flex justify-start landscape:col-auto landscape:row-auto">
+            <div className="col-start-1 row-start-2 flex justify-start">
               <Seat
                 name={players[1].name}
                 cardCount={players[1].hand.getCards().length}
@@ -283,7 +286,7 @@ export default function GameBoard({
               />
             </div>
 
-            <div className="col-start-2 row-start-2 flex flex-col items-center gap-4 px-2 py-2 landscape:col-auto landscape:row-auto landscape:gap-0 landscape:px-0.5 landscape:py-0">
+            <div className="col-start-2 row-start-2 flex flex-col items-center gap-4 px-2 py-2 landscape:gap-0 landscape:px-0.5 landscape:py-0">
               {/* Draw pile / discard pile */}
               <div className="flex items-center justify-center gap-4 sm:gap-6 landscape:gap-1">
                 <div className="flex flex-col items-center gap-1.5 landscape:gap-0">
@@ -370,7 +373,7 @@ export default function GameBoard({
               </div>
             </div>
 
-            <div className="col-start-3 row-start-2 flex justify-end landscape:col-auto landscape:row-auto">
+            <div className="col-start-3 row-start-2 flex justify-end">
               <Seat
                 name={players[3].name}
                 cardCount={players[3].hand.getCards().length}
