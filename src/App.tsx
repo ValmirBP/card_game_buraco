@@ -10,9 +10,9 @@ import { useOnlineStore } from './online/onlineStore'
 import type { AIDifficulty } from './engine/ai'
 
 const DEFAULT_BOT_NAMES: BotNames = {
-  partner: 'Parceiro',
-  opponent1: 'Adversário 1',
-  opponent2: 'Adversário 2',
+  partner: 'Bruno',
+  opponent1: 'Ana',
+  opponent2: 'Carlos',
 }
 
 type Screen = 'menu' | 'gameplay' | 'result' | 'onlineLobby' | 'onlineGameplay'
@@ -71,7 +71,7 @@ export default function App() {
     setScreen('menu')
   }
 
-  const fitScreen = screen === 'gameplay' || screen === 'onlineGameplay'
+  const fitScreen = screen === 'gameplay' || screen === 'onlineGameplay' || screen === 'menu'
 
   return (
     <Layout fit={fitScreen}>
