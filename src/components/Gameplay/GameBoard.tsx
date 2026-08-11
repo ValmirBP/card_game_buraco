@@ -41,7 +41,7 @@ const TEAM_GRID_CLASS: Record<TeamId, string> = {
  * landscape (via the `landscape:` variant) so the whole table fits the
  * screen height without scrolling. Opt-in (passed explicitly to
  * CardComponent/CardBack), so it never affects Online or the player's hand. */
-const TABLE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-7 landscape:h-10'
+const TABLE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-9 landscape:h-[3.35rem]'
 
 /** The 4-seat table: opponents/partner around a center that shows the draw
  * pile, discard pile (with a small fan of the last few cards), the two
@@ -226,7 +226,7 @@ export default function GameBoard({
             )}
           </div>
 
-          <div className="flex items-center justify-between pl-14 sm:pl-16 landscape:pl-6">
+          <div className="flex items-center justify-between pl-14 sm:pl-16 landscape:absolute landscape:right-1 landscape:top-1 landscape:z-30 landscape:w-auto landscape:justify-end landscape:pl-0">
             <h3 className="font-display text-lg text-card-gold landscape:hidden">Mesa</h3>
             <AnimatePresence>
               {status === 'playing' && !isHumanTurn && (
@@ -265,19 +265,9 @@ export default function GameBoard({
               papel), mas o cruzeiro é PRESERVADO: parceiro em cima, adversários
               nas laterais — só encolhido, numa faixa compacta, pra os painéis
               "Nós"/"Eles" abaixo dominarem a tela. */}
-          <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] grid-rows-[auto_auto_auto] items-center gap-3 sm:gap-4 landscape:gap-1">
-            <div />
-            <div className="col-start-2 row-start-1 flex justify-center">
-              <Seat
-                name={players[2].name}
-                cardCount={players[2].hand.getCards().length}
-                isCurrentTurn={status === 'playing' && currentPlayerIndex === 2}
-                teamId={teamIdOfSeat(2)}
-              />
-            </div>
-            <div />
-
-            <div className="col-start-1 row-start-2 flex justify-start">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 sm:gap-4 landscape:flex landscape:items-center landscape:justify-between landscape:gap-2">
+            {/* Adversário 1 (Ana) — esquerda; de frente pro Adversário 2 */}
+            <div className="flex justify-start">
               <Seat
                 name={players[1].name}
                 cardCount={players[1].hand.getCards().length}
@@ -286,7 +276,17 @@ export default function GameBoard({
               />
             </div>
 
-            <div className="col-start-2 row-start-2 flex flex-col items-center gap-4 px-2 py-2 landscape:gap-0 landscape:px-0.5 landscape:py-0">
+            {/* Centro (coluna): Parceiro no topo (de frente pra você) +
+                monte/descarte + Você embaixo (só retrato). Em paisagem essa
+                coluna é a única faixa do topo — curtinha —, deixando toda a
+                altura restante pros painéis "Nós"/"Eles". */}
+            <div className="flex flex-col items-center gap-2 landscape:flex-row landscape:items-center landscape:gap-1.5">
+              <Seat
+                name={players[2].name}
+                cardCount={players[2].hand.getCards().length}
+                isCurrentTurn={status === 'playing' && currentPlayerIndex === 2}
+                teamId={teamIdOfSeat(2)}
+              />
               {/* Draw pile / discard pile */}
               <div className="flex items-center justify-center gap-4 sm:gap-6 landscape:gap-1">
                 <div className="flex flex-col items-center gap-1.5 landscape:gap-0">
@@ -317,7 +317,7 @@ export default function GameBoard({
                     <div
                       id="deck-pile"
                       onClick={handleDeckClick}
-                      className={`flex h-24 w-16 items-center justify-center rounded-xl border border-dashed border-white/20 text-[10px] text-gray-400 sm:h-28 sm:w-20 landscape:h-10 landscape:w-7 landscape:text-[6px] ${
+                      className={`flex h-24 w-16 items-center justify-center rounded-xl border border-dashed border-white/20 text-[10px] text-gray-400 sm:h-28 sm:w-20 landscape:h-[3.35rem] landscape:w-9 landscape:text-[6px] ${
                         canClickDeck ? 'cursor-pointer ring-2 ring-card-gold' : ''
                       }`}
                     >
@@ -362,7 +362,7 @@ export default function GameBoard({
                       ) : (
                         <div
                           id="discard-top"
-                          className="flex h-24 w-16 items-center justify-center rounded-xl border border-dashed border-white/20 text-[10px] text-gray-400 sm:h-28 sm:w-20 landscape:h-10 landscape:w-7 landscape:text-[6px]"
+                          className="flex h-24 w-16 items-center justify-center rounded-xl border border-dashed border-white/20 text-[10px] text-gray-400 sm:h-28 sm:w-20 landscape:h-[3.35rem] landscape:w-9 landscape:text-[6px]"
                         >
                           Vazio
                         </div>
@@ -371,9 +371,24 @@ export default function GameBoard({
                   </div>
                 </div>
               </div>
+
+              {/* O assento "Você" some em paisagem — a própria mão (embaixo,
+                  em tamanho legível) já faz esse papel, e a dica de turno
+                  aparece no cabeçalho da mesa e na PlayerHand, então essa
+                  linha extra só custava altura. */}
+              <div className="landscape:hidden">
+                <Seat
+                  name={players[0].name}
+                  cardCount={players[0].hand.getCards().length}
+                  isCurrentTurn={status === 'playing' && currentPlayerIndex === 0}
+                  teamId={teamIdOfSeat(0)}
+                  compact
+                />
+              </div>
             </div>
 
-            <div className="col-start-3 row-start-2 flex justify-end">
+            {/* Adversário 2 (Carlos) — direita; de frente pro Adversário 1 */}
+            <div className="flex justify-end">
               <Seat
                 name={players[3].name}
                 cardCount={players[3].hand.getCards().length}
@@ -381,22 +396,6 @@ export default function GameBoard({
                 teamId={teamIdOfSeat(3)}
               />
             </div>
-
-            <div className="landscape:hidden" />
-            {/* O assento "Você" some em paisagem — a própria mão (embaixo,
-                em tamanho legível) já ocupa esse papel, e a dica de turno
-                aparece no cabeçalho da mesa (ver abaixo) e na própria
-                PlayerHand, então essa linha extra só custava altura. */}
-            <div className="col-start-2 row-start-3 flex justify-center landscape:hidden">
-              <Seat
-                name={players[0].name}
-                cardCount={players[0].hand.getCards().length}
-                isCurrentTurn={status === 'playing' && currentPlayerIndex === 0}
-                teamId={teamIdOfSeat(0)}
-                compact
-              />
-            </div>
-            <div className="landscape:hidden" />
           </div>
 
           {/* Dica/erro: sobreposta (não reserva altura própria), pra caber
@@ -454,7 +453,7 @@ export default function GameBoard({
                   )}
                 </h4>
                 <span className="text-xs text-gray-200 landscape:text-center landscape:text-[8px] landscape:leading-tight">
-                  {team.score} pts · {team.melds.length}c
+                  {team.score} pts · {team.melds.filter(m => m.isCanastra).length} can.
                   {team.hasTakenMorto ? ' · morto' : ''}
                 </span>
               </div>
@@ -463,7 +462,7 @@ export default function GameBoard({
                   {isDropTarget ? 'Clique aqui para baixar as cartas selecionadas' : 'Nenhum jogo baixado ainda'}
                 </span>
               ) : (
-                <div className="scrollbar-gold flex flex-wrap gap-3 landscape:min-h-0 landscape:flex-1 landscape:flex-nowrap landscape:overflow-x-auto landscape:overflow-y-hidden landscape:gap-1.5 landscape:pb-1">
+                <div className="scrollbar-gold flex flex-wrap items-start gap-3 landscape:min-h-0 landscape:flex-1 landscape:flex-nowrap landscape:items-start landscape:gap-2 landscape:overflow-x-auto landscape:overflow-y-auto landscape:pb-1">
                   <AnimatePresence>
                     {team.melds.map((canasta, ci) => {
                       const compatible = canClickToExtend && canExtendMeld(
@@ -486,35 +485,34 @@ export default function GameBoard({
                         >
                           {/* Usa canasta.layout (ordem canônica): o curinga
                               aparece na posição da carta que ele representa
-                              e "desliza" quando a carta real chega. Numa
-                              canastra FECHADA (7+ cartas) a carta de maior
-                              valor (última do layout) fica DEITADA (girada
-                              90°), como numa mesa de verdade, sinalizando que
-                              o jogo virou canastra. */}
+                              e "desliza" quando a carta real chega. Como no
+                              Buraco Jogatina, cada jogo é uma COLUNA VERTICAL —
+                              as cartas se sobrepõem de cima pra baixo, deixando
+                              o canto (rank + naipe) de TODAS visível no topo de
+                              cada carta, e a última carta inteira embaixo. Isso
+                              mantém os naipes sempre legíveis mesmo com as
+                              cartas pequenas da mesa. Uma canastra fechada (7+)
+                              ganha um anel dourado ao redor da coluna. */}
                           {(() => {
                             const slots = canasta.layout ?? canasta.cards.map(card => ({ card }))
                             const isClosed =
                               (canasta as { isCanastra?: boolean }).isCanastra ??
                               canasta.cards.length >= 7
-                            const lastIdx = slots.length - 1
                             return (
-                              <div className="flex items-center -space-x-9 sm:-space-x-10 landscape:-space-x-6">
-                                {slots.map((slot, cii) => {
-                                  const deitada = isClosed && cii === lastIdx
-                                  return (
-                                    <div
-                                      key={cii}
-                                      style={{ zIndex: cii }}
-                                      className={deitada ? 'ml-6 rotate-90 sm:ml-7 landscape:ml-4' : ''}
-                                    >
-                                      <CardComponent
-                                        card={slot.card}
-                                        sizeClassName={TABLE_CARD_SIZE}
-                                        compactOnLandscape
-                                      />
-                                    </div>
-                                  )
-                                })}
+                              <div
+                                className={`flex flex-col items-start rounded-lg space-y-[-4.2rem] sm:space-y-[-5rem] landscape:space-y-[-1.8rem] ${
+                                  isClosed ? 'ring-2 ring-card-gold/70' : ''
+                                }`}
+                              >
+                                {slots.map((slot, cii) => (
+                                  <div key={cii} style={{ zIndex: cii }}>
+                                    <CardComponent
+                                      card={slot.card}
+                                      sizeClassName={TABLE_CARD_SIZE}
+                                      compactOnLandscape
+                                    />
+                                  </div>
+                                ))}
                               </div>
                             )
                           })()}

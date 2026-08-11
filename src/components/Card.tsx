@@ -70,10 +70,10 @@ function JesterIllustration({ compactOnLandscape }: { compactOnLandscape?: boole
 export function CardComponent({ card, onClick, selected, index, sizeClassName, compactOnLandscape }: CardProps) {
   const suitClass = SUIT_COLOR_CLASS[card.suit]
   const cornerTextClass = compactOnLandscape
-    ? 'text-sm sm:text-base landscape:text-[7px]'
+    ? 'text-sm sm:text-base landscape:text-[10px] landscape:leading-none'
     : 'text-sm sm:text-base'
   const centerTextClass = compactOnLandscape
-    ? 'text-4xl sm:text-5xl landscape:text-base'
+    ? 'text-4xl sm:text-5xl landscape:text-xl'
     : 'text-4xl sm:text-5xl'
   const cornerGap = compactOnLandscape ? 'left-2 top-1.5 landscape:left-1 landscape:top-0.5' : 'left-2 top-1.5'
   const cornerGapBottom = compactOnLandscape
