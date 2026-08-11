@@ -29,6 +29,9 @@ export default function Scoreboard() {
           // a rodada em andamento (team.score).
           const matchTotal = matchScores[team.id] + team.score
           const prev = previousMatchScores?.[team.id]
+          // "Canastras" = só os jogos completos (7+ cartas); jogos ainda
+          // incompletos na mesa não contam como canastra.
+          const canastraCount = team.melds.filter(m => m.isCanastra).length
           return (
             <div
               key={team.id}
@@ -53,7 +56,9 @@ export default function Scoreboard() {
                   / {prev}
                 </span>
               )}
-              <span className="whitespace-nowrap text-[10px] text-gray-300">{team.melds.length}c</span>
+              <span className="whitespace-nowrap text-[10px] text-gray-300" title="Canastras (jogos de 7+ cartas)">
+                {canastraCount} can.
+              </span>
               <span
                 className={`text-[10px] ${team.hasTakenMorto ? 'text-green-300' : 'text-gray-500'}`}
                 title="Morto pego?"

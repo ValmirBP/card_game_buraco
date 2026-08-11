@@ -111,7 +111,10 @@ export default function Result({ onBackToMenu, onNextRound, onNewMatch }: Result
                       {TEAM_LABEL[team.id]} · {seatsOfTeam(team.id)}
                     </div>
                     <div className="text-xs text-gray-300">
-                      {team.melds.length} canastra{team.melds.length === 1 ? '' : 's'}
+                      {(() => {
+                        const canastras = team.melds.filter(m => m.isCanastra).length
+                        return `${canastras} canastra${canastras === 1 ? '' : 's'}`
+                      })()}
                       {team.hasTakenMorto ? ' · pegou o morto' : ' · não pegou o morto'}
                     </div>
                   </div>
