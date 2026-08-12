@@ -280,15 +280,16 @@ export default function GameBoard({
                 monte/descarte + Você embaixo (só retrato). Em paisagem essa
                 coluna é a única faixa do topo — curtinha —, deixando toda a
                 altura restante pros painéis "Nós"/"Eles". */}
-            <div className="flex flex-col items-center gap-2 landscape:flex-row landscape:items-center landscape:gap-1.5">
+            <div className="flex flex-col items-center gap-2 landscape:gap-1">
               <Seat
                 name={players[2].name}
                 cardCount={players[2].hand.getCards().length}
                 isCurrentTurn={status === 'playing' && currentPlayerIndex === 2}
                 teamId={teamIdOfSeat(2)}
               />
-              {/* Draw pile / discard pile */}
-              <div className="flex items-center justify-center gap-4 sm:gap-6 landscape:gap-1">
+              {/* Monte e descarte, afastados um do outro (com bom espaço
+                  entre eles, também em paisagem). */}
+              <div className="flex items-center justify-center gap-8 sm:gap-10 landscape:gap-9">
                 <div className="flex flex-col items-center gap-1.5 landscape:gap-0">
                   <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-300 sm:text-xs landscape:hidden">
                     Monte
