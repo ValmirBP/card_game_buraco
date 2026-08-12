@@ -69,10 +69,6 @@ export default function GameBoard({
   if (!game) return null
 
   const { players, discardPile, deck, mortos, teams, currentPlayerIndex, status } = game.state
-  const topDiscard = discardPile[discardPile.length - 1]
-  // Buraco ABERTO: o lixo é totalmente visível — todas as cartas abaixo do
-  // topo aparecem em leque (com scroll horizontal quando a pilha cresce).
-  const fanDiscard = discardPile.slice(0, -1)
   const isHumanTurn = status === 'playing' && currentPlayerIndex === 0
 
   const flashHint = (message: string) => {
@@ -250,49 +246,52 @@ export default function GameBoard({
     </div>
   )
 
+  // Descarte como uma SEGUNDA FILEIRA acima da mão: as cartas do lixo em
+  // leque horizontal, mostradas "pela metade" (só o topo, rank+naipe grandes
+  // e legíveis) — espelhando a mão. A última carta (topo do lixo) fica
+  // destacada e é a âncora #discard-top das animações. Buraco é aberto:
+  // todo o lixo aparece (rola no eixo X se crescer muito).
   const discardPileBlock = (
-    <div className="flex flex-col items-center gap-1.5 landscape:flex-row landscape:items-center landscape:gap-1.5">
-      <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-300 sm:text-xs landscape:text-[8px]">
+    <div className="flex w-full flex-col items-center gap-0.5">
+      <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-300 sm:text-xs landscape:text-[8px] landscape:leading-none">
         Descarte
       </span>
       <div
         id="discard-pile"
         onClick={handleDiscardPileClick}
-        className={`relative flex items-center rounded-lg ${
+        className={`scrollbar-gold flex w-full max-w-full items-start justify-center overflow-x-auto overflow-y-hidden rounded-lg px-2 py-0.5 -space-x-7 sm:-space-x-8 landscape:-space-x-6 ${
           canClickDiscardToDraw || canClickDiscardToDiscard
-            ? 'cursor-pointer ring-2 ring-card-gold shadow-[0_0_16px_rgba(212,175,55,0.6)]'
+            ? 'cursor-pointer ring-2 ring-card-gold shadow-[0_0_16px_rgba(212,175,55,0.5)]'
             : ''
-        }`}
+        } max-h-[3.5rem] landscape:max-h-[2rem]`}
       >
-        {fanDiscard.length > 0 && (
-          <div className="scrollbar-gold mr-[-2.4rem] flex max-w-[40vw] -space-x-8 overflow-x-auto py-1 opacity-70 sm:mr-[-2.8rem] sm:max-w-[24rem] landscape:mr-[-1.4rem] landscape:max-w-[34vw] landscape:-space-x-5">
-            {fanDiscard.map((card, i) => (
-              <div key={i} style={{ zIndex: i }} className="flex-shrink-0 scale-90 landscape:scale-100">
-                <CardComponent card={card} sizeClassName={PILE_CARD_SIZE} compactOnLandscape />
-              </div>
-            ))}
+        {discardPile.length === 0 ? (
+          <div
+            id="discard-top"
+            className="flex h-6 w-16 items-center justify-center rounded-lg border border-dashed border-white/20 text-[10px] text-gray-400 sm:w-20 landscape:w-8 landscape:text-[6px]"
+          >
+            Vazio
           </div>
+        ) : (
+          discardPile.map((card, i) => {
+            const isTop = i === discardPile.length - 1
+            return (
+              <div
+                key={i}
+                id={isTop ? 'discard-top' : undefined}
+                style={{ zIndex: i }}
+                className={`flex-shrink-0 rounded-lg ${isTop ? 'ring-2 ring-card-gold/80' : 'opacity-90'}`}
+              >
+                <CardComponent
+                  card={card}
+                  sizeClassName={PILE_CARD_SIZE}
+                  compactOnLandscape
+                  cornerClassName="text-sm font-normal sm:text-base landscape:text-base landscape:leading-none"
+                />
+              </div>
+            )
+          })
         )}
-        <AnimatePresence mode="wait">
-          {topDiscard ? (
-            <motion.div
-              key={discardPile.length}
-              id="discard-top"
-              initial={{ opacity: 0, y: -12, rotate: -6 }}
-              animate={{ opacity: 1, y: 0, rotate: 0 }}
-              className="relative z-10"
-            >
-              <CardComponent card={topDiscard} sizeClassName={PILE_CARD_SIZE} compactOnLandscape />
-            </motion.div>
-          ) : (
-            <div
-              id="discard-top"
-              className="flex h-24 w-16 items-center justify-center rounded-xl border border-dashed border-white/20 text-[10px] text-gray-400 sm:h-28 sm:w-20 landscape:h-[2.9rem] landscape:w-8 landscape:text-[6px]"
-            >
-              Vazio
-            </div>
-          )}
-        </AnimatePresence>
       </div>
     </div>
   )
@@ -463,8 +462,9 @@ export default function GameBoard({
           )
         })}
 
-        {/* Descarte — embaixo, logo acima da mão (row3/col2-3) */}
-        <div className="order-6 flex justify-center landscape:col-start-2 landscape:col-span-2 landscape:row-start-3 landscape:justify-self-center landscape:self-end">
+        {/* Descarte — SEGUNDA FILEIRA logo acima da mão, largura toda
+            (row3/col1-4), cartas em meia-carta */}
+        <div className="order-6 flex w-full justify-center landscape:col-start-1 landscape:col-span-4 landscape:row-start-3 landscape:justify-self-stretch landscape:self-end">
           {discardPileBlock}
         </div>
 

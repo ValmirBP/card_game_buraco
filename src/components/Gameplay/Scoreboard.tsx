@@ -22,7 +22,7 @@ export default function Scoreboard() {
   const { teams } = game.state
 
   return (
-    <div className="z-40 rounded-xl border border-card-gold/30 bg-black/40 px-2 py-1 shadow-[0_4px_16px_rgba(0,0,0,0.35)] backdrop-blur-md landscape:px-1.5 landscape:py-0.5">
+    <div className="z-40 rounded-xl border border-card-gold/30 bg-black/40 px-2 py-1 shadow-[0_4px_16px_rgba(0,0,0,0.35)] backdrop-blur-md landscape:rounded-md landscape:px-1.5 landscape:py-0">
       <div className="mx-auto flex max-w-7xl flex-nowrap items-center justify-center gap-2 landscape:gap-1.5">
         {teams.map(team => {
           // "Pontos atuais" da partida = rodadas já fechadas (matchScores) +
