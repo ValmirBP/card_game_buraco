@@ -18,6 +18,11 @@ interface CardProps {
    * and the player's hand keep their normal glyph size in every
    * orientation. */
   compactOnLandscape?: boolean
+  /** Overrides the corner rank/suit glyph size classes. Used pela mão do
+   * humano em paisagem, que fica em "meia carta" (só o topo aparece) e por
+   * isso quer o rank/naipe do canto BEM grandes/legíveis, sem depender do
+   * símbolo central (que fica escondido abaixo da dobra). */
+  cornerClassName?: string
 }
 
 const SUIT_SYMBOLS: Record<CardType['suit'], string> = {
@@ -67,11 +72,13 @@ function JesterIllustration({ compactOnLandscape }: { compactOnLandscape?: boole
   )
 }
 
-export function CardComponent({ card, onClick, selected, index, sizeClassName, compactOnLandscape }: CardProps) {
+export function CardComponent({ card, onClick, selected, index, sizeClassName, compactOnLandscape, cornerClassName }: CardProps) {
   const suitClass = SUIT_COLOR_CLASS[card.suit]
-  const cornerTextClass = compactOnLandscape
-    ? 'text-sm sm:text-base landscape:text-[10px] landscape:leading-none'
-    : 'text-sm sm:text-base'
+  const cornerTextClass = cornerClassName
+    ? cornerClassName
+    : compactOnLandscape
+      ? 'text-sm sm:text-base landscape:text-[10px] landscape:leading-none'
+      : 'text-sm sm:text-base'
   const centerTextClass = compactOnLandscape
     ? 'text-4xl sm:text-5xl landscape:text-xl'
     : 'text-4xl sm:text-5xl'

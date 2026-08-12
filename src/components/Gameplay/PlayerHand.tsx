@@ -86,7 +86,7 @@ export default function PlayerHand({ phase }: PlayerHandProps) {
       <div
         id="player-hand-anchor"
         className={`scrollbar-gold flex -space-x-8 overflow-x-auto px-1 pb-3 pt-3 transition-[max-height] duration-200 sm:-space-x-10 landscape:-space-x-6 landscape:overflow-y-hidden landscape:pb-0.5 ${
-          hasSelection ? 'landscape:max-h-[5rem] landscape:pt-3' : 'landscape:max-h-[1.9rem] landscape:pt-1'
+          hasSelection ? 'landscape:max-h-[5rem] landscape:pt-3' : 'landscape:max-h-[2.7rem] landscape:pt-1'
         }`}
       >
         {orderedHand(hand).map(({ card, index }, position) => (
@@ -102,6 +102,10 @@ export default function PlayerHand({ phase }: PlayerHandProps) {
               onClick={isHumanTurn ? () => toggleCardSelection(index) : undefined}
               sizeClassName={HAND_CARD_SIZE}
               compactOnLandscape
+              // Naipes GRANDES no canto: em paisagem a mão fica em "meia carta"
+              // (só o topo aparece), então o rank/naipe do canto precisa ser
+              // bem legível por si só.
+              cornerClassName="text-sm font-normal sm:text-base landscape:text-lg landscape:leading-none"
             />
           </div>
         ))}
