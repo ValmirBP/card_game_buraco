@@ -39,7 +39,9 @@ export function Layout({ children, fit = false }: LayoutProps) {
        * area, warm brown gradient with a subtle inner bevel — CSS only. */}
       <div
         className={`relative z-10 mx-auto max-w-7xl rounded-[2rem] p-1.5 sm:p-2.5 ${
-          fit ? 'my-1.5 flex h-[calc(100dvh-0.75rem)] flex-col sm:my-2 sm:h-[calc(100dvh-1rem)]' : 'my-4 sm:my-6'
+          fit
+            ? 'my-1.5 flex h-[calc(100dvh-0.75rem)] flex-col sm:my-2 sm:h-[calc(100dvh-1rem)] landscape:my-0 landscape:h-[100dvh] landscape:max-w-none landscape:rounded-none landscape:p-0.5'
+            : 'my-4 sm:my-6'
         }`}
         style={{
           background: 'linear-gradient(160deg, #8a5a2e 0%, #6b4423 45%, #4a2f18 100%)',
@@ -49,7 +51,9 @@ export function Layout({ children, fit = false }: LayoutProps) {
       >
         <div
           className={`rounded-[1.6rem] ${
-            fit ? 'flex min-h-0 flex-1 flex-col overflow-hidden px-2 py-2 sm:px-3 sm:py-3' : 'px-4 py-6'
+            fit
+              ? 'flex min-h-0 flex-1 flex-col overflow-hidden px-2 py-2 sm:px-3 sm:py-3 landscape:rounded-lg landscape:px-1 landscape:py-1'
+              : 'px-4 py-6'
           }`}
           style={{
             backgroundColor: '#0f5132',
