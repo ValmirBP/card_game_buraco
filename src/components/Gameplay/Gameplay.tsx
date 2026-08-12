@@ -6,6 +6,7 @@ import PlayerHand from './PlayerHand'
 import Scoreboard from './Scoreboard'
 import DrawAnimation, { type DrawAnimState } from './DrawAnimation'
 import CardFlyAnimation, { type FlyAnimState } from './CardFlyAnimation'
+import AiDrawAnimation, { type BackFlyState } from './AiDrawAnimation'
 import { canTakeDiscardPile } from './discardRules'
 
 export type TurnPhase = 'draw' | 'play'
@@ -14,7 +15,12 @@ interface GameplayProps {
   onGameEnd: () => void
 }
 
-const AI_THINK_DELAY_MS = 800
+// Pausa antes de cada jogada da IA — 2s pra dar tempo de ver a "compra"
+// (verso da carta indo pro assento do jogador) antes de ele baixar/descartar.
+const AI_THINK_DELAY_MS = 2000
+// Quando a carta-fantasma da compra da IA "chega" no assento (deve acompanhar
+// DURATION_S do AiDrawAnimation), pra então rodar o turno de verdade.
+const AI_DRAW_ANIM_MS = 700
 // Deve acompanhar DURATION_S do CardFlyAnimation (~0.5s) + pequena folga.
 const FLY_ANIM_MS = 650
 
@@ -41,6 +47,8 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
   const [pickupAnim, setPickupAnim] = useState<FlyAnimState | null>(null)
   const [discardAnim, setDiscardAnim] = useState<FlyAnimState | null>(null)
   const [tableAnim, setTableAnim] = useState<FlyAnimState | null>(null)
+  // Fantasma da "compra" de um jogador da IA (verso indo do monte pro assento).
+  const [aiDrawAnim, setAiDrawAnim] = useState<BackFlyState | null>(null)
 
   // Banner de destaque para eventos do MORTO (pegou / virou monte), que antes
   // passavam despercebidos (o morto fica no canto e a pega é automática).
@@ -65,8 +73,22 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
   useEffect(() => {
     if (!game) return
     if (game.state.status !== 'playing') return
-    if (game.state.currentPlayerIndex === 0) return
+    const seat = game.state.currentPlayerIndex
+    if (seat === 0) return
 
+    // 1) Anima a COMPRA: um verso de carta desliza do monte até o assento
+    //    do jogador da vez (feedback de "a carta indo pra ele"). Decorativo.
+    const deckEl = document.getElementById('deck-pile')
+    const seatEl = document.querySelector(`[data-seat-index="${seat}"]`)
+    const fromRect = deckEl?.getBoundingClientRect()
+    const toRect = seatEl?.getBoundingClientRect()
+    if (fromRect && toRect) {
+      const id = Date.now()
+      setAiDrawAnim({ id, fromRect, toRect })
+      window.setTimeout(() => setAiDrawAnim(current => (current?.id === id ? null : current)), AI_DRAW_ANIM_MS)
+    }
+
+    // 2) Depois da pausa (2s), roda o turno da IA de verdade.
     const timeoutId = setTimeout(() => {
       useGameStore.getState().aiTurn()
     }, AI_THINK_DELAY_MS)
@@ -243,6 +265,7 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
         />
       </div>
       <DrawAnimation anim={drawAnim} />
+      <AiDrawAnimation anim={aiDrawAnim} />
       <CardFlyAnimation anim={pickupAnim} />
       <CardFlyAnimation anim={discardAnim} />
       <CardFlyAnimation anim={tableAnim} />

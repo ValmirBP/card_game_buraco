@@ -325,7 +325,7 @@ export default function GameBoard({
         </div>
 
         {/* Parceiro (topo-centro), FORA dos painéis (row1/col2-3) */}
-        <div className="order-2 flex justify-center landscape:col-start-2 landscape:col-span-2 landscape:row-start-1 landscape:justify-self-center landscape:self-center">
+        <div data-seat-index={2} className="order-2 flex justify-center landscape:col-start-2 landscape:col-span-2 landscape:row-start-1 landscape:justify-self-center landscape:self-center">
           <Seat
             name={players[2].name}
             cardCount={players[2].hand.getCards().length}
@@ -335,7 +335,7 @@ export default function GameBoard({
         </div>
 
         {/* Adversário 1 (Ana) — borda esquerda (row2/col1) */}
-        <div className="order-3 flex justify-start landscape:col-start-1 landscape:row-start-2 landscape:self-center landscape:justify-self-center">
+        <div data-seat-index={1} className="order-3 flex justify-start landscape:col-start-1 landscape:row-start-2 landscape:self-center landscape:justify-self-center">
           <Seat
             name={players[1].name}
             cardCount={players[1].hand.getCards().length}
@@ -345,7 +345,7 @@ export default function GameBoard({
         </div>
 
         {/* Adversário 2 (Carlos) — borda direita (row2/col4) */}
-        <div className="order-5 flex justify-end landscape:col-start-4 landscape:row-start-2 landscape:self-center landscape:justify-self-center">
+        <div data-seat-index={3} className="order-5 flex justify-end landscape:col-start-4 landscape:row-start-2 landscape:self-center landscape:justify-self-center">
           <Seat
             name={players[3].name}
             cardCount={players[3].hand.getCards().length}
