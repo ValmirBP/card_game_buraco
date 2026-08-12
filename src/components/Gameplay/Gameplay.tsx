@@ -219,7 +219,7 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
   const lastLog = gameLog[gameLog.length - 1]
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-2 landscape:gap-1">
+    <div className="flex h-full min-h-0 flex-col gap-2 landscape:gap-0.5">
       {/* Placar (topo, altura automática) */}
       <div className="shrink-0">
         <Scoreboard />
