@@ -112,7 +112,13 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
   // não é cancelado quando chegam outras linhas de log — senão o aviso ficava
   // preso na tela (bug quando o parceiro/adversário pegava o morto).
   const bannerTimeoutRef = useRef<number | null>(null)
-  const seenLogLenRef = useRef(0)
+  // IMPORTANTE: inicia apontando pro FIM do log atual. Ao trocar de rodada o
+  // Gameplay REMONTA (passa pela tela de Resultado e volta), e o gameLog é
+  // acumulado — se começasse em 0, re-escanearia o log inteiro e mostraria de
+  // novo o "pegou o morto" da rodada anterior. Começando no tamanho atual, só
+  // avisos NOVOS (desta rodada, após a montagem) disparam o banner — um por
+  // ocorrência, sem herdar o da rodada passada.
+  const seenLogLenRef = useRef(gameLog.length)
   useEffect(() => {
     const newEntries = gameLog.slice(seenLogLenRef.current)
     seenLogLenRef.current = gameLog.length
