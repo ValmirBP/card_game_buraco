@@ -91,8 +91,11 @@ export function CardComponent({ card, onClick, selected, index, sizeClassName, c
     <motion.div
       layout
       initial={{ opacity: 0, y: 24, scale: 0.9 }}
-      animate={{ opacity: 1, y: selected ? -12 : 0, scale: 1 }}
-      whileHover={{ y: selected ? -16 : -10, scale: 1.08, zIndex: 40 }}
+      // A carta NÃO sobe ao ser selecionada — a seleção só a REALÇA (anel
+      // dourado + leve zoom), sem mudar a altura da fileira (a mão fica em
+      // "meia carta" fixa). Sem lift no hover também.
+      animate={{ opacity: 1, y: 0, scale: selected ? 1.06 : 1 }}
+      whileHover={{ scale: 1.08, zIndex: 40 }}
       whileTap={{ scale: 0.94 }}
       transition={{
         delay: (index ?? 0) * 0.04,
@@ -110,7 +113,7 @@ export function CardComponent({ card, onClick, selected, index, sizeClassName, c
         card.isWild
           ? 'border-purple-300/50 bg-gradient-to-br from-fuchsia-600 via-purple-600 to-indigo-800 text-white'
           : 'border-black/10 bg-white',
-        selected ? 'shadow-[0_0_18px_rgba(212,175,55,0.85)] ring-4 ring-card-gold' : '',
+        selected ? 'z-20 shadow-[0_0_18px_rgba(212,175,55,0.95)] ring-4 ring-card-gold' : '',
       ].join(' ')}
     >
       {card.isWild ? (

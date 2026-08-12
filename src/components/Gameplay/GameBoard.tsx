@@ -41,10 +41,24 @@ const TEAM_GRID_CLASS: Record<TeamId, string> = {
  * ficam num tamanho legível (naipes visíveis), já que os jogos são a vista
  * principal. Opt-in, então nunca afeta Online nem a mão. */
 const TABLE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-9 landscape:h-[3.35rem]'
-/** Footprint do MONTE e do DESCARTE — um pouco menores em paisagem que as
- * cartas dos jogos, pra as faixas de cima (monte) e de baixo (descarte)
- * ficarem finas e sobrar o máximo de feltro pros painéis "Nós"/"Eles". */
+/** Footprint do MONTE — pequeno no canto, só pra ficar visível/clicável. */
 const PILE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-8 landscape:h-[2.9rem]'
+/** Footprint das cartas do DESCARTE — MESMO tamanho das cartas da mão, pra a
+ * fileira do descarte ficar paralela à mão e visualmente consistente. Deve
+ * acompanhar HAND_CARD_SIZE em PlayerHand.tsx. */
+const HAND_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-12 landscape:h-[4.25rem]'
+/** Naipes/rank do canto grandes e legíveis (usado na mão e no descarte). */
+const BIG_CORNER = 'text-sm font-normal sm:text-base landscape:text-lg landscape:leading-none'
+
+/** Sobreposição vertical das cartas de um jogo (coluna). Quanto MAIS cartas,
+ * mais elas se JUNTAM (margem negativa maior) pra a coluna não crescer sem
+ * limite e caber no painel. Classes literais pra o Tailwind gerá-las. */
+function meldStackSpacing(n: number): string {
+  if (n >= 9) return 'space-y-[-4.9rem] sm:space-y-[-5.7rem] landscape:space-y-[-2.6rem]'
+  if (n >= 7) return 'space-y-[-4.6rem] sm:space-y-[-5.4rem] landscape:space-y-[-2.25rem]'
+  if (n >= 5) return 'space-y-[-4.4rem] sm:space-y-[-5.2rem] landscape:space-y-[-2rem]'
+  return 'space-y-[-4.2rem] sm:space-y-[-5rem] landscape:space-y-[-1.8rem]'
+}
 
 /** The 4-seat table: opponents/partner around a center that shows the draw
  * pile, discard pile (with a small fan of the last few cards), the two
@@ -263,12 +277,12 @@ export default function GameBoard({
           canClickDiscardToDraw || canClickDiscardToDiscard
             ? 'cursor-pointer ring-2 ring-card-gold shadow-[0_0_16px_rgba(212,175,55,0.5)]'
             : ''
-        } max-h-[3.5rem] landscape:max-h-[2rem]`}
+        } max-h-[3.5rem] landscape:max-h-[2.7rem]`}
       >
         {discardPile.length === 0 ? (
           <div
             id="discard-top"
-            className="flex h-6 w-16 items-center justify-center rounded-lg border border-dashed border-white/20 text-[10px] text-gray-400 sm:w-20 landscape:w-8 landscape:text-[6px]"
+            className="flex h-6 w-16 items-center justify-center rounded-lg border border-dashed border-white/20 text-[10px] text-gray-400 sm:w-20 landscape:w-12 landscape:text-[8px]"
           >
             Vazio
           </div>
@@ -284,9 +298,9 @@ export default function GameBoard({
               >
                 <CardComponent
                   card={card}
-                  sizeClassName={PILE_CARD_SIZE}
+                  sizeClassName={HAND_CARD_SIZE}
                   compactOnLandscape
-                  cornerClassName="text-sm font-normal sm:text-base landscape:text-base landscape:leading-none"
+                  cornerClassName={BIG_CORNER}
                 />
               </div>
             )
@@ -303,12 +317,11 @@ export default function GameBoard({
           o MONTE no canto sup-esquerdo, o DESCARTE embaixo (logo acima da
           mão) e os painéis "Nós"/"Eles" ocupando as duas colunas centrais —
           a MAIOR parte da mesa. Nada rola na vertical. */}
-      <div className="flex flex-col gap-3 sm:gap-4 landscape:grid landscape:h-full landscape:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_auto] landscape:grid-rows-[auto_minmax(0,1fr)_auto] landscape:items-stretch landscape:gap-x-2 landscape:gap-y-0.5">
-        {/* Monte + mortos — canto superior-esquerdo (row1/col1), lado a lado
-            pra a faixa do topo ficar fina (altura de uma carta só). */}
-        <div className="order-1 flex items-center justify-center gap-4 landscape:col-start-1 landscape:row-start-1 landscape:justify-self-start landscape:gap-1.5">
+      <div className="flex flex-col gap-3 sm:gap-4 landscape:grid landscape:h-full landscape:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_auto] landscape:grid-rows-[auto_minmax(0,1fr)_auto] landscape:items-stretch landscape:gap-x-1 landscape:gap-y-0.5">
+        {/* Monte — canto superior-esquerdo (row1/col1), visível e clicável.
+            (O morto fica escondido num canto discreto, ver overlay abaixo.) */}
+        <div className="order-1 flex items-center justify-center landscape:col-start-1 landscape:row-start-1 landscape:justify-self-start">
           {deckPile}
-          {mortoBlock}
         </div>
 
         {/* Parceiro (topo-centro), FORA dos painéis (row1/col2-3) */}
@@ -357,7 +370,7 @@ export default function GameBoard({
               key={team.id}
               id={team.id === 'A' ? 'meld-drop-zone' : undefined}
               onClick={team.id === 'A' ? handleDropZoneClick : undefined}
-              className={`space-y-2 overflow-hidden rounded-xl border p-3 transition-all landscape:flex landscape:h-full landscape:min-h-0 landscape:flex-col landscape:space-y-0.5 landscape:p-1.5 ${
+              className={`space-y-2 overflow-hidden rounded-xl border p-3 transition-all landscape:flex landscape:h-full landscape:min-h-0 landscape:flex-col landscape:space-y-0.5 landscape:p-1 ${
                 TEAM_GRID_CLASS[team.id]
               } ${TEAM_PANEL_CLASS[team.id]} ${
                 isDropTarget ? 'cursor-pointer border-card-gold shadow-[0_0_16px_rgba(212,175,55,0.5)]' : ''
@@ -404,24 +417,51 @@ export default function GameBoard({
                           }`}
                         >
                           {/* Coluna vertical: cartas sobrepostas de cima pra
-                              baixo, rank+naipe de todas visível no topo, última
-                              carta inteira embaixo. Canastra fechada (7+) ganha
+                              baixo, rank+naipe de todas visível no topo. Quanto
+                              mais cartas, mais elas se JUNTAM (ver
+                              meldStackSpacing). Quando a canastra FECHA (7+,
+                              limpa ou suja), a carta de MAIOR valor (última do
+                              layout) fica DEITADA (na horizontal) embaixo,
+                              sinalizando canastra fechada, e a coluna ganha
                               anel dourado. */}
                           {(() => {
                             const slots = canasta.layout ?? canasta.cards.map(card => ({ card }))
                             const isClosed =
                               (canasta as { isCanastra?: boolean }).isCanastra ?? canasta.cards.length >= 7
+                            const topIdx = slots.length - 1
+                            const stackSlots = isClosed ? slots.slice(0, topIdx) : slots
+                            const horizontalSlot = isClosed ? slots[topIdx] : null
                             return (
                               <div
-                                className={`flex flex-col items-start rounded-lg space-y-[-4.2rem] sm:space-y-[-5rem] landscape:space-y-[-1.8rem] ${
+                                className={`flex flex-col items-start rounded-lg ${
                                   isClosed ? 'ring-2 ring-card-gold/70' : ''
                                 }`}
                               >
-                                {slots.map((slot, cii) => (
-                                  <div key={cii} style={{ zIndex: cii }}>
-                                    <CardComponent card={slot.card} sizeClassName={TABLE_CARD_SIZE} compactOnLandscape />
+                                <div className={`flex flex-col items-start ${meldStackSpacing(slots.length)}`}>
+                                  {stackSlots.map((slot, cii) => (
+                                    <div key={cii} style={{ zIndex: cii }}>
+                                      <CardComponent
+                                        card={slot.card}
+                                        sizeClassName={TABLE_CARD_SIZE}
+                                        compactOnLandscape
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                                {horizontalSlot && (
+                                  <div
+                                    style={{ zIndex: 60 }}
+                                    className="relative mt-0.5 flex h-16 w-24 items-center justify-center sm:h-20 sm:w-28 landscape:h-10 landscape:w-[3.6rem]"
+                                  >
+                                    <div className="rotate-90">
+                                      <CardComponent
+                                        card={horizontalSlot.card}
+                                        sizeClassName={TABLE_CARD_SIZE}
+                                        compactOnLandscape
+                                      />
+                                    </div>
                                   </div>
-                                ))}
+                                )}
                               </div>
                             )
                           })()}
@@ -478,6 +518,11 @@ export default function GameBoard({
             compact
           />
         </div>
+      </div>
+
+      {/* Morto — escondido num canto discreto (topo-direito), pequeno. */}
+      <div className="pointer-events-none absolute right-1 top-6 z-20 origin-top-right scale-[0.62] landscape:scale-[0.5]">
+        {mortoBlock}
       </div>
 
       {/* Selo de turno (sobreposto, canto sup-direito) */}

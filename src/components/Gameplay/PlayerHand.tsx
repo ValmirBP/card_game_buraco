@@ -49,7 +49,6 @@ export default function PlayerHand({ phase }: PlayerHandProps) {
 
   const hand = game.state.players[0].hand.getCards()
   const isHumanTurn = game.state.status === 'playing' && game.state.currentPlayerIndex === 0
-  const hasSelection = selectedCardIndices.length > 0
 
   const hint = !isHumanTurn
     ? 'IA jogando…'
@@ -69,25 +68,16 @@ export default function PlayerHand({ phase }: PlayerHandProps) {
         </h3>
         {hint && <span className="truncate text-[10px] text-gray-300 sm:text-xs landscape:text-[8px]">{hint}</span>}
       </div>
-      {/* Seleção NÃO eleva o z-index — a carta selecionada sobe
-          verticalmente mas mantém o empilhamento natural do leque, sem
-          cobrir o canto (rank/naipe) da carta vizinha. Só o hover traz a
-          carta pra frente, temporariamente, pra leitura.
-
-          "Meia carta" em paisagem: pra sobrar espaço pra mesa (a vista
-          principal), a faixa da mão fica baixa e corta a metade inferior
-          das cartas (overflow-y-hidden + max-height reduzido) — só a
-          metade de cima "espia" (rank/naipe do canto continuam legíveis).
-          Ao selecionar alguma carta, a faixa cresce (max-height maior) pra
-          revelar as cartas inteiras — a seleção já eleva a carta (ver
-          Card.tsx), então ela sobe e aparece por completo. Sem seleção,
-          volta a encolher pro modo "peek". O eixo X continua rolável se a
-          mão não couber. */}
+      {/* "Meia carta" em paisagem: a faixa da mão fica baixa e corta a
+          metade inferior das cartas (overflow-y-hidden + max-height fixo) —
+          só a metade de cima "espia" (rank/naipe do canto, grandes,
+          continuam legíveis). A mão NÃO cresce ao selecionar (o jogador não
+          precisa ver a carta inteira) — a seleção só REALÇA a carta com o
+          anel dourado (ver Card.tsx), sem subir nada. O eixo X continua
+          rolável se a mão não couber. */}
       <div
         id="player-hand-anchor"
-        className={`scrollbar-gold flex -space-x-8 overflow-x-auto px-1 pb-3 pt-3 transition-[max-height] duration-200 sm:-space-x-10 landscape:-space-x-6 landscape:overflow-y-hidden landscape:pb-0.5 ${
-          hasSelection ? 'landscape:max-h-[5rem] landscape:pt-3' : 'landscape:max-h-[2.7rem] landscape:pt-1'
-        }`}
+        className="scrollbar-gold flex -space-x-8 overflow-x-auto px-1 pb-3 pt-3 sm:-space-x-10 landscape:max-h-[2.7rem] landscape:-space-x-6 landscape:overflow-y-hidden landscape:pb-0.5 landscape:pt-1"
       >
         {orderedHand(hand).map(({ card, index }, position) => (
           <div

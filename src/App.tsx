@@ -71,7 +71,8 @@ export default function App() {
     setScreen('menu')
   }
 
-  const fitScreen = screen === 'gameplay' || screen === 'onlineGameplay' || screen === 'menu'
+  const fitScreen =
+    screen === 'gameplay' || screen === 'onlineGameplay' || screen === 'menu' || screen === 'result'
 
   return (
     <Layout fit={fitScreen}>
