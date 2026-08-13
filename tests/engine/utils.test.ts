@@ -205,9 +205,18 @@ describe('isValidCanasta', () => {
       expect(isValidCanasta(cards)).toBe(true)
     })
 
-    test('[K♥,A♥,2♥] "dar a volta" -> false, same-suit 2 out of natural position cannot act as wild', () => {
+    test('[K♥,A♥,2♥] -> true, 2♥ atua como curinga na posição da Q (Q-K-A, suja); NÃO é "dar a volta"', () => {
       const cards = [real('K'), real('A'), two('hearts')]
-      expect(isValidCanasta(cards)).toBe(false)
+      expect(isValidCanasta(cards)).toBe(true)
+      const analysis = analyzeMeld(cards)
+      expect(analysis).not.toBeNull()
+      // suja (o 2 está atuando como curinga numa sequência alta)
+      expect(analysis!.isClean).toBe(false)
+      // o curinga ocupa a posição da Q (valor 12), ABAIXO da sequência K-A —
+      // nunca acima do Ás (que seria o wrap ilegal K-A-2)
+      const twoEntry = analysis!.layout.find(e => e.card.rank === '2')
+      expect(twoEntry!.representsValue).toBe(12)
+      expect(Math.max(...analysis!.layout.map(e => e.representsValue))).toBe(14)
     })
 
     test('[5♥,2♠,JOKER,8♥,9♥,10♥,J♥] -> false, two wilds (2♠ + joker) in the same meld', () => {
@@ -458,9 +467,13 @@ describe('Ace at both ends simultaneously (double-ace sequence, A..K..A)', () =>
     expect(isValidCanasta(cards)).toBe(false)
   })
 
-  test('K,A,2 same-suit "dar a volta" is still invalid (single ace - not the double-ace case)', () => {
+  test('K,A,2 same-suit forma Q-K-A (2 como Q, suja) — não é wrap nem o caso double-ace', () => {
     const cards = [real('K'), real('A'), two('hearts')]
-    expect(isValidCanasta(cards)).toBe(false)
+    expect(isValidCanasta(cards)).toBe(true)
+    const layout = resolveMeldLayout(cards)!
+    // curinga (2) na posição da Q (12), teto no Ás (14): Q-K-A, sem dar a volta
+    expect(layout.find(e => e.card.rank === '2')!.representsValue).toBe(12)
+    expect(Math.max(...layout.map(e => e.representsValue))).toBe(14)
   })
 })
 

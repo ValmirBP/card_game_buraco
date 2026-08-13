@@ -93,9 +93,11 @@ describe('Canasta', () => {
     expect(() => new Canasta(cards)).toThrow()
   })
 
-  test('throws for K,A,2 same-suit "dar a volta"', () => {
+  test('aceita K,A,2 same-suit como Q-K-A (2 vira a Q, suja) — não é wrap', () => {
     const cards = [real('K'), real('A'), two('hearts')]
-    expect(() => new Canasta(cards)).toThrow()
+    const canasta = new Canasta(cards)
+    expect(canasta.isClean).toBe(false)
+    expect(canasta.layout.find(e => e.card.rank === '2')!.representsValue).toBe(12)
   })
 
   test('recognizes an ace-both-ends sequence (Q,K,A)', () => {

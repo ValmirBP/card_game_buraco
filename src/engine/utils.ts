@@ -324,24 +324,29 @@ function analyzeSequence(others: Card[], twos: Card[], jokers: Card[]): MeldAnal
 
     // Interpretation 2 (Part A): the 2 acts as the sequence's sole curinga.
     // Only reachable when it's the ONLY wild in the meld (budget = 1).
-    // Restricted to ace-LOW numbering only: allowing this under ace-HIGH
-    // would reintroduce "dar a volta" (e.g. K,A,2 wrapping the 2 around
-    // from the top of the sequence back past the Ace), which is illegal.
     //
-    // Regra do 9 (Bug 2 fix): the meld stays clean only while the ENTIRE
-    // sequence - real cards AND the slot the curinga itself occupies - tops
-    // out at rank 8. If either a real card of rank >=9 is present, OR the
-    // curinga's own computed position (computeWildValue) is >=9 (e.g.
-    // 8,2,10,J: the 2 fills the gap at 9, with no real 9 card at all), the
-    // meld goes dirty. This must look at the resolved wild position, not
-    // just scan for a literal '9' rank among the real cards.
-    if (genericWildCount === 0 && trySequenceWithAceMode(others, 1, 'low')) {
-      const realValues = others
-        .map(c => sequenceRankValue(c.rank, 'low'))
-        .sort((a, b) => a - b)
-      const wildValue = computeWildValue(realValues, 'low')
-      const maxValue = Math.max(...realValues, wildValue)
-      return buildSequenceAnalysis(others, natural2, 'low', maxValue < 9)
+    // Tenta ace-LOW primeiro (posições baixas, onde vale a "regra do 9" de
+    // limpeza) e, se não formar, ace-HIGH — pra permitir o 2 como curinga
+    // em sequências ALTAS, ex.: 2,K,A onde o 2 ocupa a posição da Q (Q-K-A).
+    // Isso NÃO é "dar a volta": computeWildValue sempre coloca o curinga no
+    // slot logo ABAIXO da sequência (nunca acima do Ás), então K,A,2 vira
+    // Q-K-A, e nunca um wrap K-A-2. Um wrap real exigiria o curinga em valor
+    // 15 (acima do Ás), o que computeWildValue não produz aqui.
+    //
+    // Regra do 9: com o 2 (mesmo naipe) atuando como curinga, o jogo só fica
+    // limpo enquanto TODA a sequência (cartas reais E o slot do próprio
+    // curinga) topa no 8. Do 9 pra cima (real ou a posição resolvida do
+    // curinga), suja. Sequências altas (com K/A) são sempre sujas por isso.
+    if (genericWildCount === 0) {
+      for (const aceMode of ['low', 'high'] as AceMode[]) {
+        if (!trySequenceWithAceMode(others, 1, aceMode)) continue
+        const realValues = others
+          .map(c => sequenceRankValue(c.rank, aceMode))
+          .sort((a, b) => a - b)
+        const wildValue = computeWildValue(realValues, aceMode)
+        const maxValue = Math.max(...realValues, wildValue)
+        return buildSequenceAnalysis(others, natural2, aceMode, maxValue < 9)
+      }
     }
 
     return null
