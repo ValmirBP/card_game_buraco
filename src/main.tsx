@@ -3,6 +3,14 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import '@fontsource/righteous/400.css'
 import './styles/index.css'
+import { useGameStore } from './store/gameStore'
+
+// DEV-only: expõe o store pra depuração manual no console (reproduzir bugs de
+// baixar sequência etc.). Removido do bundle de produção pelo tree-shaking do
+// `import.meta.env.DEV`.
+if (import.meta.env.DEV) {
+  ;(window as unknown as { __store: typeof useGameStore }).__store = useGameStore
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

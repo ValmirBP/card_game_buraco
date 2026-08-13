@@ -273,7 +273,7 @@ export default function GameBoard({
       <div
         id="discard-pile"
         onClick={handleDiscardPileClick}
-        className={`scrollbar-gold flex w-full max-w-full items-start justify-center overflow-x-auto overflow-y-hidden rounded-lg px-2 py-0.5 -space-x-7 sm:-space-x-8 landscape:-space-x-6 ${
+        className={`scrollbar-gold flex w-full max-w-full items-start justify-center overflow-x-auto overflow-y-hidden rounded-lg px-2 py-0.5 -space-x-5 sm:-space-x-6 landscape:-space-x-2 ${
           canClickDiscardToDraw || canClickDiscardToDiscard
             ? 'cursor-pointer ring-2 ring-card-gold shadow-[0_0_16px_rgba(212,175,55,0.5)]'
             : ''
@@ -428,40 +428,33 @@ export default function GameBoard({
                             const slots = canasta.layout ?? canasta.cards.map(card => ({ card }))
                             const isClosed =
                               (canasta as { isCanastra?: boolean }).isCanastra ?? canasta.cards.length >= 7
-                            const topIdx = slots.length - 1
-                            const stackSlots = isClosed ? slots.slice(0, topIdx) : slots
-                            const horizontalSlot = isClosed ? slots[topIdx] : null
+                            const lastIdx = slots.length - 1
                             return (
                               <div
-                                className={`flex flex-col items-start rounded-lg ${
+                                className={`flex flex-col items-start rounded-lg ${meldStackSpacing(slots.length)} ${
                                   isClosed ? 'ring-2 ring-card-gold/70' : ''
                                 }`}
                               >
-                                <div className={`flex flex-col items-start ${meldStackSpacing(slots.length)}`}>
-                                  {stackSlots.map((slot, cii) => (
-                                    <div key={cii} style={{ zIndex: cii }}>
+                                {slots.map((slot, cii) => {
+                                  // Canastra fechada: a carta de MAIOR valor (última)
+                                  // fica DEITADA (girada 90°), sobreposta em cima da
+                                  // carta anterior — parte da própria canastra, não
+                                  // separada.
+                                  const deitada = isClosed && cii === lastIdx
+                                  return (
+                                    <div
+                                      key={cii}
+                                      style={{ zIndex: cii }}
+                                      className={deitada ? 'origin-center rotate-90' : ''}
+                                    >
                                       <CardComponent
                                         card={slot.card}
                                         sizeClassName={TABLE_CARD_SIZE}
                                         compactOnLandscape
                                       />
                                     </div>
-                                  ))}
-                                </div>
-                                {horizontalSlot && (
-                                  <div
-                                    style={{ zIndex: 60 }}
-                                    className="relative mt-0.5 flex h-16 w-24 items-center justify-center sm:h-20 sm:w-28 landscape:h-10 landscape:w-[3.6rem]"
-                                  >
-                                    <div className="rotate-90">
-                                      <CardComponent
-                                        card={horizontalSlot.card}
-                                        sizeClassName={TABLE_CARD_SIZE}
-                                        compactOnLandscape
-                                      />
-                                    </div>
-                                  </div>
-                                )}
+                                  )
+                                })}
                               </div>
                             )
                           })()}

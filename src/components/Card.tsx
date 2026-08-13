@@ -131,17 +131,24 @@ export function CardComponent({ card, onClick, selected, index, sizeClassName, c
         </div>
       ) : (
         <>
-          <div className={`absolute flex flex-col items-center leading-none ${cornerGap} ${suitClass}`}>
-            <span className={`font-black ${cornerTextClass}`}>{card.rank}</span>
-            <span className={cornerTextClass}>{SUIT_SYMBOLS[card.suit]}</span>
+          {/* Índice do canto (estilo carta real): rank em cima, naipe logo
+              abaixo bem juntinho (leading tight + tucking), no topo-esquerdo e
+              espelhado no rodapé-direito. */}
+          <div className={`absolute flex flex-col items-center leading-[0.85] ${cornerGap} ${suitClass}`}>
+            <span className={`font-bold tracking-tight ${cornerTextClass}`}>{card.rank}</span>
+            <span className={`-mt-[0.1em] ${cornerTextClass}`}>{SUIT_SYMBOLS[card.suit]}</span>
           </div>
           <div
-            className={`absolute flex rotate-180 flex-col items-center leading-none ${cornerGapBottom} ${suitClass}`}
+            className={`absolute flex rotate-180 flex-col items-center leading-[0.85] ${cornerGapBottom} ${suitClass}`}
           >
-            <span className={`font-black ${cornerTextClass}`}>{card.rank}</span>
-            <span className={cornerTextClass}>{SUIT_SYMBOLS[card.suit]}</span>
+            <span className={`font-bold tracking-tight ${cornerTextClass}`}>{card.rank}</span>
+            <span className={`-mt-[0.1em] ${cornerTextClass}`}>{SUIT_SYMBOLS[card.suit]}</span>
           </div>
-          <div className={`flex h-full w-full items-center justify-center ${centerTextClass} ${suitClass}`}>
+          {/* Naipe central grande, um pouco mais suave (opacidade) pra não
+              "brigar" com o índice do canto — leitura mais de carta real. */}
+          <div
+            className={`flex h-full w-full items-center justify-center opacity-90 ${centerTextClass} ${suitClass}`}
+          >
             {SUIT_SYMBOLS[card.suit]}
           </div>
         </>

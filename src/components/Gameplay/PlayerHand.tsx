@@ -1,6 +1,5 @@
 import { useGameStore } from '../../store/gameStore'
 import { CardComponent } from '../Card'
-import { rankToNumber } from '../../engine/utils'
 import type { Card } from '../../engine/card'
 import type { TurnPhase } from './Gameplay'
 
@@ -23,9 +22,20 @@ const SUIT_ORDER: Record<Card['suit'], number> = {
   diamonds: 3,
 }
 
+/** Valor do rank pra ordenar a mão com o ÁS BAIXO (A=1), da esquerda pra
+ * direita: A 2 3 4 5 6 7 8 9 10 J Q K. */
+function handRankValue(rank: Card['rank']): number {
+  if (rank === 'A') return 1
+  if (rank === 'J') return 11
+  if (rank === 'Q') return 12
+  if (rank === 'K') return 13
+  const n = parseInt(rank, 10)
+  return isNaN(n) ? 0 : n
+}
+
 /** Ordena a mão para exibição — agrupa por naipe e, dentro do naipe, em ordem
- * decrescente A K Q J 10 9 8 7 6 5 4 3 2. Curingas ficam por último.
- * Preserva o índice original de cada carta (usado para seleção/descarte). */
+ * CRESCENTE começando pelo Ás: A 2 3 4 5 6 7 8 9 10 J Q K. Curingas ficam por
+ * último. Preserva o índice original de cada carta (seleção/descarte). */
 function orderedHand(hand: Card[]): { card: Card; index: number }[] {
   return hand
     .map((card, index) => ({ card, index }))
@@ -33,7 +43,7 @@ function orderedHand(hand: Card[]): { card: Card; index: number }[] {
       if (a.card.isWild !== b.card.isWild) return a.card.isWild ? 1 : -1
       if (a.card.isWild && b.card.isWild) return 0
       if (a.card.suit !== b.card.suit) return SUIT_ORDER[a.card.suit] - SUIT_ORDER[b.card.suit]
-      return rankToNumber(b.card.rank) - rankToNumber(a.card.rank)
+      return handRankValue(a.card.rank) - handRankValue(b.card.rank)
     })
 }
 
@@ -77,7 +87,7 @@ export default function PlayerHand({ phase }: PlayerHandProps) {
           rolável se a mão não couber. */}
       <div
         id="player-hand-anchor"
-        className="scrollbar-gold flex -space-x-8 overflow-x-auto px-1 pb-3 pt-3 sm:-space-x-10 landscape:max-h-[2.7rem] landscape:-space-x-6 landscape:overflow-y-hidden landscape:pb-0.5 landscape:pt-1"
+        className="scrollbar-gold flex -space-x-6 overflow-x-auto px-1 pb-3 pt-3 sm:-space-x-7 landscape:max-h-[2.7rem] landscape:-space-x-2.5 landscape:overflow-y-hidden landscape:pb-0.5 landscape:pt-1"
       >
         {orderedHand(hand).map(({ card, index }, position) => (
           <div
