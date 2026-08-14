@@ -8,6 +8,10 @@ export interface FlyAnimState {
   fromRect: DOMRect
   toRect: DOMRect
   cards: Card[]
+  /** Duração do voo em segundos (default DURATION_S). Voos mais "longos"
+   * (ex.: lixo indo pro assento de um adversário) usam um valor maior pra
+   * dar tempo de acompanhar. */
+  durationS?: number
 }
 
 const DURATION_S = 0.5
@@ -52,7 +56,12 @@ export default function CardFlyAnimation({ anim }: { anim: FlyAnimState | null }
                 opacity: [1, 1, 0],
               }}
               exit={{ opacity: 0 }}
-              transition={{ duration: DURATION_S, delay: i * 0.05, ease: 'easeInOut', times: [0, 0.7, 1] }}
+              transition={{
+                duration: anim.durationS ?? DURATION_S,
+                delay: i * 0.05,
+                ease: 'easeInOut',
+                times: [0, 0.85, 1],
+              }}
             >
               <div className={CARD_SIZE_CLASSES}>
                 <CardComponent card={card} />

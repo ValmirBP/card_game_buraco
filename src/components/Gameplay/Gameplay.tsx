@@ -21,6 +21,10 @@ const AI_THINK_DELAY_MS = 2000
 // Quando a carta-fantasma da compra da IA "chega" no assento (deve acompanhar
 // DURATION_S do AiDrawAnimation), pra então rodar o turno de verdade.
 const AI_DRAW_ANIM_MS = 700
+// Voo do LIXO indo pro assento de quem pegou: mais lento e visível (a carta
+// atravessa a mesa até um adversário na borda), com folga pra limpar depois.
+const AI_TAKE_ANIM_S = 1.1
+const AI_TAKE_ANIM_MS = 1300
 // Deve acompanhar DURATION_S do CardFlyAnimation (~0.5s) + pequena folga.
 const FLY_ANIM_MS = 650
 
@@ -91,6 +95,9 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
       const logBefore = store.gameLog.length
       const seatEl = document.querySelector(`[data-seat-index="${seat}"]`)
       const toRect = seatEl?.getBoundingClientRect()
+      // Origem do lixo capturada AGORA (antes do turno), com a pilha ainda
+      // cheia — depois do aiTurn o descarte fica "Vazio" (elemento menor).
+      const discardFromRect = document.getElementById('discard-pile')?.getBoundingClientRect()
 
       store.aiTurn()
 
@@ -99,10 +106,10 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
       if (!toRect) return
       const id = Date.now()
       if (tookDiscard && discardBefore.length > 0) {
-        const fromRect = document.getElementById('discard-pile')?.getBoundingClientRect()
+        const fromRect = discardFromRect
         if (fromRect) {
-          setAiTakeAnim({ id, fromRect, toRect, cards: discardBefore.slice(-4) })
-          window.setTimeout(() => setAiTakeAnim(current => (current?.id === id ? null : current)), FLY_ANIM_MS)
+          setAiTakeAnim({ id, fromRect, toRect, cards: discardBefore.slice(-4), durationS: AI_TAKE_ANIM_S })
+          window.setTimeout(() => setAiTakeAnim(current => (current?.id === id ? null : current)), AI_TAKE_ANIM_MS)
         }
       } else {
         const fromRect = document.getElementById('deck-pile')?.getBoundingClientRect()
