@@ -16,6 +16,7 @@ export default function Scoreboard() {
   const game = useGameStore(s => s.game)
   const matchScores = useGameStore(s => s.matchScores)
   const previousMatchScores = useGameStore(s => s.previousMatchScores)
+  const roundFinalized = useGameStore(s => s.roundFinalized)
 
   if (!game) return null
 
@@ -26,8 +27,13 @@ export default function Scoreboard() {
       <div className="mx-auto flex max-w-7xl flex-nowrap items-center justify-center gap-2 landscape:gap-1.5">
         {teams.map(team => {
           // "Pontos atuais" da partida = rodadas já fechadas (matchScores) +
-          // a rodada em andamento (team.score).
-          const matchTotal = matchScores[team.id] + team.score
+          // a rodada em andamento (team.score) - MAS só enquanto a rodada
+          // ainda não foi contabilizada. No frame final (round finished),
+          // finalizeRoundIfNeeded() já somou team.score dentro de
+          // matchScores; somar de novo aqui mostraria o dobro por um frame,
+          // até o Gameplay desmontar (o useEffect que troca de tela roda
+          // depois do paint).
+          const matchTotal = matchScores[team.id] + (roundFinalized ? 0 : team.score)
           const prev = previousMatchScores?.[team.id]
           // "Canastras" = só os jogos completos (7+ cartas); jogos ainda
           // incompletos na mesa não contam como canastra.

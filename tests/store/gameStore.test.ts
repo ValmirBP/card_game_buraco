@@ -339,4 +339,39 @@ describe('useGameStore', () => {
     expect(state.selectedCardIndices).toEqual([])
     expect(state.gameLog).toEqual([])
   })
+
+  describe('B4: resetGame captures previousMatchScores (Voltar ao Menu -> Jogar de novo)', () => {
+    test('resetGame() with in-progress match points saves them as previousMatchScores', () => {
+      useGameStore.getState().initGame('Alice', 'easy')
+      useGameStore.setState({ matchScores: { A: 2000, B: 1500 } })
+
+      useGameStore.getState().resetGame()
+
+      expect(useGameStore.getState().previousMatchScores).toEqual({ A: 2000, B: 1500 })
+    })
+
+    test('the NEXT initGame (Voltar ao Menu -> Jogar vs IA) shows that previousMatchScores, not a stale one from 2 matches ago', () => {
+      useGameStore.getState().initGame('Alice', 'easy')
+      useGameStore.setState({ matchScores: { A: 2000, B: 1500 } })
+      useGameStore.getState().resetGame()
+
+      useGameStore.getState().initGame('Bob', 'easy')
+
+      expect(useGameStore.getState().previousMatchScores).toEqual({ A: 2000, B: 1500 })
+    })
+
+    test('resetGame() with matchScores still at {0,0} (never scored) does NOT overwrite previousMatchScores with zeros', () => {
+      useGameStore.getState().initGame('Alice', 'easy')
+      useGameStore.setState({ matchScores: { A: 2000, B: 1500 } })
+      useGameStore.getState().resetGame() // previousMatchScores = {A:2000,B:1500}
+
+      // Start and immediately abandon a fresh match without ever scoring.
+      useGameStore.getState().initGame('Carol', 'easy')
+      expect(useGameStore.getState().matchScores).toEqual({ A: 0, B: 0 })
+      useGameStore.getState().resetGame()
+
+      // Still the earlier real match, not wiped to {0,0}.
+      expect(useGameStore.getState().previousMatchScores).toEqual({ A: 2000, B: 1500 })
+    })
+  })
 })

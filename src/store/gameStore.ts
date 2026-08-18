@@ -559,7 +559,16 @@ export const useGameStore = create<GameStore>((set, get) => {
 
   clearSelection: () => set({ selectedCardIndices: [] }),
 
-  resetGame: () =>
+  resetGame: () => {
+    // Mesma guarda de initGame: guarda a pontuação da partida que está sendo
+    // abandonada (se houver pontos) como "partida anterior" - sem isso,
+    // "Voltar ao Menu" -> "Jogar vs IA" mostrava o placar de DUAS partidas
+    // atrás (o de initGame nunca rodava de novo pra atualizar), e uma
+    // partida abandonada no meio nunca virava "anterior".
+    const prev = get().matchScores
+    const previousMatchScores =
+      prev.A !== 0 || prev.B !== 0 ? { A: prev.A, B: prev.B } : get().previousMatchScores
+
     set({
       game: null,
       version: 0,
@@ -570,8 +579,10 @@ export const useGameStore = create<GameStore>((set, get) => {
       round: 1,
       matchWinner: undefined,
       matchConfig: undefined,
+      previousMatchScores,
       roundFinalized: false,
-    }),
+    })
+  },
 
   startNextRound: () => {
     const { matchWinner, matchConfig, gameLog, round } = get()

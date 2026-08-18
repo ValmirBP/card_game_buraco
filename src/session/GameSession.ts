@@ -227,6 +227,15 @@ export class GameSession {
     if (guardResult) return guardResult
 
     const player = this.game.getCurrentPlayer()
+    if (cardIndex < 0 || cardIndex >= player.hand.getSize()) return fail('indice de carta invalido')
+    // A1: game.discard() também recusa esvaziar a mão sem morto/canastra
+    // limpa (ver game.ts) - checa isso ANTES pra dar um erro específico, em
+    // vez do genérico "indice invalido" que o success===false abaixo
+    // devolveria pros dois casos.
+    if (this.game.wouldDiscardEmptyHandIllegally(cardIndex)) {
+      return fail('voce nao pode descartar a ultima carta sem poder bater')
+    }
+
     const hadMorto = this.game.getTeamOfCurrentPlayer().hasTakenMorto
 
     const success = this.game.discard(cardIndex)

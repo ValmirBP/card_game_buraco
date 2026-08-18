@@ -4,7 +4,7 @@ import { Canasta } from './canasta'
 import { GameState, Team, TeamId, TeamScoreBreakdown, createGameState, teamOfSeat } from './gameState'
 import { isValidCanasta, canExtendMeld, scoreCardValue } from './utils'
 
-const HAND_SIZE = 11
+export const HAND_SIZE = 11
 const MORTO_SIZE = 11
 const MORTO_COUNT = 2
 
@@ -100,6 +100,25 @@ export class Game {
 
   discard(cardIndex: number): boolean {
     const player = this.getCurrentPlayer()
+    if (cardIndex < 0 || cardIndex >= player.hand.getSize()) return false
+
+    // Descarte é o único caminho de esvaziar a mão que faltava essa guarda:
+    // playCanasta/extendMeld já recusam a jogada se ela deixaria a mão sem
+    // direito de bater (ver wouldEmptyHandIllegally). Sem isso aqui, um
+    // jogador podia descartar a última carta e ficar preso com 0 cartas sem
+    // ter pego o morto nem ter canastra limpa - e, se o parceiro fechasse uma
+    // canastra limpa depois, isGameOver()/finish() creditava +100 de bônus de
+    // batida sem ninguém ter batido de fato.
+    //
+    // minSafeRemaining = 1, NÃO 2: descartar até sobrar 1 carta é jogada
+    // normal (no próximo turno o jogador compra e volta a ter 2) - só
+    // descartar a ÚLTIMA carta (indo a 0) é que exige direito de bater.
+    // Usar o limiar de 2 (o de wouldEmptyHandIllegally, para melds) aqui
+    // travaria a dupla em qualquer mão de 2 cartas, incapaz de descartar
+    // para sempre - um travamento bem pior que o bug original.
+    const team = this.getTeamOfCurrentPlayer()
+    if (this.wouldLeaveTeamStuck(player, 1, 1, team, team.melds)) return false
+
     const card = player.hand.removeCard(cardIndex)
     if (!card) return false
     this.state.discardPile.push(card)
@@ -259,18 +278,50 @@ export class Game {
   }
 
   /**
-   * The Buraco rule this enforces: a player may only empty their hand via a
-   * meld (playCanasta/extendMeld) if, immediately after, their team can
-   * EITHER take the morto (team hasn't taken one yet AND one is still on the
-   * table) OR close/bater (canClose, evaluated against `resultingMelds` -
-   * the team's meld set AFTER this play, including the new/extended meld -
-   * since a canastra just completed by this very play must count). If
-   * neither holds, emptying the hand would leave the player stuck with
-   * nothing to discard and no way to end the turn, so the play is illegal.
+   * Shared "would this leave the team stuck" predicate behind both
+   * wouldEmptyHandIllegally (melds/extends) and discard()'s own guard.
+   * `minSafeRemaining` is deliberately DIFFERENT for the two callers - see
+   * their respective doc comments for why 1 card left is fine for a discard
+   * but not for a meld:
    *
-   * Returns false (legal) whenever this particular play wouldn't actually
-   * empty the hand - `cardsToRemoveCount` must equal the current hand size
-   * for the illegality check to even apply.
+   * A play is only even in question when it would leave FEWER than
+   * `minSafeRemaining` cards. Then it's legal only if the team can EITHER
+   * take the morto (hasn't taken one yet AND one is still on the table) OR
+   * close/bater (canClose, evaluated against `resultingMelds` - the team's
+   * meld set AFTER this play, since a canastra just completed by this very
+   * play must count).
+   */
+  private wouldLeaveTeamStuck(
+    player: Player,
+    cardsToRemoveCount: number,
+    minSafeRemaining: number,
+    team: Team,
+    resultingMelds: Canasta[]
+  ): boolean {
+    if (player.hand.getSize() - cardsToRemoveCount >= minSafeRemaining) return false
+
+    const couldTakeMorto = !team.hasTakenMorto && this.state.mortos.length > 0
+    if (couldTakeMorto) return false
+
+    return !this.canCloseWithMelds(team, resultingMelds)
+  }
+
+  /**
+   * The Buraco rule this enforces: a player may only meld/extend down to 0
+   * or 1 cards left in hand if, immediately after, their team has morto or
+   * closing rights (see wouldLeaveTeamStuck). Requires 2+ cards left
+   * (`minSafeRemaining = 2`), NOT just "would leave 0": every turn MUST end
+   * with exactly one discard (endTurn only runs after a successful discard()
+   * - see gameStore.ts), with no further draw in between. So a meld that
+   * leaves exactly 1 card commits the player to discarding that very card
+   * next, in the SAME turn, which would empty the hand with no closing
+   * rights one step later - and by then extending is already refused (this
+   * same check) and discarding would be refused too (discard()'s own guard,
+   * a laxer minSafeRemaining=1 - see there), leaving no legal move at all.
+   * Blocking the meld a step earlier avoids that dead end.
+   *
+   * Returns false (legal) whenever this particular play would leave 2+ cards
+   * in hand - plenty of room, no risk of getting stuck.
    */
   wouldEmptyHandIllegally(
     player: Player,
@@ -278,12 +329,7 @@ export class Game {
     team: Team,
     resultingMelds: Canasta[]
   ): boolean {
-    if (player.hand.getSize() !== cardsToRemoveCount) return false
-
-    const couldTakeMorto = !team.hasTakenMorto && this.state.mortos.length > 0
-    if (couldTakeMorto) return false
-
-    return !this.canCloseWithMelds(team, resultingMelds)
+    return this.wouldLeaveTeamStuck(player, cardsToRemoveCount, 2, team, resultingMelds)
   }
 
   /**
@@ -326,6 +372,18 @@ export class Game {
     const extended = meld.withExtraCards(cards)
     const resultingMelds = team.melds.map((m, i) => (i === meldIndex ? extended : m))
     return this.wouldEmptyHandIllegally(player, cards.length, team, resultingMelds)
+  }
+
+  /**
+   * UI helper: would discarding the card at `cardIndex` be refused because it
+   * empties the hand illegally (down to 0 cards, no morto/close rights)?
+   * Mirrors the guard discard() itself runs, without mutating anything.
+   */
+  wouldDiscardEmptyHandIllegally(cardIndex: number): boolean {
+    const player = this.getCurrentPlayer()
+    if (cardIndex < 0 || cardIndex >= player.hand.getSize()) return false
+    const team = this.getTeamOfCurrentPlayer()
+    return this.wouldLeaveTeamStuck(player, 1, 1, team, team.melds)
   }
 
   endTurn(): void {

@@ -87,6 +87,25 @@ describe('GameSession illegal intents are rejected without side effects', () => 
     expect(game.getCurrentPlayer().hand.getSize()).toBe(3) // untouched
   })
 
+  it('A1: rejects discarding the last card without morto/close rights, with a SPECIFIC error message (not "indice invalido")', () => {
+    const session = new GameSession(allHumans())
+    session.applyIntent(0, { type: 'draw' })
+
+    const game = internalGame(session)
+    const teamA = game.state.teams.find((t: any) => t.id === 'A')
+    teamA.hasTakenMorto = true
+    game.state.mortos = []
+    // Sem canastra limpa -> canClose fica false.
+    game.getCurrentPlayer().hand = new Hand([new Card('diamonds', 'Q', false)])
+
+    const result = session.applyIntent(0, { type: 'discard', cardIndex: 0 })
+
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/bater/i)
+    expect(result.error).not.toMatch(/indice/i)
+    expect(game.getCurrentPlayer().hand.getSize()).toBe(1) // untouched
+  })
+
   it('rejects takeDiscard when the discard pile is empty', () => {
     const session = new GameSession(allHumans())
     const result = session.applyIntent(0, { type: 'takeDiscard' })
