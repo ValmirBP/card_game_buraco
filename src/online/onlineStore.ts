@@ -110,7 +110,25 @@ function connect(onOpen: () => void): void {
   intentionalClose = false
   useOnlineStore.setState({ connection: 'connecting', errorMsg: null })
 
-  const ws = new WebSocket(resolveWsUrl(useOnlineStore.getState().serverAddress))
+  // `new WebSocket(...)` pode lançar SÍNCRONO (não é um erro assíncrono
+  // pego por onerror/onclose) em cenários de política do navegador/WebView -
+  // ex.: uma página https:// tentando abrir ws:// (mixed content) lança
+  // SecurityError na hora. Sem o try/catch, isso derrubava o handler de
+  // clique inteiro em silêncio: sem errorMsg, sem log, o usuário só via a
+  // tela voltar pro formulário como se nada tivesse acontecido.
+  let ws: WebSocket
+  try {
+    ws = new WebSocket(resolveWsUrl(useOnlineStore.getState().serverAddress))
+  } catch (err) {
+    useOnlineStore.setState({
+      connection: 'closed',
+      errorMsg:
+        err instanceof Error
+          ? `Não foi possível conectar: ${err.message}`
+          : 'Não foi possível conectar ao servidor.',
+    })
+    return
+  }
   socket = ws
 
   ws.onopen = () => {

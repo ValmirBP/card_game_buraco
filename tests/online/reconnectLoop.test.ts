@@ -99,4 +99,27 @@ describe('onlineStore reconnect loop (B7)', () => {
 
     expect(FakeWebSocket.instances.length).toBe(countAfterLeave)
   })
+
+  test('a synchronous WebSocket constructor error (ex.: SecurityError de mixed-content numa pagina https:// tentando ws://) surfaces errorMsg instead of failing silently', () => {
+    // Reproduz o bug real encontrado no emulador: dentro do APK, a pagina
+    // carrega em https://localhost e `new WebSocket('ws://...')` lanca
+    // SecurityError SINCRONO (nao um erro assincrono via onclose/onerror).
+    // Sem o try/catch em connect(), isso derrubava o handler de clique
+    // inteiro em silencio - a tela so "voltava" pro formulario, sem
+    // nenhuma mensagem de erro visivel pro usuario.
+    class ThrowingWebSocket {
+      constructor() {
+        throw new DOMException(
+          "Failed to construct 'WebSocket': An insecure WebSocket connection may not be initiated from a page loaded over HTTPS.",
+          'SecurityError'
+        )
+      }
+    }
+    ;(global as unknown as { WebSocket: unknown }).WebSocket = ThrowingWebSocket
+
+    useOnlineStore.getState().join('ABCDE', 'Você')
+
+    expect(useOnlineStore.getState().connection).toBe('closed')
+    expect(useOnlineStore.getState().errorMsg).toMatch(/não foi possível conectar/i)
+  })
 })
