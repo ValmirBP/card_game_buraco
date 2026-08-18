@@ -1,12 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- usesCleartextTraffic: o modo Online conecta num servidor LAN comum
+         (ws://IP:3001, sem TLS). Desde a API 28 o Android bloqueia por
+         padrao QUALQUER trafego de rede nao criptografado (camada distinta
+         da politica de mixed-content da pagina, ja tratada via
+         capacitor.config.ts server.androidScheme) - sem isso, a conexao
+         WebSocket falha silenciosamente (fecha logo apos abrir) mesmo com
+         o servidor no ar e a porta acessivel. -->
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
+        android:usesCleartextTraffic="true"
         android:theme="@style/AppTheme">
 
         <activity
