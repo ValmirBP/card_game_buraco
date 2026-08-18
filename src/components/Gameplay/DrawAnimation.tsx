@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { CardComponent, CardBack, CARD_SIZE_CLASSES } from '../Card'
 import type { Card } from '../../engine/card'
+import { clampToViewport } from './flightMath'
 
 export interface DrawAnimState {
   /** Unique key so React remounts the ghost for each new draw. */
@@ -8,6 +9,9 @@ export interface DrawAnimState {
   fromRect: DOMRect
   toRect: DOMRect
   card: Card
+  /** Overrides o footprint do fantasma (default CARD_SIZE_CLASSES). Ver o
+   * mesmo campo em FlyAnimState (CardFlyAnimation.tsx). */
+  sizeClassName?: string
 }
 
 /**
@@ -28,6 +32,12 @@ const TOTAL_S = SLIDE_S + HOLD_S + FADE_S
  * Ghost card overlay for the "Comprar" action. Purely decorative — it
  * doesn't touch game state; the real card is already in the hand
  * underneath. Non-blocking: the game stays interactive while this plays.
+ *
+ * POSITIONING: same center-point + `-translate-x/y-1/2` approach as
+ * CardFlyAnimation (see its doc comment) — the wrapper is sized by CSS
+ * classes (sizeClassName), not by fromRect's dimensions, so the "hold" zoom
+ * stays centered on the target regardless of how wide fromRect/toRect are
+ * (e.g. #player-hand-anchor, the whole hand row).
  */
 export default function DrawAnimation({ anim }: { anim: DrawAnimState | null }) {
   return (
@@ -35,21 +45,26 @@ export default function DrawAnimation({ anim }: { anim: DrawAnimState | null }) 
       {anim && (
         <motion.div
           key={anim.id}
-          className="pointer-events-none fixed z-[100]"
-          style={{ left: 0, top: 0, width: anim.fromRect.width, height: anim.fromRect.height }}
+          className={`pointer-events-none fixed left-0 top-0 z-[100] -translate-x-1/2 -translate-y-1/2 ${anim.sizeClassName ?? CARD_SIZE_CLASSES}`}
           initial={{
-            x: anim.fromRect.left,
-            y: anim.fromRect.top,
+            x: anim.fromRect.left + anim.fromRect.width / 2,
+            y: anim.fromRect.top + anim.fromRect.height / 2,
             scale: 1,
             opacity: 1,
           }}
-          animate={{
-            x: anim.toRect.left + anim.toRect.width / 2 - anim.fromRect.width / 2,
-            y: anim.toRect.top + anim.toRect.height / 2 - anim.fromRect.height / 2,
-            // Slight zoom during the hold so the drawn card is easy to read.
-            scale: [1, 1.25, 1.25, 1],
-            opacity: [1, 1, 1, 0],
-          }}
+          animate={(() => {
+            const landing = clampToViewport(
+              anim.toRect.left + anim.toRect.width / 2,
+              anim.toRect.top + anim.toRect.height / 2
+            )
+            return {
+              x: landing.x,
+              y: landing.y,
+              // Slight zoom during the hold so the drawn card is easy to read.
+              scale: [1, 1.25, 1.25, 1],
+              opacity: [1, 1, 1, 0],
+            }
+          })()}
           transition={{
             duration: TOTAL_S,
             ease: 'easeInOut',
@@ -57,7 +72,7 @@ export default function DrawAnimation({ anim }: { anim: DrawAnimState | null }) 
           }}
         >
           <motion.div
-            className={`relative ${CARD_SIZE_CLASSES}`}
+            className="relative h-full w-full"
             style={{ transformStyle: 'preserve-3d' }}
             initial={{ rotateY: 0 }}
             animate={{ rotateY: 180 }}

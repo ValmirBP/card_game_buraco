@@ -28,6 +28,30 @@ const AI_TAKE_ANIM_MS = 1300
 // Deve acompanhar DURATION_S do CardFlyAnimation (~0.5s) + pequena folga.
 const FLY_ANIM_MS = 650
 
+// Footprints landscape-aware pros fantasmas de animação, espelhando os
+// tamanhos reais das cartas nos respectivos contextos (GameBoard.tsx
+// TABLE_CARD_SIZE/PILE_CARD_SIZE, PlayerHand.tsx HAND_CARD_SIZE) - repetidos
+// aqui (não importados) pra não acoplar Gameplay.tsx à estrutura interna
+// desses componentes; só os valores literais precisam bater.
+const GHOST_HAND_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-12 landscape:h-[4.25rem]'
+const GHOST_TABLE_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-9 landscape:h-[3.35rem]'
+const GHOST_PILE_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-8 landscape:h-[2.9rem]'
+
+/** Entre os índices de cartas selecionadas na mão, acha o elemento
+ * `[data-hand-index]` MAIS À ESQUERDA na tela (menor `left`) — não
+ * necessariamente `cardIndices[0]`, já que PlayerHand reordena a exibição
+ * (A→K por naipe) mantendo o índice original de cada carta. Cai para
+ * `#player-hand-anchor` (a fileira inteira) se nada for encontrado. */
+function leftmostHandCardRect(cardIndices: number[]): DOMRect | undefined {
+  const rects = cardIndices
+    .map(i => document.querySelector(`[data-hand-index="${i}"]`)?.getBoundingClientRect())
+    .filter((r): r is DOMRect => Boolean(r))
+  if (rects.length === 0) {
+    return document.getElementById('player-hand-anchor')?.getBoundingClientRect()
+  }
+  return rects.reduce((leftmost, r) => (r.left < leftmost.left ? r : leftmost))
+}
+
 export default function Gameplay({ onGameEnd }: GameplayProps) {
   // `version` MUST be selected alongside `game`: `game` is a mutable engine
   // instance whose object reference never changes across actions, so
@@ -97,7 +121,14 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
       const toRect = seatEl?.getBoundingClientRect()
       // Origem do lixo capturada AGORA (antes do turno), com a pilha ainda
       // cheia — depois do aiTurn o descarte fica "Vazio" (elemento menor).
-      const discardFromRect = document.getElementById('discard-pile')?.getBoundingClientRect()
+      // #discard-top é a carta do topo (tamanho de carta); cai para
+      // #discard-pile (a fileira inteira) só se o topo não existir por
+      // algum motivo — o centro do ponto de pouso/partida usa o CENTRO do
+      // retângulo (ver CardFlyAnimation), então mesmo a fileira inteira
+      // pousaria em algum lugar razoável, mas o topo é mais preciso.
+      const discardFromRect = (
+        document.getElementById('discard-top') ?? document.getElementById('discard-pile')
+      )?.getBoundingClientRect()
 
       store.aiTurn()
 
@@ -108,7 +139,14 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
       if (tookDiscard && discardBefore.length > 0) {
         const fromRect = discardFromRect
         if (fromRect) {
-          setAiTakeAnim({ id, fromRect, toRect, cards: discardBefore.slice(-4), durationS: AI_TAKE_ANIM_S })
+          setAiTakeAnim({
+            id,
+            fromRect,
+            toRect,
+            cards: discardBefore.slice(-4),
+            durationS: AI_TAKE_ANIM_S,
+            sizeClassName: GHOST_PILE_SIZE,
+          })
           window.setTimeout(() => setAiTakeAnim(current => (current?.id === id ? null : current)), AI_TAKE_ANIM_MS)
         }
       } else {
@@ -181,7 +219,7 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
 
     if (fromRect && toRect && drawnCard) {
       const id = Date.now()
-      setDrawAnim({ id, fromRect, toRect, card: drawnCard })
+      setDrawAnim({ id, fromRect, toRect, card: drawnCard, sizeClassName: GHOST_HAND_SIZE })
       // Deve acompanhar TOTAL_S do DrawAnimation (~2.15s) + pequena folga.
       window.setTimeout(() => {
         setDrawAnim(current => (current?.id === id ? null : current))
@@ -190,7 +228,9 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
   }
 
   const handleTakeDiscard = () => {
-    const discardEl = document.getElementById('discard-pile')
+    // #discard-top é a carta do topo (tamanho de carta); cai para
+    // #discard-pile (a fileira inteira) só se o topo não existir.
+    const discardEl = document.getElementById('discard-top') ?? document.getElementById('discard-pile')
     const handEl = document.getElementById('player-hand-anchor')
     const fromRect = discardEl?.getBoundingClientRect()
     const cardsBefore = [...game.state.discardPile]
@@ -202,7 +242,7 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
     if (fromRect && toRect && cardsBefore.length > 0) {
       const id = Date.now()
       // Only fly a handful of ghosts for legibility even if the pile is huge.
-      setPickupAnim({ id, fromRect, toRect, cards: cardsBefore.slice(-3) })
+      setPickupAnim({ id, fromRect, toRect, cards: cardsBefore.slice(-3), sizeClassName: GHOST_HAND_SIZE })
       window.setTimeout(() => setPickupAnim(current => (current?.id === id ? null : current)), FLY_ANIM_MS)
     }
   }
@@ -229,7 +269,7 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
     const toRect = discardEl?.getBoundingClientRect()
     if (fromRect && toRect && card) {
       const id = Date.now()
-      setDiscardAnim({ id, fromRect, toRect, cards: [card] })
+      setDiscardAnim({ id, fromRect, toRect, cards: [card], sizeClassName: GHOST_HAND_SIZE })
       window.setTimeout(() => setDiscardAnim(current => (current?.id === id ? null : current)), FLY_ANIM_MS)
     }
   }
@@ -238,9 +278,12 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
     const { selectedCardIndices } = useGameStore.getState()
     if (selectedCardIndices.length < 3) return
 
-    const handEl = document.getElementById('player-hand-anchor')
+    // Origem: a carta selecionada mais à esquerda na tela (não a fileira
+    // inteira #player-hand-anchor) — cardIndices[0] não é confiável aqui,
+    // pois PlayerHand reordena a exibição (A→K por naipe) mantendo o índice
+    // original de cada carta.
+    const fromRect = leftmostHandCardRect(selectedCardIndices)
     const zoneEl = document.getElementById('meld-drop-zone')
-    const fromRect = handEl?.getBoundingClientRect()
     const toRect = zoneEl?.getBoundingClientRect()
     const hand = game.state.players[0].hand.getCards()
     const cards = selectedCardIndices.map(i => hand[i]).filter((c): c is NonNullable<typeof c> => Boolean(c))
@@ -250,14 +293,15 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
 
     if (fromRect && toRect && cards.length > 0) {
       const id = Date.now()
-      setTableAnim({ id, fromRect, toRect, cards: cards.slice(0, 4) })
+      setTableAnim({ id, fromRect, toRect, cards: cards.slice(0, 4), sizeClassName: GHOST_TABLE_SIZE })
       window.setTimeout(() => setTableAnim(current => (current?.id === id ? null : current)), FLY_ANIM_MS)
     }
   }
 
   const handleExtendMeld = (meldIndex: number, cardIndices: number[], targetRect: DOMRect) => {
-    const handEl = document.getElementById('player-hand-anchor')
-    const fromRect = handEl?.getBoundingClientRect()
+    // Mesmo raciocínio de handlePlayCanasta: a carta mais à esquerda, não a
+    // fileira inteira da mão.
+    const fromRect = leftmostHandCardRect(cardIndices)
     const hand = game.state.players[0].hand.getCards()
     const cards = cardIndices.map(i => hand[i]).filter((c): c is NonNullable<typeof c> => Boolean(c))
 
@@ -265,7 +309,7 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
 
     if (fromRect && cards.length > 0) {
       const id = Date.now()
-      setTableAnim({ id, fromRect, toRect: targetRect, cards: cards.slice(0, 4) })
+      setTableAnim({ id, fromRect, toRect: targetRect, cards: cards.slice(0, 4), sizeClassName: GHOST_TABLE_SIZE })
       window.setTimeout(() => setTableAnim(current => (current?.id === id ? null : current)), FLY_ANIM_MS)
     }
   }
