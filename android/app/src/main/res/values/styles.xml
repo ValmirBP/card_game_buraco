@@ -9,14 +9,28 @@
         <item name="colorAccent">@color/colorAccent</item>
     </style>
 
+    <!-- android:windowBackground direto no tema (não só via
+         getWindow().setBackgroundDrawable() no MainActivity): o splash da
+         Capacitor (fundo branco, ver drawable/splash.png) ficava visível na
+         faixa do recorte de câmera em paisagem, onde a WebView some sob o
+         cutout mas a janela nativa ainda aparece por trás - setar no tema
+         garante o verde do feltro desde o primeiro frame, sem corrida com o
+         plugin de SplashScreen da Capacitor. -->
     <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <item name="android:windowBackground">#0f5132</item>
     </style>
 
 
+    <!-- AndroidManifest usa ESSE tema diretamente na activity (não só no
+         boot) - por isso troquei o splash.png (branco) por verde sólido:
+         sem isso, qualquer área que a WebView não cobre (ex.: a faixa do
+         recorte de câmera em paisagem) mostra o branco do splash por trás,
+         mesmo minutos depois do app aberto, bem depois do splash "sumir". -->
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
-        <item name="android:background">@drawable/splash</item>
+        <item name="android:windowBackground">#0f5132</item>
+        <item name="windowSplashScreenBackground">#0f5132</item>
     </style>
 </resources>

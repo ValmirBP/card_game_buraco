@@ -41,16 +41,21 @@ export function Layout({ children, fit = false }: LayoutProps) {
        * Safe-area-inset (A6): o Android desenha atrás do recorte de câmera
        * (LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES no MainActivity +
        * viewport-fit=cover no index.html), e em paisagem o recorte cai numa
-       * das bordas LATERAIS (esquerda ou direita, dependendo da rotação).
-       * Sem isso, conteúdo perto da borda (ex.: o selo de turno/morto no
-       * canto) podia ficar atrás do recorte. `max(0.125rem, env(...))`
-       * preserva o padding visual de sempre (0.125rem = p-0.5) em telas sem
-       * recorte, onde env() resolve pra 0. A altura também desconta os
-       * insets de cima/baixo, não só o dvh cru. */}
+       * das bordas LATERAIS (esquerda ou direita, dependendo da rotação). O
+       * fundo da janela já é o mesmo verde do feltro (ver MainActivity), então
+       * deixar o feltro ir até a borda de verdade é visualmente perfeito —
+       * um furo de câmera sobre fundo verde contínuo não aparece. Por isso
+       * NÃO reservamos mais o inset inteiro como padding do tabuleiro inteiro
+       * (isso encolhia o jogo todo por ~130px numa tela de 6.3" só pra
+       * proteger uma furo de ~1cm) — cada elemento perto da borda que
+       * realmente pode colidir com o recorte (selo de turno, morto, monte)
+       * se protege individualmente, ver GameBoard.tsx. A altura ainda
+       * desconta os insets de cima/baixo (esses não têm o mesmo fundo
+       * contínuo por trás — ver `h-[calc(...)]` abaixo). */}
       <div
         className={`relative z-10 mx-auto max-w-7xl rounded-[2rem] p-1.5 sm:p-2.5 ${
           fit
-            ? 'my-1.5 flex h-[calc(100dvh-0.75rem)] flex-col sm:my-2 sm:h-[calc(100dvh-1rem)] landscape:my-0 landscape:h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] landscape:max-w-none landscape:rounded-none landscape:p-0.5 landscape:pl-[max(0.125rem,env(safe-area-inset-left))] landscape:pr-[max(0.125rem,env(safe-area-inset-right))]'
+            ? 'my-1.5 flex h-[calc(100dvh-0.75rem)] flex-col sm:my-2 sm:h-[calc(100dvh-1rem)] landscape:my-0 landscape:h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] landscape:max-w-none landscape:rounded-none landscape:p-0.5'
             : 'my-4 sm:my-6'
         }`}
         style={{

@@ -6,6 +6,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { WebSocketServer, WebSocket } from 'ws'
 import { ProtocolServer, ClientMessage } from './protocol'
+import { lanAddresses as computeLanAddresses, lanBaseUrl as computeLanBaseUrl } from './lanAddress'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DIST_DIR = path.resolve(__dirname, '..', 'dist')
@@ -58,24 +59,11 @@ async function isDirectory(filePath: string): Promise<boolean> {
 }
 
 function lanAddresses(): string[] {
-  const nets = networkInterfaces()
-  const addresses: string[] = []
-  for (const name of Object.keys(nets)) {
-    for (const net of nets[name] ?? []) {
-      if (net.family === 'IPv4' && !net.internal) {
-        addresses.push(net.address)
-      }
-    }
-  }
-  return addresses
+  return computeLanAddresses(networkInterfaces())
 }
 
-/** Best LAN base URL (first non-internal IPv4) with the port, e.g.
- * `http://192.168.2.169:3001`. Empty if no LAN IP is available (e.g. no
- * network), so the client falls back to window.location.origin. */
 function lanBaseUrl(): string {
-  const addresses = lanAddresses()
-  return addresses.length > 0 ? `http://${addresses[0]}:${PORT}` : ''
+  return computeLanBaseUrl(networkInterfaces(), PORT)
 }
 
 const httpServer = createServer((req, res) => {

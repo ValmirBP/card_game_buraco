@@ -39,8 +39,11 @@ const TEAM_GRID_CLASS: Record<TeamId, string> = {
 
 /** Footprint das cartas dos JOGOS baixados (colunas verticais). Em paisagem
  * ficam num tamanho legível (naipes visíveis), já que os jogos são a vista
- * principal. Opt-in, então nunca afeta Online nem a mão. */
-const TABLE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-9 landscape:h-[3.35rem]'
+ * principal. Opt-in, então nunca afeta Online nem a mão. Aumentado (~57%)
+ * depois que o tabuleiro parou de perder ~130px de largura pro
+ * over-reservation de safe-area-inset (ver Layout.tsx) — sobrou espaço de
+ * verdade pra deixar as canastras baixadas legíveis. */
+const TABLE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-14 landscape:h-[5.25rem]'
 /** Footprint do MONTE — pequeno no canto, só pra ficar visível/clicável. */
 const PILE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-8 landscape:h-[2.9rem]'
 /** Footprint das cartas do DESCARTE — MESMO tamanho das cartas da mão, pra a
@@ -60,11 +63,11 @@ const BIG_CORNER = 'text-sm font-normal sm:text-base landscape:text-lg landscape
  * (abaixo) mantém overflow-y-auto como rede de segurança: uma canastra rara
  * e muito longa fica ROLÁVEL, nunca cortada/inacessível. */
 function meldStackSpacing(n: number): string {
-  if (n >= 12) return 'space-y-[-4.9rem] sm:space-y-[-5.7rem] landscape:space-y-[-2.9rem]'
-  if (n >= 9) return 'space-y-[-4.7rem] sm:space-y-[-5.5rem] landscape:space-y-[-2.7rem]'
-  if (n >= 7) return 'space-y-[-4.5rem] sm:space-y-[-5.3rem] landscape:space-y-[-2.4rem]'
-  if (n >= 5) return 'space-y-[-4.3rem] sm:space-y-[-5.1rem] landscape:space-y-[-2.1rem]'
-  return 'space-y-[-4.2rem] sm:space-y-[-5rem] landscape:space-y-[-1.8rem]'
+  if (n >= 12) return 'space-y-[-4.9rem] sm:space-y-[-5.7rem] landscape:space-y-[-4.55rem]'
+  if (n >= 9) return 'space-y-[-4.7rem] sm:space-y-[-5.5rem] landscape:space-y-[-4.25rem]'
+  if (n >= 7) return 'space-y-[-4.5rem] sm:space-y-[-5.3rem] landscape:space-y-[-3.75rem]'
+  if (n >= 5) return 'space-y-[-4.3rem] sm:space-y-[-5.1rem] landscape:space-y-[-3.3rem]'
+  return 'space-y-[-4.2rem] sm:space-y-[-5rem] landscape:space-y-[-2.8rem]'
 }
 
 /** The 4-seat table: opponents/partner around a center that shows the draw
@@ -330,8 +333,10 @@ export default function GameBoard({
           a MAIOR parte da mesa. Nada rola na vertical. */}
       <div className="flex flex-col gap-3 sm:gap-4 landscape:grid landscape:h-full landscape:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_auto] landscape:grid-rows-[auto_minmax(0,1fr)_auto] landscape:items-stretch landscape:gap-x-1 landscape:gap-y-0.5">
         {/* Monte — canto superior-esquerdo (row1/col1), visível e clicável.
-            (O morto fica escondido num canto discreto, ver overlay abaixo.) */}
-        <div className="order-1 flex items-center justify-center landscape:col-start-1 landscape:row-start-1 landscape:justify-self-start">
+            (O morto fica escondido num canto discreto, ver overlay abaixo.)
+            landscape:ml-[env(...)]: protege só o monte se o recorte cair do
+            lado esquerdo nessa rotação (ver comentário em Layout.tsx). */}
+        <div className="order-1 flex items-center justify-center landscape:col-start-1 landscape:row-start-1 landscape:justify-self-start landscape:ml-[env(safe-area-inset-left)]">
           {deckPile}
         </div>
 
@@ -463,6 +468,7 @@ export default function GameBoard({
                                         sizeClassName={TABLE_CARD_SIZE}
                                         compactOnLandscape
                                         cornerLayout="row"
+                                        cornerClassName={BIG_CORNER}
                                       />
                                     </div>
                                   )
@@ -525,13 +531,17 @@ export default function GameBoard({
         </div>
       </div>
 
-      {/* Morto — escondido num canto discreto (topo-direito), pequeno. */}
-      <div className="pointer-events-none absolute right-1 top-6 z-20 origin-top-right scale-[0.62] landscape:scale-[0.5]">
+      {/* Morto — escondido num canto discreto (topo-direito), pequeno.
+          landscape:mr-[env(...)]: única proteção contra o recorte de câmera
+          que sobrou aqui (ver comentário em Layout.tsx) — se o recorte cair
+          do lado direito nessa rotação, empurra só este badge, não o
+          tabuleiro inteiro. */}
+      <div className="pointer-events-none absolute right-1 top-6 z-20 origin-top-right scale-[0.62] landscape:scale-[0.5] landscape:mr-[env(safe-area-inset-right)]">
         {mortoBlock}
       </div>
 
       {/* Selo de turno (sobreposto, canto sup-direito) */}
-      <div className="pointer-events-none absolute right-2 top-2 z-30">
+      <div className="pointer-events-none absolute right-2 top-2 z-30 landscape:mr-[env(safe-area-inset-right)]">
         <AnimatePresence>
           {status === 'playing' && !isHumanTurn && (
             <motion.span
