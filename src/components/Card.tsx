@@ -23,6 +23,13 @@ interface CardProps {
    * isso quer o rank/naipe do canto BEM grandes/legíveis, sem depender do
    * símbolo central (que fica escondido abaixo da dobra). */
   cornerClassName?: string
+  /** 'row' põe rank e naipe LADO A LADO (em vez de empilhados) no índice do
+   * canto — usado nas colunas de jogos baixados em paisagem (GameBoard),
+   * onde as cartas se sobrepõem tanto que só uma faixa fina do canto de cada
+   * carta (abaixo da carta de cima) fica visível; empilhado, o naipe some
+   * nessa faixa. Default 'column' (empilhado, como uma carta real) em todo
+   * outro lugar (mão, monte, descarte). */
+  cornerLayout?: 'column' | 'row'
 }
 
 const SUIT_SYMBOLS: Record<CardType['suit'], string> = {
@@ -72,7 +79,16 @@ function JesterIllustration({ compactOnLandscape }: { compactOnLandscape?: boole
   )
 }
 
-export function CardComponent({ card, onClick, selected, index, sizeClassName, compactOnLandscape, cornerClassName }: CardProps) {
+export function CardComponent({
+  card,
+  onClick,
+  selected,
+  index,
+  sizeClassName,
+  compactOnLandscape,
+  cornerClassName,
+  cornerLayout = 'column',
+}: CardProps) {
   const suitClass = SUIT_COLOR_CLASS[card.suit]
   const cornerTextClass = cornerClassName
     ? cornerClassName
@@ -86,6 +102,13 @@ export function CardComponent({ card, onClick, selected, index, sizeClassName, c
   const cornerGapBottom = compactOnLandscape
     ? 'bottom-1.5 right-2 landscape:bottom-0.5 landscape:right-1'
     : 'bottom-1.5 right-2'
+  // 'row': rank e naipe lado a lado, cabe numa faixa mais baixa (ver
+  // CardProps.cornerLayout) — só em PAISAGEM (landscape:), onde a carta é
+  // pequena e a sobreposição das colunas deixa pouca altura por carta. Em
+  // retrato a carta é grande (sobra altura de sobra) e continua empilhada
+  // (o layout tradicional de carta real), mesmo quando cornerLayout='row'.
+  const cornerFlexClass = cornerLayout === 'row' ? 'flex-col landscape:flex-row landscape:gap-0.5' : 'flex-col'
+  const suitSpacingClass = cornerLayout === 'row' ? '-mt-[0.1em] landscape:mt-0' : '-mt-[0.1em]'
 
   return (
     <motion.div
@@ -134,15 +157,15 @@ export function CardComponent({ card, onClick, selected, index, sizeClassName, c
           {/* Índice do canto (estilo carta real): rank em cima, naipe logo
               abaixo bem juntinho (leading tight + tucking), no topo-esquerdo e
               espelhado no rodapé-direito. */}
-          <div className={`absolute flex flex-col items-center leading-[0.85] ${cornerGap} ${suitClass}`}>
+          <div className={`absolute flex items-center leading-[0.85] ${cornerFlexClass} ${cornerGap} ${suitClass}`}>
             <span className={`font-bold tracking-tight ${cornerTextClass}`}>{card.rank}</span>
-            <span className={`-mt-[0.1em] ${cornerTextClass}`}>{SUIT_SYMBOLS[card.suit]}</span>
+            <span className={`${suitSpacingClass} ${cornerTextClass}`}>{SUIT_SYMBOLS[card.suit]}</span>
           </div>
           <div
-            className={`absolute flex rotate-180 flex-col items-center leading-[0.85] ${cornerGapBottom} ${suitClass}`}
+            className={`absolute flex rotate-180 items-center leading-[0.85] ${cornerFlexClass} ${cornerGapBottom} ${suitClass}`}
           >
             <span className={`font-bold tracking-tight ${cornerTextClass}`}>{card.rank}</span>
-            <span className={`-mt-[0.1em] ${cornerTextClass}`}>{SUIT_SYMBOLS[card.suit]}</span>
+            <span className={`${suitSpacingClass} ${cornerTextClass}`}>{SUIT_SYMBOLS[card.suit]}</span>
           </div>
           {/* Naipe central grande, um pouco mais suave (opacidade) pra não
               "brigar" com o índice do canto — leitura mais de carta real. */}

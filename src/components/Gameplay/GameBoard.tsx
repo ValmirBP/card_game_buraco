@@ -52,11 +52,18 @@ const BIG_CORNER = 'text-sm font-normal sm:text-base landscape:text-lg landscape
 
 /** Sobreposição vertical das cartas de um jogo (coluna). Quanto MAIS cartas,
  * mais elas se JUNTAM (margem negativa maior) pra a coluna não crescer sem
- * limite e caber no painel. Classes literais pra o Tailwind gerá-las. */
+ * limite e caber no painel. Classes literais pra o Tailwind gerá-las.
+ *
+ * Em paisagem (onde o painel só tem ~130-160px de altura), o valor máximo
+ * (14 cartas, canastra "real") ainda pode passar um pouco da altura do
+ * painel dependendo do viewport — por isso o container das canastras
+ * (abaixo) mantém overflow-y-auto como rede de segurança: uma canastra rara
+ * e muito longa fica ROLÁVEL, nunca cortada/inacessível. */
 function meldStackSpacing(n: number): string {
-  if (n >= 9) return 'space-y-[-4.9rem] sm:space-y-[-5.7rem] landscape:space-y-[-2.6rem]'
-  if (n >= 7) return 'space-y-[-4.6rem] sm:space-y-[-5.4rem] landscape:space-y-[-2.25rem]'
-  if (n >= 5) return 'space-y-[-4.4rem] sm:space-y-[-5.2rem] landscape:space-y-[-2rem]'
+  if (n >= 12) return 'space-y-[-4.9rem] sm:space-y-[-5.7rem] landscape:space-y-[-2.9rem]'
+  if (n >= 9) return 'space-y-[-4.7rem] sm:space-y-[-5.5rem] landscape:space-y-[-2.7rem]'
+  if (n >= 7) return 'space-y-[-4.5rem] sm:space-y-[-5.3rem] landscape:space-y-[-2.4rem]'
+  if (n >= 5) return 'space-y-[-4.3rem] sm:space-y-[-5.1rem] landscape:space-y-[-2.1rem]'
   return 'space-y-[-4.2rem] sm:space-y-[-5rem] landscape:space-y-[-1.8rem]'
 }
 
@@ -123,6 +130,10 @@ export default function GameBoard({
     }
     if (selectedCardIndices.length > 1) {
       flashHint('Selecione apenas 1 carta para descartar.')
+      return
+    }
+    if (game.wouldDiscardEmptyHandIllegally(selectedCardIndices[0])) {
+      flashHint('Você não pode descartar a última carta sem poder bater.')
       return
     }
     onDiscardSelected()
@@ -451,6 +462,7 @@ export default function GameBoard({
                                         card={slot.card}
                                         sizeClassName={TABLE_CARD_SIZE}
                                         compactOnLandscape
+                                        cornerLayout="row"
                                       />
                                     </div>
                                   )
@@ -555,7 +567,7 @@ export default function GameBoard({
               initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="pointer-events-auto rounded-lg bg-red-500/90 px-3 py-2 text-center text-xs text-red-50 shadow-lg landscape:px-2 landscape:py-1 landscape:text-[10px]"
+              className="pointer-events-none rounded-lg bg-red-500/90 px-3 py-2 text-center text-xs text-red-50 shadow-lg landscape:px-2 landscape:py-1 landscape:text-[10px]"
             >
               {hint}
             </motion.p>
