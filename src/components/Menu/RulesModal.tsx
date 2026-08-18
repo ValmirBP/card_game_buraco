@@ -1,9 +1,21 @@
 import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
+import { HAND_SIZE } from '../../engine/game'
+import { canastaPoints } from '../../engine/utils'
+import { MATCH_TARGET } from '../../store/gameStore'
 
 interface RulesModalProps {
   onClose: () => void
 }
+
+// Valores lidos DIRETO do motor (não hardcoded) — B1: o texto já divergiu do
+// motor de verdade uma vez (dizia "14 cartas"/"500/300 pontos" quando o
+// motor usa 11 cartas e 200/100/500/1000). Importar em vez de repetir os
+// números evita a próxima divergência.
+const CLEAN_POINTS = canastaPoints('limpa', 7)
+const DIRTY_POINTS = canastaPoints('suja', 7)
+const QUINHENTOS_POINTS = canastaPoints('quinhentos', 13)
+const REAL_POINTS = canastaPoints('real', 14)
 
 export default function RulesModal({ onClose }: RulesModalProps) {
   return createPortal(
@@ -30,30 +42,42 @@ export default function RulesModal({ onClose }: RulesModalProps) {
           <div>
             <h3 className="font-bold text-white">Objetivo</h3>
             <p>
-              Ser o primeiro jogador a se livrar de todas as cartas da mão, formando o máximo de
-              canastras (sequências) possível para somar pontos.
+              Ser a primeira dupla a bater (esvaziar a mão), formando o máximo de canastras
+              (sequências de 7+ cartas) possível. A partida vai até {MATCH_TARGET} pontos,
+              somando várias rodadas.
             </p>
           </div>
           <div>
             <h3 className="font-bold text-white">Preparação</h3>
             <p>
-              Cada jogador recebe 14 cartas. O restante do baralho forma o monte de compra, e a
-              primeira carta virada inicia o descarte.
+              Cada jogador recebe {HAND_SIZE} cartas. O restante do baralho forma o monte de
+              compra (com 2 mortos reservados à parte), e a primeira carta virada inicia o
+              descarte.
             </p>
           </div>
           <div>
             <h3 className="font-bold text-white">Seu Turno</h3>
             <p>
-              1. Compre uma carta do monte. 2. Forme canastras (3 ou mais cartas em sequência do
-              mesmo naipe, podendo usar curingas). 3. Descarte uma carta para encerrar o turno.
+              1. Compre uma carta do monte (ou pegue a pilha de descarte). 2. Baixe ou estenda
+              jogos (3 ou mais cartas em sequência do mesmo naipe, com no máximo 1 curinga; ou
+              uma trinca de 2+ Áses). 3. Descarte uma carta para encerrar o turno.
             </p>
           </div>
           <div>
-            <h3 className="font-bold text-white">Pontuação</h3>
+            <h3 className="font-bold text-white">Canastras (7+ cartas)</h3>
             <p>
-              Canasta limpa (sem curingas): 500 pontos. Canasta suja (com curingas): 300 pontos.
-              Fechar o jogo (bater) rende um bônus de +100 pontos. Cartas que sobrarem na mão ao
-              final contam pontos negativos.
+              Limpa (sem curinga): {CLEAN_POINTS} pontos. Suja (com 1 curinga): {DIRTY_POINTS}{' '}
+              pontos. Canastra de Quinhentos (13 cartas, 2 ao Ás, limpa): {QUINHENTOS_POINTS}{' '}
+              pontos. Canastra Real (14 cartas, Ás ao Ás, limpa): {REAL_POINTS} pontos.
+            </p>
+          </div>
+          <div>
+            <h3 className="font-bold text-white">Bater</h3>
+            <p>
+              Só é permitido esvaziar a mão quando a dupla já pegou o morto (ou não há mais
+              morto disponível) E tem pelo menos uma canastra limpa. Bater rende um bônus de
+              +100 pontos; não pegar o morto quando ainda era possível custa -100. Cartas que
+              sobrarem na mão ao final contam pontos negativos.
             </p>
           </div>
         </div>

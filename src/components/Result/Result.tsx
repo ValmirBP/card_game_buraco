@@ -57,7 +57,7 @@ export default function Result({ onBackToMenu, onNextRound, onNewMatch }: Result
       .join(' e ')
 
   return (
-    <div className="flex h-full min-h-0 flex-col items-center justify-center gap-8 overflow-y-auto px-4 py-6 text-center landscape:gap-2 landscape:overflow-hidden landscape:py-2">
+    <div className="flex h-full min-h-0 flex-col items-center justify-center gap-8 overflow-y-auto px-4 py-6 text-center landscape:justify-start landscape:gap-2 landscape:overflow-y-auto landscape:py-2">
       <motion.div
         initial={{ opacity: 0, scale: 0.7, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -153,7 +153,7 @@ export default function Result({ onBackToMenu, onNextRound, onNewMatch }: Result
                 <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
                   <div
                     className="h-full rounded-full bg-card-gold transition-[width]"
-                    style={{ width: `${Math.min(100, (matchScores[team.id] / MATCH_TARGET) * 100)}%` }}
+                    style={{ width: `${Math.max(0, Math.min(100, (matchScores[team.id] / MATCH_TARGET) * 100))}%` }}
                   />
                 </div>
                 <div className="mt-1 text-xs text-gray-400">
