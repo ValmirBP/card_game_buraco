@@ -39,6 +39,19 @@ html, body, #root {
 html, body {
   /* Evita pull-to-refresh e bounce lateral no meio da partida (mobile). */
   overscroll-behavior: none;
+  /* App de jogo: nada de seleção de texto (um toque mais longo numa carta ou
+     na mesa abria o menu "Copiar/Traduzir" do Android por cima do jogo) nem
+     do balão de "callout" do iOS. Inputs continuam editáveis (ver abaixo). */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Campos de texto (nome do jogador etc.) precisam continuar selecionáveis. */
+input, textarea {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 /* Thin, gold-tinted scrollbars for horizontally-scrolling card rows */
