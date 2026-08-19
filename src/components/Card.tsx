@@ -135,7 +135,7 @@ export function CardComponent({
         onClick ? 'cursor-pointer' : '',
         card.isWild
           ? 'border-purple-300/50 bg-gradient-to-br from-fuchsia-600 via-purple-600 to-indigo-800 text-white'
-          : 'border-black/10 bg-white',
+          : 'border-black/10 bg-card-face',
         selected ? 'z-20 shadow-[0_0_18px_rgba(212,175,55,0.95)] ring-4 ring-card-gold' : '',
       ].join(' ')}
     >

@@ -12,6 +12,9 @@
   --color-card-gold-light: #f1d580;
   --color-card-gold-dark: #a3801f;
 
+  /* Card face — marfim/creme (carta de baralho tradicional), não branco puro */
+  --color-card-face: #f6efd8;
+
   /* Suit colors — traditional 2-color deck: hearts/diamonds red, clubs/spades black */
   --color-suit-hearts: #d4143c;
   --color-suit-diamonds: #d4143c;
