@@ -473,6 +473,44 @@ describe('Game', () => {
       expect(game.extendMeld(0, [new Card('hearts', '8', false)])).toBe(false)
     })
 
+    // Exemplo exato do usuário (2026-08-19), agora pelo fluxo COMPLETO do
+    // jogo (playCanasta + extendMeld - o mesmo caminho usado pelo offline e
+    // pelo servidor online): baixa 3-4-5-6-7-[2 no lugar do 8]-9 (nasce
+    // suja, pois o 9 entrou com o 2 fora da posição natural) e depois
+    // estende com o 8 real. O 2 desliza pra posição natural, mas a canastra
+    // CONTINUA suja - sujeira é permanente, naipes iguais não a salvam.
+    test('sujeira permanente sobrevive ao extendMeld do fluxo completo (exemplo 3..7+2(=8)+9, depois 8 real)', () => {
+      const players = makeFourPlayers()
+      const meldCards = [
+        new Card('spades', '3', false),
+        new Card('spades', '4', false),
+        new Card('spades', '5', false),
+        new Card('spades', '6', false),
+        new Card('spades', '7', false),
+        new Card('spades', '2', false),
+        new Card('spades', '9', false),
+      ]
+      for (const c of meldCards) players[0].hand.addCard(c)
+      const eight = new Card('spades', '8', false)
+      players[0].hand.addCard(eight)
+      // keepers: baixar/estender deve deixar 2+ cartas na mão (regra A1)
+      players[0].hand.addCard(new Card('clubs', 'K', false))
+      players[0].hand.addCard(new Card('clubs', 'Q', false))
+      players[0].hand.addCard(new Card('clubs', 'J', false))
+      const game = new Game(players)
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+
+      expect(game.playCanasta(meldCards)).toBe(true)
+      expect(teamA.melds[0].isClean).toBe(false)
+      expect(teamA.melds[0].kind).toBe('suja')
+
+      expect(game.extendMeld(0, [eight])).toBe(true)
+      // Análise fresca de 2..9 diria "limpa" - mas a sujeira é permanente.
+      expect(teamA.melds[0].isClean).toBe(false)
+      expect(teamA.melds[0].kind).toBe('suja')
+      expect(teamA.melds[0].cards).toHaveLength(8)
+    })
+
     test('returns false and has no side effects when the extension is invalid', () => {
       const players = makeFourPlayers()
       const game = new Game(players)

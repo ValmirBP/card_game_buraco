@@ -255,5 +255,36 @@ describe('Canasta', () => {
       const cloned = dirtied.clone()
       expect(cloned.isClean).toBe(false)
     })
+
+    // Exemplo exato do usuário (2026-08-19): 3-4-5-6-7-[2 no lugar do 8]-9
+    // já NASCE suja (o 9 entrou enquanto o 2 estava fora da posição
+    // natural). Quando o 8 real chega e o 2 desliza pra posição natural
+    // (2-3-4-5-6-7-8-9, que numa análise fresca seria limpa), ela CONTINUA
+    // suja - a sujeira é permanente, não importa que os naipes sejam iguais.
+    test('exemplo do usuario: [3,4,5,6,7,2(=8),9] nasce suja; 8 real chega, 2 desce pro natural -> continua suja', () => {
+      const cards = [
+        real('3', 'spades'),
+        real('4', 'spades'),
+        real('5', 'spades'),
+        real('6', 'spades'),
+        real('7', 'spades'),
+        two('spades'),
+        real('9', 'spades'),
+      ]
+      const canasta = new Canasta(cards)
+      expect(canasta.isClean).toBe(false) // 2 ocupa o slot do 8, 9 real presente
+      expect(canasta.kind).toBe('suja') // 7 cartas: ja e canastra, suja
+      expect(canasta.layout.map(l => l.representsValue)).toEqual([3, 4, 5, 6, 7, 8, 9])
+
+      const extended = canasta.withExtraCards([real('8', 'spades')])
+      // Análise fresca de 2,3,4,5,6,7,8,9 diria "2 natural, limpa" - mas a
+      // sujeira já aconteceu e é permanente.
+      expect(extended.isClean).toBe(false)
+      expect(extended.kind).toBe('suja')
+      // O 2 de fato deslizou pra posição natural no layout (valor 2)...
+      expect(extended.layout.map(l => l.representsValue)).toEqual([2, 3, 4, 5, 6, 7, 8, 9])
+      // ...mas isso não a torna limpa.
+      expect(extended.wasDirty).toBe(true)
+    })
   })
 })
