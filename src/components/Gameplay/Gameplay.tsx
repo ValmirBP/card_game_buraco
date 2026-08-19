@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/gameStore'
 import GameBoard from './GameBoard'
 import PlayerHand from './PlayerHand'
+import DiscardRow from './DiscardRow'
 import Scoreboard from './Scoreboard'
 import DrawAnimation, { type DrawAnimState } from './DrawAnimation'
 import CardFlyAnimation, { type FlyAnimState } from './CardFlyAnimation'
@@ -333,10 +334,7 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
       <div className="min-h-0 flex-1 overflow-y-auto landscape:overflow-hidden">
         <GameBoard
           phase={phase}
-          canTakeDiscard={canTakeDiscard}
           onDraw={handleDraw}
-          onTakeDiscardPile={handleTakeDiscard}
-          onDiscardSelected={handleDiscard}
           onPlayCanastaSelected={handlePlayCanasta}
           onExtendMeld={handleExtendMeld}
         />
@@ -374,10 +372,23 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
         {lastLog ?? 'Nenhuma ação ainda.'}
       </div>
 
-      {/* Mão (fixa, embaixo) — sem painel de ações: a dica de contexto fica
-          numa linha fina dentro do próprio card da mão (ver PlayerHand). */}
-      <div className="shrink-0">
-        <PlayerHand phase={phase} />
+      {/* Rodapé (fixo, embaixo): UM painel só com a Mão e o Descarte lado a
+          lado ("em paralelo"), divididos por um filete — pedido do usuário.
+          A mão fica com a maior parte da largura; o descarte rola no eixo X
+          se crescer. */}
+      <div className="flex shrink-0 items-stretch gap-2 rounded-xl border border-white/10 bg-black/25 px-3 py-1.5 shadow-lg backdrop-blur-sm landscape:gap-1.5 landscape:px-2 landscape:py-0.5">
+        <div className="min-w-0 flex-[3]">
+          <PlayerHand phase={phase} />
+        </div>
+        <div className="w-px shrink-0 self-stretch bg-white/15" />
+        <div className="min-w-0 flex-[2]">
+          <DiscardRow
+            phase={phase}
+            canTakeDiscard={canTakeDiscard}
+            onTakeDiscardPile={handleTakeDiscard}
+            onDiscardSelected={handleDiscard}
+          />
+        </div>
       </div>
     </div>
   )

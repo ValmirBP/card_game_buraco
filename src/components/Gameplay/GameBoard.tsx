@@ -1,4 +1,4 @@
-import { useState, type MouseEvent } from 'react'
+import { useState, type CSSProperties, type MouseEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/gameStore'
 import { CardComponent, CardBack } from '../Card'
@@ -9,12 +9,7 @@ import type { TurnPhase } from './Gameplay'
 
 interface GameBoardProps {
   phase: TurnPhase
-  /** Whether "pegar o descarte" is currently a legal move (pile non-empty
-   * and it's the human's turn to draw) — drives the discard-pile glow. */
-  canTakeDiscard: boolean
   onDraw: () => void
-  onTakeDiscardPile: () => void
-  onDiscardSelected: () => void
   onPlayCanastaSelected: () => void
   onExtendMeld: (meldIndex: number, cardIndices: number[], targetRect: DOMRect) => void
 }
@@ -53,35 +48,27 @@ const HAND_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-12 landscape:h-[4.
 /** Naipes/rank do canto grandes e legíveis (usado na mão e no descarte). */
 const BIG_CORNER = 'text-sm font-normal sm:text-base landscape:text-lg landscape:leading-none'
 
-/** Sobreposição vertical das cartas de um jogo (coluna). Quanto MAIS cartas,
- * mais elas se JUNTAM (margem negativa maior) pra a coluna não crescer sem
- * limite e caber no painel. Classes literais pra o Tailwind gerá-las.
+/** Sobreposição vertical das cartas de um jogo (coluna) — SÓ NO RETRATO.
+ * Quanto MAIS cartas, mais elas se JUNTAM (margem negativa maior) pra a
+ * coluna não crescer sem limite. Classes literais pra o Tailwind gerá-las.
  *
- * Em paisagem (onde o painel só tem ~130-160px de altura), o valor máximo
- * (14 cartas, canastra "real") ainda pode passar um pouco da altura do
- * painel dependendo do viewport — por isso o container das canastras
- * (abaixo) mantém overflow-y-auto como rede de segurança: uma canastra rara
- * e muito longa fica ROLÁVEL, nunca cortada/inacessível. */
+ * Em PAISAGEM essas margens são ignoradas: as cartas ficam em posição
+ * absoluta distribuídas por porcentagem da altura do painel (ver o bloco
+ * das canastras no JSX — `--stack-frac`), o que garante que TODAS cabem sem
+ * rolagem qualquer que seja a quantidade; cada carta leva landscape:mt-0
+ * pra anular estas margens (space-y usa :where(), especificidade zero). */
 function meldStackSpacing(n: number): string {
-  if (n >= 12) return 'space-y-[-4.9rem] sm:space-y-[-5.7rem] landscape:space-y-[-4.55rem]'
-  if (n >= 9) return 'space-y-[-4.7rem] sm:space-y-[-5.5rem] landscape:space-y-[-4.25rem]'
-  if (n >= 7) return 'space-y-[-4.5rem] sm:space-y-[-5.3rem] landscape:space-y-[-3.75rem]'
-  if (n >= 5) return 'space-y-[-4.3rem] sm:space-y-[-5.1rem] landscape:space-y-[-3.3rem]'
-  return 'space-y-[-4.2rem] sm:space-y-[-5rem] landscape:space-y-[-2.8rem]'
+  if (n >= 12) return 'space-y-[-4.9rem] sm:space-y-[-5.7rem]'
+  if (n >= 9) return 'space-y-[-4.7rem] sm:space-y-[-5.5rem]'
+  if (n >= 7) return 'space-y-[-4.5rem] sm:space-y-[-5.3rem]'
+  if (n >= 5) return 'space-y-[-4.3rem] sm:space-y-[-5.1rem]'
+  return 'space-y-[-4.2rem] sm:space-y-[-5rem]'
 }
 
 /** The 4-seat table: opponents/partner around a center that shows the draw
  * pile, discard pile (with a small fan of the last few cards), the two
  * mortos (crossed face-down cards until taken), and the two teams' melds. */
-export default function GameBoard({
-  phase,
-  canTakeDiscard,
-  onDraw,
-  onTakeDiscardPile,
-  onDiscardSelected,
-  onPlayCanastaSelected,
-  onExtendMeld,
-}: GameBoardProps) {
+export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExtendMeld }: GameBoardProps) {
   // Subscribed so the board re-renders whenever any part of `game` mutates
   // (see the REACTIVITY CONTRACT comment on GameStore.game).
   useGameStore(s => s.version)
@@ -103,8 +90,6 @@ export default function GameBoard({
   // ---- Manipulação direta: monte / descarte / mesa (sem botões) ----------
 
   const canClickDeck = isHumanTurn && phase === 'draw'
-  const canClickDiscardToDraw = isHumanTurn && phase === 'draw' && canTakeDiscard
-  const canClickDiscardToDiscard = isHumanTurn && phase === 'play' && selectedCardIndices.length === 1
   const canClickDropZone = isHumanTurn && phase === 'play' && selectedCardIndices.length >= 3
 
   const handleDeckClick = () => {
@@ -114,32 +99,6 @@ export default function GameBoard({
       return
     }
     onDraw()
-  }
-
-  const handleDiscardPileClick = () => {
-    if (!isHumanTurn) return
-    if (phase === 'draw') {
-      if (!canTakeDiscard) {
-        flashHint('O descarte está vazio.')
-        return
-      }
-      onTakeDiscardPile()
-      return
-    }
-    // phase === 'play'
-    if (selectedCardIndices.length === 0) {
-      flashHint('Selecione 1 carta para descartar.')
-      return
-    }
-    if (selectedCardIndices.length > 1) {
-      flashHint('Selecione apenas 1 carta para descartar.')
-      return
-    }
-    if (game.wouldDiscardEmptyHandIllegally(selectedCardIndices[0])) {
-      flashHint('Você não pode descartar a última carta sem poder bater.')
-      return
-    }
-    onDiscardSelected()
   }
 
   const handleDropZoneClick = () => {
@@ -274,55 +233,8 @@ export default function GameBoard({
     </div>
   )
 
-  // Descarte como uma SEGUNDA FILEIRA acima da mão: as cartas do lixo em
-  // leque horizontal, mostradas "pela metade" (só o topo, rank+naipe grandes
-  // e legíveis) — espelhando a mão. A última carta (topo do lixo) fica
-  // destacada e é a âncora #discard-top das animações. Buraco é aberto:
-  // todo o lixo aparece (rola no eixo X se crescer muito).
-  const discardPileBlock = (
-    <div className="flex w-full flex-col items-center gap-0.5">
-      <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-300 sm:text-xs landscape:text-[8px] landscape:leading-none">
-        Descarte
-      </span>
-      <div
-        id="discard-pile"
-        onClick={handleDiscardPileClick}
-        className={`scrollbar-gold flex w-full max-w-full items-start justify-center overflow-x-auto overflow-y-hidden rounded-lg px-2 py-0.5 -space-x-5 sm:-space-x-6 landscape:-space-x-2 ${
-          canClickDiscardToDraw || canClickDiscardToDiscard
-            ? 'cursor-pointer ring-2 ring-card-gold shadow-[0_0_16px_rgba(212,175,55,0.5)]'
-            : ''
-        } max-h-[3.5rem] landscape:max-h-[2.7rem]`}
-      >
-        {discardPile.length === 0 ? (
-          <div
-            id="discard-top"
-            className="flex h-6 w-16 items-center justify-center rounded-lg border border-dashed border-white/20 text-[10px] text-gray-400 sm:w-20 landscape:w-12 landscape:text-[8px]"
-          >
-            Vazio
-          </div>
-        ) : (
-          discardPile.map((card, i) => {
-            const isTop = i === discardPile.length - 1
-            return (
-              <div
-                key={i}
-                id={isTop ? 'discard-top' : undefined}
-                style={{ zIndex: i }}
-                className={`flex-shrink-0 rounded-lg ${isTop ? 'ring-2 ring-card-gold/80' : 'opacity-90'}`}
-              >
-                <CardComponent
-                  card={card}
-                  sizeClassName={HAND_CARD_SIZE}
-                  compactOnLandscape
-                  cornerClassName={BIG_CORNER}
-                />
-              </div>
-            )
-          })
-        )}
-      </div>
-    </div>
-  )
+  // O DESCARTE não mora mais aqui: virou o componente DiscardRow, embutido
+  // no painel da mão (lado a lado) — ver Gameplay.tsx.
 
   return (
     <div className="relative h-full min-h-0 rounded-2xl border border-white/10 bg-black/25 p-2 shadow-lg backdrop-blur-sm sm:p-4 landscape:rounded-xl landscape:border-0 landscape:p-1 landscape:overflow-hidden">
@@ -331,7 +243,7 @@ export default function GameBoard({
           o MONTE no canto sup-esquerdo, o DESCARTE embaixo (logo acima da
           mão) e os painéis "Nós"/"Eles" ocupando as duas colunas centrais —
           a MAIOR parte da mesa. Nada rola na vertical. */}
-      <div className="flex flex-col gap-3 sm:gap-4 landscape:grid landscape:h-full landscape:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_auto] landscape:grid-rows-[auto_minmax(0,1fr)_auto] landscape:items-stretch landscape:gap-x-1 landscape:gap-y-0.5">
+      <div className="flex flex-col gap-3 sm:gap-4 landscape:grid landscape:h-full landscape:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_auto] landscape:grid-rows-[auto_minmax(0,1fr)] landscape:items-stretch landscape:gap-x-1 landscape:gap-y-0.5">
         {/* Monte — canto superior-esquerdo (row1/col1), visível e clicável.
             (O morto fica escondido num canto discreto, ver overlay abaixo.)
             landscape:ml-[env(...)]: protege só o monte se o recorte cair do
@@ -409,7 +321,7 @@ export default function GameBoard({
                   {isDropTarget ? 'Clique aqui para baixar as cartas selecionadas' : 'Nenhum jogo baixado ainda'}
                 </span>
               ) : (
-                <div className="scrollbar-gold flex flex-wrap items-start gap-3 landscape:min-h-0 landscape:flex-1 landscape:flex-nowrap landscape:items-start landscape:gap-2 landscape:overflow-x-auto landscape:overflow-y-auto landscape:pb-1">
+                <div className="scrollbar-gold flex flex-wrap items-start gap-3 landscape:min-h-0 landscape:flex-1 landscape:flex-nowrap landscape:items-stretch landscape:gap-2 landscape:overflow-x-auto landscape:overflow-y-hidden landscape:pb-1">
                   <AnimatePresence>
                     {team.melds.map((canasta, ci) => {
                       const compatible =
@@ -424,7 +336,7 @@ export default function GameBoard({
                           initial={{ opacity: 0, scale: 0.85 }}
                           animate={{ opacity: 1, scale: 1 }}
                           onClick={event => handleMeldClick(event, team.id, ci, canasta.cards)}
-                          className={`space-y-1 rounded-lg p-1 transition-shadow landscape:flex-shrink-0 ${
+                          className={`space-y-1 rounded-lg p-1 transition-shadow landscape:flex landscape:h-full landscape:min-h-0 landscape:flex-shrink-0 landscape:flex-col landscape:space-y-0.5 ${
                             canClickToExtend
                               ? compatible
                                 ? 'cursor-pointer ring-2 ring-card-gold shadow-[0_0_14px_rgba(212,175,55,0.5)]'
@@ -433,12 +345,17 @@ export default function GameBoard({
                           }`}
                         >
                           {/* Coluna vertical: cartas sobrepostas de cima pra
-                              baixo, rank+naipe de todas visível no topo. Quanto
-                              mais cartas, mais elas se JUNTAM (ver
-                              meldStackSpacing). Quando a canastra FECHA (7+,
-                              limpa ou suja), a carta de MAIOR valor (última do
-                              layout) fica DEITADA (na horizontal) embaixo,
-                              sinalizando canastra fechada, e a coluna ganha
+                              baixo, rank+naipe de todas visível no topo.
+                              Retrato: fluxo normal com margens negativas
+                              (meldStackSpacing). PAISAGEM: cartas em posição
+                              ABSOLUTA distribuídas por PORCENTAGEM da altura
+                              disponível — top = (100% - altura da carta) *
+                              i/(n-1) — o que garante matematicamente que
+                              TODAS as cartas cabem SEM rolagem, qualquer que
+                              seja a quantidade (pedido do usuário): quanto
+                              mais cartas, mais sobrepostas ficam,
+                              automaticamente. Quando a canastra FECHA (7+),
+                              a última carta fica DEITADA e a coluna ganha
                               anel dourado. */}
                           {(() => {
                             const slots = canasta.layout ?? canasta.cards.map(card => ({ card }))
@@ -447,7 +364,7 @@ export default function GameBoard({
                             const lastIdx = slots.length - 1
                             return (
                               <div
-                                className={`flex flex-col items-start rounded-lg ${meldStackSpacing(slots.length)} ${
+                                className={`flex flex-col items-start rounded-lg ${meldStackSpacing(slots.length)} landscape:relative landscape:block landscape:min-h-0 landscape:w-14 landscape:flex-1 ${
                                   isClosed ? 'ring-2 ring-card-gold/70' : ''
                                 }`}
                               >
@@ -460,8 +377,20 @@ export default function GameBoard({
                                   return (
                                     <div
                                       key={cii}
-                                      style={{ zIndex: cii }}
-                                      className={deitada ? 'origin-center rotate-90' : ''}
+                                      style={
+                                        {
+                                          zIndex: cii,
+                                          // Fração da altura disponível onde esta
+                                          // carta ancora (0 = topo, 1 = fundo).
+                                          '--stack-frac': lastIdx > 0 ? cii / lastIdx : 0,
+                                          '--stack-i': cii,
+                                        } as CSSProperties
+                                      }
+                                      // min(): pilha COMPACTA (1.4rem de "espiada"
+                                      // por carta) enquanto couber; quando a coluna
+                                      // enche, a distribuição percentual vence e as
+                                      // cartas se comprimem — sempre SEM rolagem.
+                                      className={`${deitada ? 'origin-center rotate-90 ' : ''}landscape:absolute landscape:left-0 landscape:mt-0 landscape:top-[min(calc((100%-5.25rem)*var(--stack-frac)),calc(var(--stack-i)*1.4rem))]`}
                                     >
                                       <CardComponent
                                         card={slot.card}
@@ -477,7 +406,7 @@ export default function GameBoard({
                             )
                           })()}
                           <div
-                            className={`text-center text-xs font-semibold landscape:text-[9px] landscape:leading-tight ${
+                            className={`text-center text-xs font-semibold landscape:shrink-0 landscape:text-[9px] landscape:leading-tight ${
                               canasta.kind === 'real'
                                 ? 'text-card-gold'
                                 : canasta.kind === 'quinhentos'
@@ -512,12 +441,6 @@ export default function GameBoard({
             </div>
           )
         })}
-
-        {/* Descarte — SEGUNDA FILEIRA logo acima da mão, largura toda
-            (row3/col1-4), cartas em meia-carta */}
-        <div className="order-6 flex w-full justify-center landscape:col-start-1 landscape:col-span-4 landscape:row-start-3 landscape:justify-self-stretch landscape:self-end">
-          {discardPileBlock}
-        </div>
 
         {/* Você — só em retrato (a própria mão faz esse papel em paisagem) */}
         <div className="order-7 flex justify-center landscape:hidden">

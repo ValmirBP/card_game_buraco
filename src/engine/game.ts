@@ -95,6 +95,11 @@ export class Game {
     }
     const cards = [...this.state.discardPile]
     this.state.discardPile = []
+    // Regra do lixo de carta única: se o lixo tinha SÓ esta carta, ela não
+    // pode ser devolvida ao descarte neste mesmo turno (senão pegar o lixo
+    // vira uma espiada grátis sem custo). Com 2+ cartas não há bloqueio -
+    // o jogador ficou com o resto da pilha, pagou o preço.
+    this.state.blockedDiscardCard = cards.length === 1 ? cards[0] : null
     return cards
   }
 
@@ -119,11 +124,42 @@ export class Game {
     const team = this.getTeamOfCurrentPlayer()
     if (this.wouldLeaveTeamStuck(player, 1, 1, team, team.melds)) return false
 
+    // Regra do lixo de carta única (ver takeDiscardPile): a carta exata
+    // pega de um lixo unitário não pode voltar pro descarte neste turno.
+    if (this.isDiscardBlockedCard(cardIndex)) return false
+
     const card = player.hand.removeCard(cardIndex)
     if (!card) return false
+    this.markMortoUsedIfApplicable(team)
     this.state.discardPile.push(card)
     this.maybeAutoPickUpMorto()
     return true
+  }
+
+  /**
+   * UI helper + guarda interna do discard(): a carta neste índice da mão é
+   * a carta bloqueada do turno (pega de um lixo que tinha só ela)?
+   * Comparação por REFERÊNCIA - a cópia-gêmea do baralho duplo que já
+   * estava na mão continua liberada.
+   */
+  isDiscardBlockedCard(cardIndex: number): boolean {
+    const blocked = this.state.blockedDiscardCard
+    if (!blocked) return false
+    return this.getCurrentPlayer().hand.getCards()[cardIndex] === blocked
+  }
+
+  /**
+   * Regra do "morto não usado": marca o morto do time como usado quando o
+   * jogador que o pegou completa QUALQUER jogada (baixar/estender/descartar)
+   * com a mão nova. Chamado ANTES de maybeAutoPickUpMorto em cada ação, de
+   * propósito: a jogada que ESVAZIOU a mão e disparou a pega automática usou
+   * a mão antiga, não o morto - nesse momento hasTakenMorto ainda é false e
+   * nada é marcado.
+   */
+  private markMortoUsedIfApplicable(team: Team): void {
+    if (team.hasTakenMorto && team.mortoTakenBySeat === this.state.currentPlayerIndex) {
+      team.mortoUsed = true
+    }
   }
 
   /**
@@ -155,6 +191,7 @@ export class Game {
       player.hand.removeCard(idx)
     }
 
+    this.markMortoUsedIfApplicable(team)
     team.melds.push(canasta)
     team.score += canasta.getScore()
 
@@ -187,6 +224,7 @@ export class Game {
       player.hand.removeCard(idx)
     }
 
+    this.markMortoUsedIfApplicable(team)
     const oldScore = meld.getScore()
     team.melds[meldIndex] = extended
     team.score += extended.getScore() - oldScore
@@ -250,6 +288,10 @@ export class Game {
       player.hand.addCard(card)
     }
     team.hasTakenMorto = true
+    // Regra do "morto não usado" (ver finish/markMortoUsedIfApplicable):
+    // registra QUEM pegou e que ele ainda não jogou com a mão nova.
+    team.mortoTakenBySeat = this.state.currentPlayerIndex
+    team.mortoUsed = false
     return true
   }
 
@@ -387,6 +429,9 @@ export class Game {
   }
 
   endTurn(): void {
+    // O bloqueio da carta pega de um lixo unitário vale só pelo turno em
+    // que ela foi pega (ver takeDiscardPile/discard).
+    this.state.blockedDiscardCard = null
     this.state.currentPlayerIndex = (this.state.currentPlayerIndex + 1) % this.state.players.length
   }
 
@@ -467,15 +512,27 @@ export class Game {
     const breakdowns: TeamScoreBreakdown[] = this.state.teams.map(team => {
       const meldPoints = team.melds.reduce((sum, m) => sum + m.getScore(), 0)
       const batidaBonus = closerTeamId === team.id ? 100 : 0
-      const mortoPenalty = !team.hasTakenMorto && this.state.mortos.length > 0 ? -100 : 0
-      const handPenalty =
-        0 -
-        team.seats.reduce((sum, seat) => {
-          const cards = this.state.players[seat].hand.getCards()
-          return sum + cards.reduce((s, card) => s + scoreCardValue(card), 0)
-        }, 0)
+
+      // Duas formas de levar os -100 do morto:
+      //  a) nunca pegou um morto que ainda estava disponível na mesa, ou
+      //  b) pegou o morto mas o jogador que o pegou NUNCA jogou com a mão
+      //     nova (regra do usuário: "perde os 100 pontos do morto, e não os
+      //     pontos que estão na mão") - nesse caso as cartas na mão DESSE
+      //     jogador ficam fora da penalidade de mão (counted=false abaixo).
+      const mortoNeverTaken = !team.hasTakenMorto && this.state.mortos.length > 0
+      const mortoTakenButUnused = team.hasTakenMorto && team.mortoUsed === false
+      const mortoPenalty = mortoNeverTaken || mortoTakenButUnused ? -100 : 0
+
+      const handBySeat = team.seats.map(seat => {
+        const player = this.state.players[seat]
+        const points = player.hand.getCards().reduce((s, card) => s + scoreCardValue(card), 0)
+        const counted = !(mortoTakenButUnused && seat === team.mortoTakenBySeat)
+        return { seat, playerName: player.name, points, counted }
+      })
+      const handPenalty = 0 - handBySeat.reduce((sum, h) => sum + (h.counted ? h.points : 0), 0)
+
       const total = meldPoints + batidaBonus + mortoPenalty + handPenalty
-      return { teamId: team.id, meldPoints, batidaBonus, mortoPenalty, handPenalty, total }
+      return { teamId: team.id, meldPoints, batidaBonus, mortoPenalty, handPenalty, handBySeat, total }
     })
 
     breakdowns.forEach(b => {

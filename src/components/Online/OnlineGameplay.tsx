@@ -1,6 +1,7 @@
 import { useOnlineStore } from '../../online/onlineStore'
 import OnlineGameBoard from './OnlineGameBoard'
 import OnlinePlayerHand from './OnlinePlayerHand'
+import OnlineDiscardRow from './OnlineDiscardRow'
 import OnlineResult from './OnlineResult'
 import type { TeamId } from '../../engine/gameState'
 
@@ -89,9 +90,16 @@ export default function OnlineGameplay({ onBackToMenu }: OnlineGameplayProps) {
         <span className="text-card-gold">Registro:</span> {lastLog ?? 'Nenhuma ação ainda.'}
       </div>
 
-      {/* Mão (fixa, embaixo) — sem painel de botões */}
-      <div className="shrink-0">
-        <OnlinePlayerHand view={view} />
+      {/* Rodapé: UM painel só com a Mão e o Descarte lado a lado ("em
+          paralelo") — igual ao Gameplay offline. */}
+      <div className="flex shrink-0 items-stretch gap-2 rounded-xl border border-white/10 bg-black/25 px-3 py-1.5 shadow-lg backdrop-blur-sm landscape:gap-1.5 landscape:px-2 landscape:py-0.5">
+        <div className="min-w-0 flex-[3]">
+          <OnlinePlayerHand view={view} />
+        </div>
+        <div className="w-px shrink-0 self-stretch bg-white/15" />
+        <div className="min-w-0 flex-[2]">
+          <OnlineDiscardRow view={view} />
+        </div>
       </div>
     </div>
   )

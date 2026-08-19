@@ -185,12 +185,16 @@ function discardLowestValueCard(game: Game, player: Player): boolean {
   let lowestValue = Infinity
   for (let i = 0; i < cards.length; i++) {
     if (hasNonWild && isWildCard(cards[i])) continue
+    // Regra do lixo unitário (ver Game.takeDiscardPile): pula a carta que o
+    // motor recusaria devolver ao descarte neste turno.
+    if (game.isDiscardBlockedCard(i)) continue
     const value = scoreCardValue(cards[i])
     if (value < lowestValue) {
       lowestValue = value
       lowestIndex = i
     }
   }
+  if (lowestIndex === -1) return false
   return game.discard(lowestIndex)
 }
 

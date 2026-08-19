@@ -1,4 +1,4 @@
-import { useState, type MouseEvent } from 'react'
+import { useState, type CSSProperties, type MouseEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useOnlineStore } from '../../online/onlineStore'
 import { CardComponent, CardBack } from '../Card'
@@ -11,23 +11,21 @@ import Seat from '../Gameplay/Seat'
 /** Footprint das cartas dos JOGOS baixados (colunas verticais) — idêntico ao
  * TABLE_CARD_SIZE do GameBoard.tsx offline (não exportado de lá pra não
  * acoplar os dois módulos; só os valores literais precisam bater). */
-const TABLE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-9 landscape:h-[3.35rem]'
+const TABLE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-14 landscape:h-[5.25rem]'
 /** Footprint do MONTE — idêntico ao PILE_CARD_SIZE offline. */
 const PILE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-8 landscape:h-[2.9rem]'
-/** Footprint das cartas do DESCARTE — idêntico ao HAND_CARD_SIZE offline
- * (mesmo tamanho da mão, pra ficar paralela a ela). */
-const HAND_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-12 landscape:h-[4.25rem]'
 /** Naipes/rank do canto grandes e legíveis — idêntico ao BIG_CORNER offline. */
 const BIG_CORNER = 'text-sm font-normal sm:text-base landscape:text-lg landscape:leading-none'
 
-/** Sobreposição vertical das cartas de um jogo — idêntico ao
- * meldStackSpacing offline (ver GameBoard.tsx para a explicação completa). */
+/** Sobreposição vertical das cartas de um jogo, SÓ NO RETRATO — idêntico ao
+ * meldStackSpacing offline (em paisagem as cartas ficam absolutas
+ * distribuídas por porcentagem; ver GameBoard.tsx pra explicação completa). */
 function meldStackSpacing(n: number): string {
-  if (n >= 12) return 'space-y-[-4.9rem] sm:space-y-[-5.7rem] landscape:space-y-[-2.9rem]'
-  if (n >= 9) return 'space-y-[-4.7rem] sm:space-y-[-5.5rem] landscape:space-y-[-2.7rem]'
-  if (n >= 7) return 'space-y-[-4.5rem] sm:space-y-[-5.3rem] landscape:space-y-[-2.4rem]'
-  if (n >= 5) return 'space-y-[-4.3rem] sm:space-y-[-5.1rem] landscape:space-y-[-2.1rem]'
-  return 'space-y-[-4.2rem] sm:space-y-[-5rem] landscape:space-y-[-1.8rem]'
+  if (n >= 12) return 'space-y-[-4.9rem] sm:space-y-[-5.7rem]'
+  if (n >= 9) return 'space-y-[-4.7rem] sm:space-y-[-5.5rem]'
+  if (n >= 7) return 'space-y-[-4.5rem] sm:space-y-[-5.3rem]'
+  if (n >= 5) return 'space-y-[-4.3rem] sm:space-y-[-5.1rem]'
+  return 'space-y-[-4.2rem] sm:space-y-[-5rem]'
 }
 
 interface OnlineGameBoardProps {
@@ -91,8 +89,6 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
   // ---- Manipulação direta: monte / descarte / mesa (sem botões) ----------
 
   const canClickDeck = isMyTurn && phase === 'draw'
-  const canClickDiscardToDraw = isMyTurn && phase === 'draw' && discardPile.length > 0
-  const canClickDiscardToDiscard = isMyTurn && phase === 'play' && selectedCardIndices.length === 1
   const canClickDropZone = isMyTurn && phase === 'play' && selectedCardIndices.length >= 3
 
   const handleDeckClick = () => {
@@ -102,28 +98,6 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
       return
     }
     sendIntent({ type: 'draw' })
-  }
-
-  const handleDiscardPileClick = () => {
-    if (!isMyTurn) return
-    if (phase === 'draw') {
-      if (discardPile.length === 0) {
-        flashHint('O descarte está vazio.')
-        return
-      }
-      sendIntent({ type: 'takeDiscard' })
-      return
-    }
-    // phase === 'play'
-    if (selectedCardIndices.length === 0) {
-      flashHint('Selecione 1 carta para descartar.')
-      return
-    }
-    if (selectedCardIndices.length > 1) {
-      flashHint('Selecione apenas 1 carta para descartar.')
-      return
-    }
-    sendIntent({ type: 'discard', cardIndex: selectedCardIndices[0] })
   }
 
   const handleDropZoneClick = () => {
@@ -229,49 +203,12 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
     </div>
   )
 
-  const discardPileBlock = (
-    <div className="flex w-full flex-col items-center gap-0.5">
-      <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-300 sm:text-xs landscape:text-[8px] landscape:leading-none">
-        Descarte
-      </span>
-      <div
-        id="discard-pile"
-        onClick={handleDiscardPileClick}
-        className={`scrollbar-gold flex w-full max-w-full items-start justify-center overflow-x-auto overflow-y-hidden rounded-lg px-2 py-0.5 -space-x-5 sm:-space-x-6 landscape:-space-x-2 ${
-          canClickDiscardToDraw || canClickDiscardToDiscard
-            ? 'cursor-pointer ring-2 ring-card-gold shadow-[0_0_16px_rgba(212,175,55,0.5)]'
-            : ''
-        } max-h-[3.5rem] landscape:max-h-[2.7rem]`}
-      >
-        {discardPile.length === 0 ? (
-          <div
-            id="discard-top"
-            className="flex h-6 w-16 items-center justify-center rounded-lg border border-dashed border-white/20 text-[10px] text-gray-400 sm:w-20 landscape:w-12 landscape:text-[8px]"
-          >
-            Vazio
-          </div>
-        ) : (
-          discardPile.map((card, i) => {
-            const isTop = i === discardPile.length - 1
-            return (
-              <div
-                key={i}
-                id={isTop ? 'discard-top' : undefined}
-                style={{ zIndex: i }}
-                className={`flex-shrink-0 rounded-lg ${isTop ? 'ring-2 ring-card-gold/80' : 'opacity-90'}`}
-              >
-                <CardComponent card={asCard(card)} sizeClassName={HAND_CARD_SIZE} compactOnLandscape cornerClassName={BIG_CORNER} />
-              </div>
-            )
-          })
-        )}
-      </div>
-    </div>
-  )
+  // O DESCARTE não mora mais aqui: virou o componente OnlineDiscardRow,
+  // embutido no painel da mão (lado a lado) — ver OnlineGameplay.tsx.
 
   return (
     <div className="relative h-full min-h-0 rounded-2xl border border-white/10 bg-black/25 p-2 shadow-lg backdrop-blur-sm sm:p-4 landscape:rounded-xl landscape:border-0 landscape:p-1 landscape:overflow-hidden">
-      <div className="flex flex-col gap-3 sm:gap-4 landscape:grid landscape:h-full landscape:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_auto] landscape:grid-rows-[auto_minmax(0,1fr)_auto] landscape:items-stretch landscape:gap-x-1 landscape:gap-y-0.5">
+      <div className="flex flex-col gap-3 sm:gap-4 landscape:grid landscape:h-full landscape:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_auto] landscape:grid-rows-[auto_minmax(0,1fr)] landscape:items-stretch landscape:gap-x-1 landscape:gap-y-0.5">
         {/* Monte — canto superior-esquerdo */}
         <div className="order-1 flex items-center justify-center landscape:col-start-1 landscape:row-start-1 landscape:justify-self-start">
           {deckPile}
@@ -353,7 +290,7 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
                   {isDropTarget ? 'Clique aqui para baixar as cartas selecionadas' : 'Nenhum jogo baixado ainda'}
                 </span>
               ) : (
-                <div className="scrollbar-gold flex flex-wrap items-start gap-3 landscape:min-h-0 landscape:flex-1 landscape:flex-nowrap landscape:items-start landscape:gap-2 landscape:overflow-x-auto landscape:overflow-y-auto landscape:pb-1">
+                <div className="scrollbar-gold flex flex-wrap items-start gap-3 landscape:min-h-0 landscape:flex-1 landscape:flex-nowrap landscape:items-stretch landscape:gap-2 landscape:overflow-x-auto landscape:overflow-y-hidden landscape:pb-1">
                   <AnimatePresence>
                     {team.melds.map((canasta, ci) => {
                       const meldCards = canasta.layout.map(entry => entry.card)
@@ -371,7 +308,7 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
                           initial={{ opacity: 0, scale: 0.85 }}
                           animate={{ opacity: 1, scale: 1 }}
                           onClick={event => handleMeldClick(event, team.id, ci, meldCards)}
-                          className={`space-y-1 rounded-lg p-1 transition-shadow landscape:flex-shrink-0 ${
+                          className={`space-y-1 rounded-lg p-1 transition-shadow landscape:flex landscape:h-full landscape:min-h-0 landscape:flex-shrink-0 landscape:flex-col landscape:space-y-0.5 ${
                             canClickToExtend
                               ? compatible
                                 ? 'cursor-pointer ring-2 ring-card-gold shadow-[0_0_14px_rgba(212,175,55,0.5)]'
@@ -379,27 +316,42 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
                               : ''
                           }`}
                         >
+                          {/* Paisagem: cartas em posição ABSOLUTA distribuídas
+                              por porcentagem da altura — TODAS cabem sem
+                              rolagem, qualquer quantidade (ver GameBoard
+                              offline pra explicação completa). */}
                           <div
-                            className={`flex flex-col items-start rounded-lg ${meldStackSpacing(canasta.layout.length)} ${
+                            className={`flex flex-col items-start rounded-lg ${meldStackSpacing(canasta.layout.length)} landscape:relative landscape:block landscape:min-h-0 landscape:w-14 landscape:flex-1 ${
                               isClosed ? 'ring-2 ring-card-gold/70' : ''
                             }`}
                           >
                             {canasta.layout.map((slot, cii) => {
                               const deitada = isClosed && cii === lastIdx
                               return (
-                                <div key={cii} style={{ zIndex: cii }} className={deitada ? 'origin-center rotate-90' : ''}>
+                                <div
+                                  key={cii}
+                                  style={
+                                    {
+                                      zIndex: cii,
+                                      '--stack-frac': lastIdx > 0 ? cii / lastIdx : 0,
+                                      '--stack-i': cii,
+                                    } as CSSProperties
+                                  }
+                                  className={`${deitada ? 'origin-center rotate-90 ' : ''}landscape:absolute landscape:left-0 landscape:mt-0 landscape:top-[min(calc((100%-5.25rem)*var(--stack-frac)),calc(var(--stack-i)*1.4rem))]`}
+                                >
                                   <CardComponent
                                     card={asCard(slot.card)}
                                     sizeClassName={TABLE_CARD_SIZE}
                                     compactOnLandscape
                                     cornerLayout="row"
+                                    cornerClassName={BIG_CORNER}
                                   />
                                 </div>
                               )
                             })}
                           </div>
                           <div
-                            className={`text-center text-xs font-semibold landscape:text-[9px] landscape:leading-tight ${
+                            className={`text-center text-xs font-semibold landscape:shrink-0 landscape:text-[9px] landscape:leading-tight ${
                               canasta.kind === 'real'
                                 ? 'text-card-gold'
                                 : canasta.kind === 'quinhentos'
@@ -434,11 +386,6 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
             </div>
           )
         })}
-
-        {/* Descarte — segunda fileira acima da mão */}
-        <div className="order-6 flex w-full justify-center landscape:col-start-1 landscape:col-span-4 landscape:row-start-3 landscape:justify-self-stretch landscape:self-end">
-          {discardPileBlock}
-        </div>
 
         {/* Você — só em retrato */}
         <div className="order-7 flex justify-center landscape:hidden">

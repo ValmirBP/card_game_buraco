@@ -235,6 +235,11 @@ export class GameSession {
     if (this.game.wouldDiscardEmptyHandIllegally(cardIndex)) {
       return fail('voce nao pode descartar a ultima carta sem poder bater')
     }
+    // Regra do lixo unitário (também recusada por game.discard) - erro
+    // específico pro cliente mostrar.
+    if (this.game.isDiscardBlockedCard(cardIndex)) {
+      return fail('voce pegou essa carta do descarte agora - nao pode devolve-la neste turno')
+    }
 
     const hadMorto = this.game.getTeamOfCurrentPlayer().hasTakenMorto
 
@@ -388,15 +393,20 @@ export class GameSession {
     const cards = player.hand.getCards()
     if (cards.length === 0) return false
 
-    let lowestIndex = 0
-    let lowestValue = scoreCardValue(cards[0])
-    for (let i = 1; i < cards.length; i++) {
+    let lowestIndex = -1
+    let lowestValue = Infinity
+    for (let i = 0; i < cards.length; i++) {
+      // Regra do lixo unitário: a carta pega de um descarte que só tinha ela
+      // não pode voltar neste turno - o fallback pula essa carta pra nunca
+      // propor um descarte que o motor vai recusar.
+      if (this.game.isDiscardBlockedCard(i)) continue
       const value = scoreCardValue(cards[i])
       if (value < lowestValue) {
         lowestValue = value
         lowestIndex = i
       }
     }
+    if (lowestIndex === -1) return false
     return this.game.discard(lowestIndex)
   }
 

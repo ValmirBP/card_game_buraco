@@ -71,7 +71,9 @@ export default function PlayerHand({ phase }: PlayerHandProps) {
           : 'Selecione cartas: 1 para descartar, 3+ para baixar um jogo.'
 
   return (
-    <div className="space-y-1 rounded-xl border border-white/10 bg-black/25 px-3 py-1.5 shadow-lg backdrop-blur-sm landscape:space-y-0 landscape:px-2 landscape:py-0.5">
+    // Sem painel próprio: o painel visual (borda/fundo) agora é o container
+    // compartilhado em Gameplay.tsx, que abriga mão E descarte lado a lado.
+    <div className="flex h-full min-w-0 flex-col space-y-1 landscape:space-y-0">
       <div className="flex flex-nowrap items-baseline justify-between gap-x-3">
         <h3 className="shrink-0 font-display text-sm text-card-gold landscape:text-[10px]">
           Sua Mão <span className="text-[10px] font-normal text-gray-400 landscape:text-[8px]">({hand.length})</span>

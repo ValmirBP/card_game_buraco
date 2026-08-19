@@ -19,7 +19,7 @@ function BreakdownRow({ label, value, muted }: { label: string; value: number; m
   const sign = value > 0 ? '+' : value < 0 ? '−' : ''
   const color = value > 0 ? 'text-green-300' : value < 0 ? 'text-red-300' : 'text-gray-400'
   return (
-    <div className="flex items-center justify-between text-sm">
+    <div className="flex items-center justify-between text-sm landscape:text-xs landscape:leading-tight">
       <span className={muted ? 'text-gray-400' : 'text-gray-200'}>{label}</span>
       <span className={`font-semibold tabular-nums ${color}`}>
         {sign}
@@ -57,7 +57,7 @@ export default function Result({ onBackToMenu, onNextRound, onNewMatch }: Result
       .join(' e ')
 
   return (
-    <div className="flex h-full min-h-0 flex-col items-center justify-center gap-8 overflow-y-auto px-4 py-6 text-center landscape:justify-start landscape:gap-2 landscape:overflow-y-auto landscape:py-2">
+    <div className="flex h-full min-h-0 flex-col items-center justify-center gap-8 overflow-y-auto px-4 py-6 text-center landscape:justify-center landscape:gap-1.5 landscape:overflow-hidden landscape:px-2 landscape:py-1">
       <motion.div
         initial={{ opacity: 0, scale: 0.7, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -103,7 +103,7 @@ export default function Result({ onBackToMenu, onNextRound, onNewMatch }: Result
                   : 'border-white/10 bg-black/25'
               }`}
             >
-              <div className="mb-2 flex items-center justify-between">
+              <div className="mb-2 flex items-center justify-between landscape:mb-1">
                 <div className="flex items-center gap-2">
                   {isWinner && <span className="text-2xl">🏆</span>}
                   <div>
@@ -125,16 +125,35 @@ export default function Result({ onBackToMenu, onNextRound, onNewMatch }: Result
               </div>
 
               {b && (
-                <div className="space-y-1 border-t border-white/10 pt-2">
+                <div className="space-y-1 border-t border-white/10 pt-2 landscape:space-y-0.5 landscape:pt-1">
                   <BreakdownRow label="Jogos na mesa (cartas + canastras)" value={b.meldPoints} />
                   {b.batidaBonus !== 0 && <BreakdownRow label="Bônus de batida" value={b.batidaBonus} />}
                   {b.mortoPenalty !== 0 && (
-                    <BreakdownRow label="Penalidade do morto não pego" value={b.mortoPenalty} />
+                    <BreakdownRow
+                      label={team.hasTakenMorto ? 'Morto pego mas não usado' : 'Penalidade do morto não pego'}
+                      value={b.mortoPenalty}
+                    />
                   )}
-                  {b.handPenalty !== 0 && (
-                    <BreakdownRow label="Cartas na mão (descontadas)" value={b.handPenalty} />
+                  {/* Cartas na mão de CADA jogador, separadamente. Um
+                      jogador com counted=false (pegou o morto e não chegou a
+                      usar) aparece riscado: as cartas dele não descontam -
+                      o time já pagou os -100 do morto acima. */}
+                  {b.handBySeat.map(h =>
+                    h.points === 0 ? null : h.counted ? (
+                      <BreakdownRow key={h.seat} label={`Mão de ${h.playerName}`} value={-h.points} />
+                    ) : (
+                      <div
+                        key={h.seat}
+                        className="flex items-center justify-between text-sm landscape:text-xs landscape:leading-tight"
+                      >
+                        <span className="text-gray-500">Mão de {h.playerName} (morto não usado — não conta)</span>
+                        <span className="font-semibold tabular-nums text-gray-500 line-through">
+                          −{h.points}
+                        </span>
+                      </div>
+                    )
                   )}
-                  <div className="mt-1 flex items-center justify-between border-t border-white/10 pt-1 text-sm font-bold">
+                  <div className="mt-1 flex items-center justify-between border-t border-white/10 pt-1 text-sm font-bold landscape:text-xs">
                     <span className="text-white">Total</span>
                     <span className={`tabular-nums ${isWinner ? 'text-card-gold' : 'text-gray-100'}`}>
                       {b.total}
@@ -143,20 +162,20 @@ export default function Result({ onBackToMenu, onNextRound, onNewMatch }: Result
                 </div>
               )}
 
-              <div className="mt-2 border-t border-white/10 pt-2">
-                <div className="flex items-center justify-between text-sm">
+              <div className="mt-2 border-t border-white/10 pt-2 landscape:mt-1 landscape:pt-1">
+                <div className="flex items-center justify-between text-sm landscape:text-xs">
                   <span className="font-semibold text-gray-200">Total da partida</span>
                   <span className="font-bold tabular-nums text-card-gold">
                     {matchScores[team.id]} / {MATCH_TARGET}
                   </span>
                 </div>
-                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10 landscape:mt-1 landscape:h-1">
                   <div
                     className="h-full rounded-full bg-card-gold transition-[width]"
                     style={{ width: `${Math.max(0, Math.min(100, (matchScores[team.id] / MATCH_TARGET) * 100))}%` }}
                   />
                 </div>
-                <div className="mt-1 text-xs text-gray-400">
+                <div className="mt-1 text-xs text-gray-400 landscape:mt-0.5 landscape:text-[10px]">
                   {matchCanastras[team.id].clean} canastra
                   {matchCanastras[team.id].clean === 1 ? '' : 's'} limpa
                   {matchCanastras[team.id].clean === 1 ? '' : 's'}

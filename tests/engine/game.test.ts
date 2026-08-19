@@ -434,6 +434,166 @@ describe('Game', () => {
     })
   })
 
+  describe('regra do lixo unitário (não devolver a carta pega no mesmo turno)', () => {
+    test('a carta pega de um descarte que SÓ tinha ela não pode ser descartada no mesmo turno', () => {
+      const players = makeFourPlayers()
+      players[0].hand.addCard(new Card('clubs', 'K', false))
+      players[0].hand.addCard(new Card('clubs', 'Q', false))
+      const game = new Game(players)
+
+      // Lixo com UMA carta.
+      const single = new Card('hearts', '7', false)
+      game.state.discardPile.push(single)
+
+      const taken = game.takeDiscardPile()!
+      expect(taken).toHaveLength(1)
+      for (const c of taken) players[0].hand.addCard(c)
+
+      // Descartar a MESMA carta (mesmo objeto) é recusado...
+      const idx = players[0].hand.getCards().findIndex(c => c === single)
+      expect(game.isDiscardBlockedCard(idx)).toBe(true)
+      expect(game.discard(idx)).toBe(false)
+      expect(players[0].hand.getSize()).toBe(3) // nada mudou
+
+      // ...mas descartar OUTRA carta é normal.
+      const otherIdx = players[0].hand.getCards().findIndex(c => c !== single)
+      expect(game.discard(otherIdx)).toBe(true)
+    })
+
+    test('a cópia-gêmea (baralho duplo) que JÁ estava na mão continua descartável', () => {
+      const players = makeFourPlayers()
+      const twin = new Card('hearts', '7', false) // cópia idêntica pré-existente na mão
+      players[0].hand.addCard(twin)
+      players[0].hand.addCard(new Card('clubs', 'K', false))
+      const game = new Game(players)
+
+      game.state.discardPile.push(new Card('hearts', '7', false))
+      const taken = game.takeDiscardPile()!
+      for (const c of taken) players[0].hand.addCard(c)
+
+      // Bloqueio é por REFERÊNCIA: a cópia antiga da mão não é bloqueada.
+      const twinIdx = players[0].hand.getCards().findIndex(c => c === twin)
+      expect(game.isDiscardBlockedCard(twinIdx)).toBe(false)
+      expect(game.discard(twinIdx)).toBe(true)
+    })
+
+    test('o bloqueio dura só o turno: no próximo turno a carta pode ser descartada', () => {
+      const players = makeFourPlayers()
+      players[0].hand.addCard(new Card('clubs', 'K', false))
+      const game = new Game(players)
+
+      const single = new Card('hearts', '7', false)
+      game.state.discardPile.push(single)
+      const taken = game.takeDiscardPile()!
+      for (const c of taken) players[0].hand.addCard(c)
+
+      // Descarta outra carta, turno passa 4 vezes (volta ao seat 0).
+      const otherIdx = players[0].hand.getCards().findIndex(c => c !== single)
+      expect(game.discard(otherIdx)).toBe(true)
+      game.endTurn()
+      game.endTurn()
+      game.endTurn()
+      game.endTurn()
+
+      const idx = players[0].hand.getCards().findIndex(c => c === single)
+      expect(game.isDiscardBlockedCard(idx)).toBe(false)
+    })
+
+    test('lixo com 2+ cartas: nenhuma carta fica bloqueada', () => {
+      const players = makeFourPlayers()
+      players[0].hand.addCard(new Card('clubs', 'K', false))
+      const game = new Game(players)
+
+      const top = new Card('hearts', '7', false)
+      game.state.discardPile.push(new Card('spades', '4', false), top)
+      const taken = game.takeDiscardPile()!
+      expect(taken).toHaveLength(2)
+      for (const c of taken) players[0].hand.addCard(c)
+
+      const idx = players[0].hand.getCards().findIndex(c => c === top)
+      expect(game.isDiscardBlockedCard(idx)).toBe(false)
+      expect(game.discard(idx)).toBe(true)
+    })
+  })
+
+  describe('regra do morto pego mas não usado (perde os 100 do morto, não as cartas da mão)', () => {
+    /** Monta um jogo em que o seat 0 esvazia a mão descartando e pega o
+     * morto automaticamente; retorna o game pronto pra terminar a rodada. */
+    function setupMortoTaken() {
+      const players = makeFourPlayers()
+      // Seat 0: 1 carta (vai descartá-la e pegar o morto).
+      players[0].hand.addCard(new Card('clubs', '5', false))
+      // Parceiro (seat 2) e adversários com mãos não-vazias.
+      players[1].hand.addCard(new Card('hearts', 'K', false))
+      players[2].hand.addCard(new Card('spades', 'K', false)) // K = 10 pts
+      players[3].hand.addCard(new Card('diamonds', 'K', false))
+      const game = new Game(players)
+      // Mortos na mesa (2, como no jogo real). Conteúdo conhecido: 11 cartas de 10 pts.
+      const morto1: Card[] = []
+      for (const rank of ['8', '9', '10', 'J', 'Q', 'K', '8', '9', '10', 'J', 'Q'] as const) {
+        morto1.push(new Card('hearts', rank, false))
+      }
+      game.state.mortos.push(morto1, [new Card('clubs', '3', false)])
+      return { game, players }
+    }
+
+    test('rodada termina logo após pegar o morto (sem usar): -100 do morto, cartas da mão NÃO descontam', () => {
+      const { game, players } = setupMortoTaken()
+      // Descarta a única carta -> mão esvazia -> pega o morto automaticamente.
+      expect(game.discard(0)).toBe(true)
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      expect(teamA.hasTakenMorto).toBe(true)
+      expect(teamA.mortoUsed).toBe(false)
+      expect(players[0].hand.getSize()).toBe(11)
+
+      game.finish()
+      const bA = game.state.scoreBreakdowns!.find(b => b.teamId === 'A')!
+      // -100 do morto (pego e não usado)...
+      expect(bA.mortoPenalty).toBe(-100)
+      // ...e as 11 cartas do morto na mão do seat 0 NÃO contam.
+      const seat0 = bA.handBySeat.find(h => h.seat === 0)!
+      expect(seat0.counted).toBe(false)
+      expect(seat0.points).toBeGreaterThan(0)
+      // A mão do PARCEIRO (seat 2, K=10) continua descontando normalmente.
+      const seat2 = bA.handBySeat.find(h => h.seat === 2)!
+      expect(seat2.counted).toBe(true)
+      expect(bA.handPenalty).toBe(-10)
+    })
+
+    test('se o jogador que pegou o morto JOGA com ele (descarta no turno seguinte), penalidade normal', () => {
+      const { game } = setupMortoTaken()
+      expect(game.discard(0)).toBe(true) // pega o morto
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+
+      // Turno passa e volta pro seat 0, que agora joga com a mão nova.
+      game.endTurn()
+      game.endTurn()
+      game.endTurn()
+      game.endTurn()
+      expect(game.state.currentPlayerIndex).toBe(0)
+      expect(game.discard(0)).toBe(true) // usou o morto
+      expect(teamA.mortoUsed).toBe(true)
+
+      game.finish()
+      const bA = game.state.scoreBreakdowns!.find(b => b.teamId === 'A')!
+      // Sem penalidade de morto (pegou E usou); as cartas restantes contam.
+      expect(bA.mortoPenalty).toBe(0)
+      const seat0 = bA.handBySeat.find(h => h.seat === 0)!
+      expect(seat0.counted).toBe(true)
+      expect(bA.handPenalty).toBeLessThan(0)
+    })
+
+    test('time que nunca pegou morto disponível: -100 e mãos contam (regra antiga preservada)', () => {
+      const { game } = setupMortoTaken()
+      // Ninguém pega o morto; rodada termina direto.
+      game.finish()
+      const bB = game.state.scoreBreakdowns!.find(b => b.teamId === 'B')!
+      expect(bB.mortoPenalty).toBe(-100)
+      expect(bB.handBySeat.every(h => h.counted)).toBe(true)
+      expect(bB.handPenalty).toBe(-20) // K + K
+    })
+  })
+
   describe('extendMeld', () => {
     test('adds a card from hand to an existing team meld and adjusts score', () => {
       const players = makeFourPlayers()

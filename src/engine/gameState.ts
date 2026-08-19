@@ -12,6 +12,16 @@ export interface Team {
   melds: Canasta[]
   score: number
   hasTakenMorto: boolean
+  /** Seat (0..3) do jogador que pegou o morto do time - definido por
+   * pickUpMorto. Usado junto com mortoUsed pela regra do "morto não usado"
+   * (ver Game.finish). */
+  mortoTakenBySeat?: number
+  /** false do momento em que o time pega o morto até o jogador que o pegou
+   * fazer QUALQUER jogada com a mão nova (baixar, estender ou descartar).
+   * Se a rodada terminar ainda false, a penalidade é os -100 do morto e as
+   * cartas na mão desse jogador NÃO contam como pontos negativos (regra do
+   * usuário: "perde os 100 do morto, não os pontos que estão na mão"). */
+  mortoUsed?: boolean
 }
 
 /**
@@ -19,12 +29,23 @@ export interface Team {
  * can show exactly where a team's final score came from instead of just the
  * total. `total` always equals `team.score` after finish() runs.
  */
+/** Pontos das cartas restantes na mão de UM jogador ao fim da rodada, pro
+ * placar mostrar cada mão separadamente. `counted=false` quando essas cartas
+ * não entram na conta (regra do morto não usado - ver Game.finish). */
+export interface SeatHandPoints {
+  seat: number
+  playerName: string
+  points: number // positivo: soma de scoreCardValue das cartas na mão
+  counted: boolean
+}
+
 export interface TeamScoreBreakdown {
   teamId: TeamId
   meldPoints: number // sum of canasta.getScore() across the team's melds on the table
   batidaBonus: number // +100 if this team closed the round (bateu), else 0
   mortoPenalty: number // -100 if penalized per the morto rule (see Game.finish), else 0
-  handPenalty: number // negative: -(sum of scoreCardValue across both partners' remaining hand cards)
+  handPenalty: number // negative: -(sum of counted hand points across the team's seats)
+  handBySeat: SeatHandPoints[] // per-player hand points (both partners, in seat order)
   total: number // meldPoints + batidaBonus + mortoPenalty + handPenalty
 }
 
@@ -56,6 +77,14 @@ export interface GameState {
   status: GameStatus
   winnerTeam?: TeamId
   scoreBreakdowns?: TeamScoreBreakdown[]
+  /** Referência exata (mesmo objeto Card) da carta que NÃO pode ser
+   * descartada neste turno: quando o lixo tinha UMA única carta e o jogador
+   * a pegou, devolvê-la no mesmo turno seria uma "espiada grátis" - regra
+   * apontada pelo usuário. Comparação por referência (não por valor) de
+   * propósito: o baralho duplo tem duas cópias idênticas de cada carta, e a
+   * cópia-gêmea que já estava na mão continua descartável. Limpo em
+   * endTurn. */
+  blockedDiscardCard?: Card | null
 }
 
 export function createGameState(players: Player[]): GameState {
