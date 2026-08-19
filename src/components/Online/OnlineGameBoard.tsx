@@ -11,7 +11,7 @@ import Seat from '../Gameplay/Seat'
 /** Footprint das cartas dos JOGOS baixados (colunas verticais) — idêntico ao
  * TABLE_CARD_SIZE do GameBoard.tsx offline (não exportado de lá pra não
  * acoplar os dois módulos; só os valores literais precisam bater). */
-const TABLE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-14 landscape:h-[5.25rem]'
+const TABLE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-[4.25rem] landscape:h-[5.25rem]'
 /** Footprint do MONTE — idêntico ao PILE_CARD_SIZE offline. */
 const PILE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-8 landscape:h-[2.9rem]'
 /** Naipes/rank do canto grandes e legíveis — idêntico ao BIG_CORNER offline. */
@@ -276,9 +276,22 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
               }`}
             >
               <div className="flex items-center justify-between gap-2 landscape:shrink-0">
-                <h4 className={`font-display text-sm landscape:text-xs ${TEAM_TEXT_CLASS[team.id]}`}>
+                <h4 className={`flex items-center font-display text-sm landscape:text-xs ${TEAM_TEXT_CLASS[team.id]}`}>
                   {TEAM_LABEL[team.id]}
-                  {isDropTarget && <span className="ml-2 text-[10px] font-normal landscape:text-[9px]">⬇ baixar</span>}
+                  {/* Botão sempre visível no cabeçalho - mesa cheia não deixa
+                      área vazia clicável no painel (ver GameBoard offline). */}
+                  {isDropTarget && (
+                    <button
+                      type="button"
+                      onClick={event => {
+                        event.stopPropagation()
+                        handleDropZoneClick()
+                      }}
+                      className="ml-2 animate-pulse rounded-full bg-card-gold px-2.5 py-0.5 font-sans text-[11px] font-bold text-black shadow-[0_0_10px_rgba(212,175,55,0.6)] landscape:px-2 landscape:text-[10px]"
+                    >
+                      ⬇ Baixar jogo
+                    </button>
+                  )}
                 </h4>
                 <span className="text-xs text-gray-200 landscape:text-[9px] landscape:leading-tight">
                   {team.score} pts · {team.melds.filter(m => m.isCanastra).length} can.
@@ -321,7 +334,7 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
                               rolagem, qualquer quantidade (ver GameBoard
                               offline pra explicação completa). */}
                           <div
-                            className={`flex flex-col items-start rounded-lg ${meldStackSpacing(canasta.layout.length)} landscape:relative landscape:block landscape:min-h-0 landscape:w-14 landscape:flex-1 ${
+                            className={`flex flex-col items-start rounded-lg ${meldStackSpacing(canasta.layout.length)} landscape:relative landscape:block landscape:min-h-0 landscape:w-[4.25rem] landscape:flex-1 ${
                               isClosed ? 'ring-2 ring-card-gold/70' : ''
                             }`}
                           >

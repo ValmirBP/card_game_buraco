@@ -38,13 +38,13 @@ const TEAM_GRID_CLASS: Record<TeamId, string> = {
  * depois que o tabuleiro parou de perder ~130px de largura pro
  * over-reservation de safe-area-inset (ver Layout.tsx) — sobrou espaço de
  * verdade pra deixar as canastras baixadas legíveis. */
-const TABLE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-14 landscape:h-[5.25rem]'
+const TABLE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-[4.25rem] landscape:h-[5.25rem]'
 /** Footprint do MONTE — pequeno no canto, só pra ficar visível/clicável. */
 const PILE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-8 landscape:h-[2.9rem]'
 /** Footprint das cartas do DESCARTE — MESMO tamanho das cartas da mão, pra a
  * fileira do descarte ficar paralela à mão e visualmente consistente. Deve
  * acompanhar HAND_CARD_SIZE em PlayerHand.tsx. */
-const HAND_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-12 landscape:h-[4.25rem]'
+const HAND_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-14 landscape:h-[4.25rem]'
 /** Naipes/rank do canto grandes e legíveis (usado na mão e no descarte). */
 const BIG_CORNER = 'text-sm font-normal sm:text-base landscape:text-lg landscape:leading-none'
 
@@ -305,10 +305,25 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
               }`}
             >
               <div className="flex items-center justify-between gap-2 landscape:shrink-0">
-                <h4 className={`font-display text-sm landscape:text-xs ${TEAM_TEXT_CLASS[team.id]}`}>
+                <h4 className={`flex items-center font-display text-sm landscape:text-xs ${TEAM_TEXT_CLASS[team.id]}`}>
                   {TEAM_LABEL[team.id]}
+                  {/* Botão SEMPRE visível no cabeçalho (que nunca é coberto
+                      pelas colunas de cartas): com a mesa cheia, o fundo do
+                      painel some atrás dos jogos e não sobra área vazia pra
+                      clicar - o botão garante que "baixar" nunca fica
+                      inalcançável (pedido do usuário). stopPropagation pra
+                      não disparar o clique do painel de novo. */}
                   {isDropTarget && (
-                    <span className="ml-2 text-[10px] font-normal landscape:text-[9px]">⬇ baixar</span>
+                    <button
+                      type="button"
+                      onClick={event => {
+                        event.stopPropagation()
+                        handleDropZoneClick()
+                      }}
+                      className="ml-2 animate-pulse rounded-full bg-card-gold px-2.5 py-0.5 font-sans text-[11px] font-bold text-black shadow-[0_0_10px_rgba(212,175,55,0.6)] landscape:px-2 landscape:text-[10px]"
+                    >
+                      ⬇ Baixar jogo
+                    </button>
                   )}
                 </h4>
                 <span className="text-xs text-gray-200 landscape:text-[9px] landscape:leading-tight">
@@ -364,7 +379,7 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
                             const lastIdx = slots.length - 1
                             return (
                               <div
-                                className={`flex flex-col items-start rounded-lg ${meldStackSpacing(slots.length)} landscape:relative landscape:block landscape:min-h-0 landscape:w-14 landscape:flex-1 ${
+                                className={`flex flex-col items-start rounded-lg ${meldStackSpacing(slots.length)} landscape:relative landscape:block landscape:min-h-0 landscape:w-[4.25rem] landscape:flex-1 ${
                                   isClosed ? 'ring-2 ring-card-gold/70' : ''
                                 }`}
                               >

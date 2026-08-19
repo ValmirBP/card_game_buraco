@@ -7,7 +7,7 @@ import type { TurnPhase } from './Gameplay'
 // MESMO footprint das cartas da mão (PlayerHand.HAND_CARD_SIZE), pra as duas
 // fileiras — mão e descarte — ficarem paralelas e visualmente idênticas
 // dentro do mesmo painel.
-const HAND_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-12 landscape:h-[4.25rem]'
+const HAND_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-14 landscape:h-[4.25rem]'
 const BIG_CORNER = 'text-sm font-normal sm:text-base landscape:text-lg landscape:leading-none'
 
 interface DiscardRowProps {
@@ -86,7 +86,7 @@ export default function DiscardRow({ phase, canTakeDiscard, onTakeDiscardPile, o
       <div
         id="discard-pile"
         onClick={handleClick}
-        className={`scrollbar-gold flex min-w-0 flex-1 items-start overflow-x-auto overflow-y-hidden rounded-lg px-1 pb-3 pt-3 -space-x-5 sm:-space-x-6 landscape:max-h-[2.7rem] landscape:-space-x-2.5 landscape:pb-0.5 landscape:pt-1 ${
+        className={`scrollbar-gold flex min-w-0 flex-1 items-start overflow-x-auto overflow-y-hidden rounded-lg px-1 pb-3 pt-3 -space-x-5 sm:-space-x-6 landscape:max-h-[2.7rem] landscape:-space-x-4 landscape:pb-0.5 landscape:pt-1 ${
           canClickToDraw || canClickToDiscard
             ? 'cursor-pointer ring-2 ring-card-gold shadow-[0_0_16px_rgba(212,175,55,0.5)]'
             : ''

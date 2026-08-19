@@ -79,79 +79,83 @@ function JesterIllustration({ compactOnLandscape }: { compactOnLandscape?: boole
   )
 }
 
-/** Cores de detalhe das figuras J/Q/K, por cor do naipe: naipes vermelhos
- * ganham figura em tons de vermelho/dourado, pretos em tons de preto/dourado
- * - como num baralho impresso de verdade. */
-const FACE_TONES: Record<'red' | 'black', { main: string; skin: string; accent: string }> = {
-  red: { main: '#b3123a', skin: '#f7dcc0', accent: '#d4af37' },
-  black: { main: '#2b2b31', skin: '#f7dcc0', accent: '#d4af37' },
-}
-
-/** Figura central estilizada das cartas de corte (J/Q/K), no lugar do naipe
- * central gigante - pedido do usuário com foto de referência de baralho
- * tradicional. Busto simples: coroa/chapéu + rosto + ombros. */
-function FaceCardIllustration({
-  rank,
-  suit,
-  compactOnLandscape,
-}: {
-  rank: 'J' | 'Q' | 'K'
-  suit: CardType['suit']
-  compactOnLandscape?: boolean
-}) {
-  const tone = suit === 'hearts' || suit === 'diamonds' ? FACE_TONES.red : FACE_TONES.black
-  const sizeClass = compactOnLandscape
-    ? 'h-12 w-12 sm:h-16 sm:w-16 landscape:h-9 landscape:w-9'
-    : 'h-12 w-12 sm:h-16 sm:w-16'
-  return (
-    <svg viewBox="0 0 48 60" className={sizeClass} xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      {/* Ombros/túnica */}
-      <path d="M8 60 Q8 44 24 44 Q40 44 40 60 Z" fill={tone.main} />
-      <path d="M20 46 L24 52 L28 46 Z" fill={tone.accent} />
-      {/* Rosto */}
-      <circle cx="24" cy="30" r="10" fill={tone.skin} stroke={tone.main} strokeWidth="1.2" />
-      {/* Olhos e boca */}
-      <circle cx="20.5" cy="29" r="1.2" fill={tone.main} />
-      <circle cx="27.5" cy="29" r="1.2" fill={tone.main} />
-      {rank === 'K' ? (
-        // Barba do rei
-        <path d="M17 33 Q24 42 31 33 Q31 38 24 39 Q17 38 17 33 Z" fill={tone.main} opacity="0.85" />
-      ) : (
-        <path d="M21 34.5 Q24 36.5 27 34.5" stroke={tone.main} strokeWidth="1.3" fill="none" strokeLinecap="round" />
-      )}
-      {rank === 'Q' && (
-        <>
-          {/* Cabelo da dama */}
-          <path d="M14 30 Q13 20 24 19 Q35 20 34 30 L34 36 Q32 32 31 28 L17 28 Q16 32 14 36 Z" fill={tone.main} />
-        </>
-      )}
-      {rank === 'K' && (
-        // Coroa do rei: 3 pontas + cruz
-        <g>
-          <path d="M14 21 L16 12 L20 17 L24 10 L28 17 L32 12 L34 21 Z" fill={tone.accent} stroke={tone.main} strokeWidth="1" />
-          <rect x="23" y="4" width="2" height="5" fill={tone.accent} />
-          <rect x="21.5" y="5.5" width="5" height="2" fill={tone.accent} />
-        </g>
-      )}
-      {rank === 'Q' && (
-        // Coroa da dama: tiara com pérolas
-        <g>
-          <path d="M15 20 L17 13 L24 16 L31 13 L33 20 Z" fill={tone.accent} stroke={tone.main} strokeWidth="1" />
-          <circle cx="17" cy="12" r="1.6" fill={tone.accent} />
-          <circle cx="24" cy="15" r="1.6" fill={tone.accent} />
-          <circle cx="31" cy="12" r="1.6" fill={tone.accent} />
-        </g>
-      )}
-      {rank === 'J' && (
-        // Chapéu do valete: boina com pena
-        <g>
-          <path d="M13 22 Q14 13 24 13 Q34 13 35 22 L33 20 Q24 16 15 20 Z" fill={tone.main} />
-          <path d="M32 14 Q37 6 42 8 Q38 12 34 16 Z" fill={tone.accent} />
-          <circle cx="14" cy="21" r="1.8" fill={tone.accent} />
-        </g>
-      )}
-    </svg>
-  )
+/** Posição dos NAIPES REPETIDOS (pips) no corpo da carta, por rank, em
+ * porcentagem [x, y] da face — o layout clássico de baralho impresso
+ * (2 colunas + coluna central pros ímpares), como na foto de referência do
+ * usuário. A/J/Q/K não usam pips (ver o JSX: naipe central único grande). */
+const PIP_POSITIONS: Record<string, Array<[number, number]>> = {
+  '2': [
+    [50, 28],
+    [50, 72],
+  ],
+  '3': [
+    [50, 22],
+    [50, 50],
+    [50, 78],
+  ],
+  '4': [
+    [32, 28],
+    [68, 28],
+    [32, 72],
+    [68, 72],
+  ],
+  '5': [
+    [32, 25],
+    [68, 25],
+    [50, 50],
+    [32, 75],
+    [68, 75],
+  ],
+  '6': [
+    [32, 24],
+    [68, 24],
+    [32, 50],
+    [68, 50],
+    [32, 76],
+    [68, 76],
+  ],
+  '7': [
+    [32, 22],
+    [68, 22],
+    [50, 36],
+    [32, 52],
+    [68, 52],
+    [32, 80],
+    [68, 80],
+  ],
+  '8': [
+    [32, 20],
+    [68, 20],
+    [50, 33],
+    [32, 47],
+    [68, 47],
+    [50, 61],
+    [32, 80],
+    [68, 80],
+  ],
+  '9': [
+    [32, 18],
+    [68, 18],
+    [32, 40],
+    [68, 40],
+    [50, 51],
+    [32, 62],
+    [68, 62],
+    [32, 84],
+    [68, 84],
+  ],
+  '10': [
+    [32, 18],
+    [68, 18],
+    [50, 29],
+    [32, 40],
+    [68, 40],
+    [32, 62],
+    [68, 62],
+    [50, 73],
+    [32, 84],
+    [68, 84],
+  ],
 }
 
 export function CardComponent({
@@ -242,15 +246,25 @@ export function CardComponent({
             <span className={`font-bold tracking-tight ${cornerTextClass}`}>{card.rank}</span>
             <span className={`${suitSpacingClass} ${cornerTextClass}`}>{SUIT_SYMBOLS[card.suit]}</span>
           </div>
-          {/* Centro: figura ilustrada nas cartas de corte (J/Q/K, como num
-              baralho impresso), naipe grande nas numéricas. */}
-          {card.rank === 'J' || card.rank === 'Q' || card.rank === 'K' ? (
-            <div className="flex h-full w-full items-center justify-center">
-              <FaceCardIllustration
-                rank={card.rank}
-                suit={card.suit}
-                compactOnLandscape={compactOnLandscape}
-              />
+          {/* Corpo da carta, estilo baralho impresso (foto de referência do
+              usuário): numéricas 2-10 mostram os NAIPES REPETIDOS (pips) na
+              contagem do rank; A/J/Q/K mostram um único naipe central grande
+              (sem figuras desenhadas - o usuário achou confuso). */}
+          {PIP_POSITIONS[card.rank] ? (
+            <div className="relative h-full w-full" aria-hidden="true">
+              {PIP_POSITIONS[card.rank].map(([x, y], pi) => (
+                <span
+                  key={pi}
+                  className={`absolute -translate-x-1/2 -translate-y-1/2 leading-none ${suitClass} ${
+                    compactOnLandscape
+                      ? 'text-sm sm:text-base landscape:text-[9px]'
+                      : 'text-sm sm:text-base'
+                  }`}
+                  style={{ left: `${x}%`, top: `${y}%` }}
+                >
+                  {SUIT_SYMBOLS[card.suit]}
+                </span>
+              ))}
             </div>
           ) : (
             <div

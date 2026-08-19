@@ -8,7 +8,7 @@ import type { TurnPhase } from './Gameplay'
 // (usado no modo Online), pra a fileira caber numa faixa fina embaixo da
 // mesa. Opt-in (passado explicitamente), então o modo Online (que não passa
 // `sizeClassName`) fica com CARD_SIZE_CLASSES normal, intocado.
-const HAND_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-12 landscape:h-[4.25rem]'
+const HAND_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-14 landscape:h-[4.25rem]'
 
 interface PlayerHandProps {
   phase: TurnPhase
@@ -89,7 +89,7 @@ export default function PlayerHand({ phase }: PlayerHandProps) {
           rolável se a mão não couber. */}
       <div
         id="player-hand-anchor"
-        className="scrollbar-gold flex -space-x-6 overflow-x-auto px-1 pb-3 pt-3 sm:-space-x-7 landscape:max-h-[2.7rem] landscape:-space-x-2.5 landscape:overflow-y-hidden landscape:pb-0.5 landscape:pt-1"
+        className="scrollbar-gold flex -space-x-6 overflow-x-auto px-1 pb-3 pt-3 sm:-space-x-7 landscape:max-h-[2.7rem] landscape:-space-x-4 landscape:overflow-y-hidden landscape:pb-0.5 landscape:pt-1"
       >
         {orderedHand(hand).map(({ card, index }, position) => (
           <div
