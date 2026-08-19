@@ -102,7 +102,7 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
   const inRoom = code !== null
 
   return (
-    <div className="flex h-full min-h-0 flex-col items-center justify-center gap-6 overflow-y-auto px-4 py-6 text-center landscape:gap-3 landscape:py-3">
+    <div className="flex h-full min-h-0 flex-col items-center justify-center gap-6 overflow-y-auto px-4 py-6 text-center landscape:justify-start landscape:gap-3 landscape:py-3">
       <h1 className="font-display text-3xl text-card-gold drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)] sm:text-4xl landscape:text-xl">
         Jogar Online
       </h1>
