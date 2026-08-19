@@ -210,7 +210,8 @@ export function CardComponent({
       aria-pressed={onClick ? Boolean(selected) : undefined}
       className={[
         sizeClassName ?? CARD_SIZE_CLASSES,
-        'relative select-none rounded-xl border shadow-md',
+        // rounded-md (não -xl): pontas menos arredondadas, pedido do usuário.
+        'relative select-none rounded-md border shadow-md',
         onClick ? 'cursor-pointer' : '',
         card.isWild
           ? 'border-purple-300/50 bg-gradient-to-br from-fuchsia-600 via-purple-600 to-indigo-800 text-white'
@@ -246,33 +247,32 @@ export function CardComponent({
             <span className={`font-bold tracking-tight ${cornerTextClass}`}>{card.rank}</span>
             <span className={`${suitSpacingClass} ${cornerTextClass}`}>{SUIT_SYMBOLS[card.suit]}</span>
           </div>
-          {/* Corpo da carta, estilo baralho impresso (foto de referência do
-              usuário): numéricas 2-10 mostram os NAIPES REPETIDOS (pips) na
-              contagem do rank; A/J/Q/K mostram um único naipe central grande
-              (sem figuras desenhadas - o usuário achou confuso). */}
-          {PIP_POSITIONS[card.rank] ? (
-            <div className="relative h-full w-full" aria-hidden="true">
+          {/* Corpo da carta. Em PAISAGEM (o jogo de verdade, cartas
+              pequenas): um ÚNICO naipe central — os naipes repetidos (pips)
+              viravam poluição visual nesse tamanho ("tem muito desenho na
+              carta", feedback do usuário). Em RETRATO (cartas grandes, ex.:
+              leque do menu), as numéricas 2-10 mantêm os pips estilo baralho
+              impresso, onde há espaço pra eles respirarem. */}
+          {PIP_POSITIONS[card.rank] && (
+            <div className="relative h-full w-full landscape:hidden" aria-hidden="true">
               {PIP_POSITIONS[card.rank].map(([x, y], pi) => (
                 <span
                   key={pi}
-                  className={`absolute -translate-x-1/2 -translate-y-1/2 leading-none ${suitClass} ${
-                    compactOnLandscape
-                      ? 'text-sm sm:text-base landscape:text-[9px]'
-                      : 'text-sm sm:text-base'
-                  }`}
+                  className={`absolute -translate-x-1/2 -translate-y-1/2 text-sm leading-none sm:text-base ${suitClass}`}
                   style={{ left: `${x}%`, top: `${y}%` }}
                 >
                   {SUIT_SYMBOLS[card.suit]}
                 </span>
               ))}
             </div>
-          ) : (
-            <div
-              className={`flex h-full w-full items-center justify-center opacity-90 ${centerTextClass} ${suitClass}`}
-            >
-              {SUIT_SYMBOLS[card.suit]}
-            </div>
           )}
+          <div
+            className={`h-full w-full items-center justify-center opacity-90 ${
+              PIP_POSITIONS[card.rank] ? 'hidden landscape:flex' : 'flex'
+            } ${centerTextClass} ${suitClass}`}
+          >
+            {SUIT_SYMBOLS[card.suit]}
+          </div>
         </>
       )}
     </motion.div>
@@ -303,7 +303,7 @@ export function CardBack({
       className={[
         sizeClassName ?? CARD_SIZE_CLASSES,
         variant === 'blue' ? 'card-back-pattern-blue' : 'card-back-pattern-red',
-        'rounded-xl border border-white/40 shadow-md',
+        'rounded-md border border-white/40 shadow-md',
         'flex items-center justify-center',
         className,
       ].join(' ')}

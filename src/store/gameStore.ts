@@ -314,11 +314,15 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     const player = game.getCurrentPlayer()
     const mortosBefore = game.state.mortos.length
+    const recyclesBefore = game.state.discardRecycles
     const card = game.drawFromDeck()
     const log = [...gameLog]
     // Nas compras, mortos só diminuem quando um morto é promovido a monte.
     if (game.state.mortos.length < mortosBefore) {
       log.push('O monte acabou — o morto virou o novo monte!')
+    }
+    if (game.state.discardRecycles > recyclesBefore) {
+      log.push('🔀 O lixo foi embaralhado e virou o novo monte!')
     }
     if (!card) {
       set({
@@ -452,6 +456,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     let hadMorto = game.getTeamOfCurrentPlayer().hasTakenMorto
     let gameEnded = false
     const mortosBeforeDraw = game.state.mortos.length
+    const recyclesBeforeDraw = game.state.discardRecycles
 
     // Draw phase: normally draws from the deck, but honors a take_discard
     // proposal from the AI's strategy if one comes back (the current
@@ -486,6 +491,9 @@ export const useGameStore = create<GameStore>((set, get) => {
     // Nas compras, mortos só diminuem quando um morto é promovido a monte.
     if (game.state.mortos.length < mortosBeforeDraw) {
       log.push('O monte acabou — o morto virou o novo monte!')
+    }
+    if (game.state.discardRecycles > recyclesBeforeDraw) {
+      log.push('🔀 O lixo foi embaralhado e virou o novo monte!')
     }
 
     let discarded = false

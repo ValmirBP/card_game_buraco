@@ -36,11 +36,15 @@ export function createDeck(): Card[] {
     deck.push(new Card('hearts', '2', true)) // Representa curinga
   }
 
-  // Embaralhar
-  for (let i = deck.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [deck[i], deck[j]] = [deck[j], deck[i]]
-  }
-
+  shuffleInPlace(deck)
   return deck
+}
+
+/** Fisher-Yates in place. Também usado quando o LIXO é embaralhado pra virar
+ * o novo monte após monte+mortos esgotarem (ver Game.drawFromDeck). */
+export function shuffleInPlace(cards: Card[]): void {
+  for (let i = cards.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[cards[i], cards[j]] = [cards[j], cards[i]]
+  }
 }

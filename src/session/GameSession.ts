@@ -193,9 +193,13 @@ export class GameSession {
 
     const player = this.game.getCurrentPlayer()
     const mortosBefore = this.game.state.mortos.length
+    const recyclesBefore = this.game.state.discardRecycles
     const card = this.game.drawFromDeck()
     if (this.game.state.mortos.length < mortosBefore) {
       this.log.push('O monte acabou — o morto virou o novo monte!')
+    }
+    if (this.game.state.discardRecycles > recyclesBefore) {
+      this.log.push('🔀 O lixo foi embaralhado e virou o novo monte!')
     }
     if (!card) {
       this.log.push('O monte acabou.')
@@ -415,6 +419,7 @@ export class GameSession {
     let hadMorto = this.game.getTeamOfCurrentPlayer().hasTakenMorto
     let gameEnded = false
     const mortosBeforeDraw = this.game.state.mortos.length
+    const recyclesBeforeDraw = this.game.state.discardRecycles
 
     const firstMove = player.playTurn(this.buildAIState())
     if (firstMove && firstMove.type === 'take_discard') {
@@ -443,6 +448,9 @@ export class GameSession {
 
     if (this.game.state.mortos.length < mortosBeforeDraw) {
       this.log.push('O monte acabou — o morto virou o novo monte!')
+    }
+    if (this.game.state.discardRecycles > recyclesBeforeDraw) {
+      this.log.push('🔀 O lixo foi embaralhado e virou o novo monte!')
     }
     this.turnPhase = 'play'
 
@@ -554,6 +562,7 @@ export class GameSession {
       matchWinner: this.matchWinner,
       winnerTeam: this.game.state.winnerTeam,
       scoreBreakdowns: this.game.state.scoreBreakdowns,
+      closerSeat: this.game.state.closerSeat,
       log: [...this.log],
     }
   }

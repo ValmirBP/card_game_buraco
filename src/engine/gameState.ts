@@ -77,6 +77,15 @@ export interface GameState {
   status: GameStatus
   winnerTeam?: TeamId
   scoreBreakdowns?: TeamScoreBreakdown[]
+  /** Assento (0..3) do jogador que BATEU (esvaziou a mão com direito de
+   * bater) — definido por finish(). undefined se a rodada terminou pelo
+   * fallback de emergência (nenhuma carta pra comprar em lugar nenhum). A UI
+   * usa isso pro banner "Fulano bateu!" antes do placar. */
+  closerSeat?: number
+  /** Quantas vezes o LIXO foi embaralhado e virou o novo monte (após monte e
+   * mortos esgotarem — ver Game.drawFromDeck). As UIs comparam antes/depois
+   * de uma compra pra logar o evento. */
+  discardRecycles: number
   /** Referência exata (mesmo objeto Card) da carta que NÃO pode ser
    * descartada neste turno: quando o lixo tinha UMA única carta e o jogador
    * a pegou, devolvê-la no mesmo turno seria uma "espiada grátis" - regra
@@ -103,5 +112,6 @@ export function createGameState(players: Player[]): GameState {
     mortos: [],
     round: 1,
     status: 'setup',
+    discardRecycles: 0,
   }
 }

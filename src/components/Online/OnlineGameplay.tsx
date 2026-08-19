@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useOnlineStore } from '../../online/onlineStore'
 import OnlineGameBoard from './OnlineGameBoard'
 import OnlinePlayerHand from './OnlinePlayerHand'
@@ -22,11 +24,29 @@ export default function OnlineGameplay({ onBackToMenu }: OnlineGameplayProps) {
   const errorMsg = useOnlineStore(s => s.errorMsg)
   const clearError = useOnlineStore(s => s.clearError)
 
+  // Rodada terminou: segura 2s mostrando o banner "Fulano bateu!" sobre a
+  // mesa antes de trocar pro placar (igual ao Gameplay offline). Volta a
+  // false quando o host inicia a próxima rodada (status -> 'playing').
+  const status = view?.status
+  const [resultReady, setResultReady] = useState(false)
+  useEffect(() => {
+    if (status !== 'finished') {
+      setResultReady(false)
+      return
+    }
+    const timeoutId = window.setTimeout(() => setResultReady(true), 2000)
+    return () => clearTimeout(timeoutId)
+  }, [status])
+
   if (!view) return null
 
-  if (view.status === 'finished') {
+  if (view.status === 'finished' && resultReady) {
     return <OnlineResult view={view} onBackToMenu={onBackToMenu} />
   }
+
+  const closerName = view.closerSeat !== undefined ? view.players[view.closerSeat]?.name : undefined
+  const batidaBanner =
+    view.status === 'finished' ? (closerName ? `🏆 ${closerName} bateu!` : '🏁 Fim da rodada!') : null
 
   const lastLog = log[log.length - 1]
   // "Nós"/"Eles" relativo ao próprio time, igual ao GameBoard online.
@@ -35,6 +55,24 @@ export default function OnlineGameplay({ onBackToMenu }: OnlineGameplayProps) {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2 landscape:gap-0.5">
+      {/* Banner de BATIDA: 2s antes do placar (ver Gameplay offline) */}
+      <AnimatePresence>
+        {batidaBanner && (
+          <motion.div
+            key={batidaBanner}
+            initial={{ opacity: 0, scale: 0.6, y: -14 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ type: 'spring', stiffness: 280, damping: 18 }}
+            className="pointer-events-none fixed inset-x-0 top-1/3 z-[130] flex justify-center px-4"
+          >
+            <span className="rounded-2xl border-2 border-card-gold bg-black/85 px-8 py-4 text-center font-display text-2xl text-card-gold shadow-[0_0_40px_rgba(212,175,55,0.8)] backdrop-blur-sm sm:text-3xl">
+              {batidaBanner}
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Placar — mesmo tratamento visual do Scoreboard.tsx offline */}
       <div className="shrink-0 z-40 rounded-xl border border-card-gold/30 bg-black/40 px-2 py-1 shadow-[0_4px_16px_rgba(0,0,0,0.35)] backdrop-blur-md landscape:rounded-md landscape:px-1.5 landscape:py-0">
         <div className="mx-auto flex max-w-7xl flex-nowrap items-center justify-center gap-2 landscape:gap-1.5">

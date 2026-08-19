@@ -1,5 +1,5 @@
 import { Player, PlayerMove } from './player'
-import { Card, createDeck } from './card'
+import { Card, createDeck, shuffleInPlace } from './card'
 import { Canasta } from './canasta'
 import { GameState, Team, TeamId, TeamScoreBreakdown, createGameState, teamOfSeat } from './gameState'
 import { isValidCanasta, canExtendMeld, scoreCardValue } from './utils'
@@ -61,9 +61,11 @@ export class Game {
    */
   drawFromDeck(): Card | null {
     this.promoteMortoIfDeckEmpty()
+    this.recycleDiscardIfExhausted()
     if (this.state.deck.length === 0) return null
     const card = this.state.deck.pop()!
     this.promoteMortoIfDeckEmpty()
+    this.recycleDiscardIfExhausted()
     return card
   }
 
@@ -73,6 +75,23 @@ export class Game {
     if (this.state.deck.length === 0 && this.state.mortos.length > 0) {
       this.state.deck = this.state.mortos.pop()!
     }
+  }
+
+  /** Regra do usuário: a rodada SÓ termina quando alguém bate (0 cartas) —
+   * nunca por esgotamento do monte. Quando monte E mortos acabam, o LIXO é
+   * embaralhado e vira o novo monte (o descarte esvazia), e o jogo segue
+   * até a batida. Só se ATÉ o lixo estiver vazio (raro ao extremo) é que
+   * isGameOver aceita encerrar sem batida, como último recurso. */
+  private recycleDiscardIfExhausted(): void {
+    if (this.state.deck.length > 0 || this.state.mortos.length > 0) return
+    if (this.state.discardPile.length === 0) return
+    const recycled = [...this.state.discardPile]
+    this.state.discardPile = []
+    // A carta bloqueada do lixo unitário saiu de cena junto com o lixo.
+    this.state.blockedDiscardCard = null
+    shuffleInPlace(recycled)
+    this.state.deck = recycled
+    this.state.discardRecycles++
   }
 
   /**
@@ -459,20 +478,26 @@ export class Game {
    * A round is over once status is 'playing' AND either:
    *  - a team has "batido" (a player's hand is empty AND their team
    *    canClose - has taken the morto and has a clean 7+ card canastra), or
-   *  - the deck (baço) AND both mortos are exhausted (a morto becomes the
-   *    new baço when the deck runs out while a morto is still available -
-   *    see drawFromDeck).
+   *  - NADA sobrou pra comprar em lugar NENHUM: monte, mortos E lixo todos
+   *    vazios (fallback de emergência, raríssimo). Esgotar só o monte+mortos
+   *    NÃO termina mais a rodada — o lixo é embaralhado e vira o novo monte
+   *    (regra do usuário: "o jogo somente finaliza quando o jogador tem 0
+   *    cartas"; ver recycleDiscardIfExhausted). Era exatamente isso que
+   *    fazia rodadas "terminarem do nada" com cartas na mão.
    */
   isGameOver(): boolean {
     if (this.state.status !== 'playing') return false
 
-    const deckEmpty = this.state.deck.length === 0 && this.state.mortos.length === 0
+    const nothingLeftAnywhere =
+      this.state.deck.length === 0 &&
+      this.state.mortos.length === 0 &&
+      this.state.discardPile.length === 0
     const someoneClosed = this.state.players.some((p, seat) => {
       if (!p.hand.isEmpty()) return false
       return this.canClose(teamOfSeat(this.state, seat))
     })
 
-    return someoneClosed || deckEmpty
+    return someoneClosed || nothingLeftAnywhere
   }
 
   /**
@@ -506,6 +531,8 @@ export class Game {
     this.state.players.forEach((p, seat) => {
       if (p.hand.isEmpty() && this.canClose(teamOfSeat(this.state, seat))) {
         closerTeamId = teamOfSeat(this.state, seat).id
+        // Registrado pro banner "Fulano bateu!" da UI (ver GameState.closerSeat).
+        this.state.closerSeat = seat
       }
     })
 

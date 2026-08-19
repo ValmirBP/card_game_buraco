@@ -86,5 +86,8 @@ export interface SeatView {
   matchWinner?: TeamId
   winnerTeam?: TeamId
   scoreBreakdowns?: TeamScoreBreakdown[]
+  /** Assento de quem BATEU nesta rodada (ver GameState.closerSeat) — pro
+   * banner "Fulano bateu!" antes do placar. */
+  closerSeat?: number
   log: string[]
 }

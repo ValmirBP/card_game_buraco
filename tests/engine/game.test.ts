@@ -893,6 +893,84 @@ describe('Game', () => {
       }
       expect(game.isGameOver()).toBe(false)
     })
+
+    // Regra do usuário: "o jogo somente finaliza quando o jogador tem 0
+    // cartas" - esgotar monte+mortos NÃO termina mais a rodada enquanto o
+    // lixo tiver cartas (ele vira o novo monte, ver drawFromDeck).
+    test('monte+mortos esgotados mas lixo com cartas: NAO termina; a compra recicla o lixo como novo monte', () => {
+      const game = new Game(makeFourPlayers())
+      game.setup()
+      game.state.deck = []
+      game.state.mortos = []
+      game.state.discardPile = [
+        new Card('hearts', '5', false),
+        new Card('clubs', '9', false),
+        new Card('spades', 'K', false),
+      ]
+
+      expect(game.isGameOver()).toBe(false)
+
+      const card = game.drawFromDeck()
+      expect(card).not.toBeNull()
+      expect(game.state.discardPile).toHaveLength(0) // lixo virou monte
+      expect(game.state.deck.length).toBe(2) // 3 recicladas - 1 comprada
+      expect(game.state.discardRecycles).toBe(1)
+      expect(game.isGameOver()).toBe(false)
+    })
+
+    test('fallback de emergência: monte, mortos E lixo vazios -> rodada termina', () => {
+      const game = new Game(makeFourPlayers())
+      game.setup()
+      game.state.deck = []
+      game.state.mortos = []
+      game.state.discardPile = []
+      expect(game.isGameOver()).toBe(true)
+    })
+
+    test('a reciclagem limpa o bloqueio do lixo unitário (a carta saiu de circulação)', () => {
+      const players = makeFourPlayers()
+      players[0].hand.addCard(new Card('clubs', 'K', false))
+      const game = new Game(players)
+      // Pega um lixo unitário -> carta bloqueada.
+      const single = new Card('hearts', '7', false)
+      game.state.discardPile.push(single)
+      const taken = game.takeDiscardPile()!
+      for (const c of taken) players[0].hand.addCard(c)
+      expect(game.state.blockedDiscardCard).toBe(single)
+      // Monte/mortos esgotam e o lixo (repopulado) é reciclado.
+      game.state.deck = []
+      game.state.mortos = []
+      game.state.discardPile = [new Card('spades', '4', false), new Card('clubs', '8', false)]
+      game.drawFromDeck()
+      expect(game.state.blockedDiscardCard).toBeNull()
+    })
+  })
+
+  describe('closerSeat (banner "Fulano bateu!")', () => {
+    test('finish() registra o assento de quem bateu', () => {
+      const players = makeFourPlayers()
+      const game = new Game(players)
+      game.setup()
+      const teamA = game.state.teams.find(t => t.id === 'A')!
+      teamA.hasTakenMorto = true
+      teamA.mortoUsed = true
+      teamA.melds = [cleanCanastra()]
+      while (!players[2].hand.isEmpty()) {
+        players[2].hand.removeCard(0) // o PARCEIRO (seat 2) bate
+      }
+      game.finish()
+      expect(game.state.closerSeat).toBe(2)
+    })
+
+    test('finish() sem batida (fallback de emergência) deixa closerSeat undefined', () => {
+      const game = new Game(makeFourPlayers())
+      game.setup()
+      game.state.deck = []
+      game.state.mortos = []
+      game.state.discardPile = []
+      game.finish()
+      expect(game.state.closerSeat).toBeUndefined()
+    })
   })
 
   describe('finish - team scoring', () => {

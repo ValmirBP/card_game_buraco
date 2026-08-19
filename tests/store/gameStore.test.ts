@@ -298,20 +298,25 @@ describe('useGameStore', () => {
     expect(state.gameLog.some(l => l.toLowerCase().includes('fim de jogo'))).toBe(true)
   })
 
-  test('game finishes once the deck (baço) runs out', () => {
+  test('esgotar o monte NAO termina mais a rodada: o lixo vira o novo monte (regra do usuario)', () => {
     useGameStore.getState().initGame('Alice', 'easy')
     const game = useGameStore.getState().game!
-    // A morto still on the table becomes the new baço when the deck runs
-    // out (see Game.drawFromDeck), so exhaustion requires both to be empty.
     game.state.deck = []
     game.state.mortos = []
 
+    // Descarta com monte+mortos esgotados: antes isso ENCERRAVA a rodada
+    // com cartas na mao ("o jogo finaliza quando tem uma carta na mao",
+    // bug reportado). Agora o jogo segue - so termina com batida (0 cartas).
     useGameStore.getState().discard(0)
+    expect(useGameStore.getState().game!.state.status).toBe('playing')
 
+    // A proxima compra recicla o lixo (embaralhado) como novo monte.
+    useGameStore.getState().drawFromDeck()
     const state = useGameStore.getState()
-    expect(state.game!.state.status).toBe('finished')
-    expect(state.game!.state.winnerTeam).toBeDefined()
-    expect(state.gameLog.some(l => l.toLowerCase().includes('fim de jogo'))).toBe(true)
+    expect(state.game!.state.status).toBe('playing')
+    expect(state.game!.state.discardRecycles).toBe(1)
+    expect(state.game!.state.discardPile).toHaveLength(0)
+    expect(state.gameLog.some(l => l.includes('lixo foi embaralhado'))).toBe(true)
   })
 
   test('toggleCardSelection adds and removes indices; clearSelection empties it', () => {

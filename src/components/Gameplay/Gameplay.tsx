@@ -163,14 +163,30 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
   }, [version, game?.state.currentPlayerIndex, game?.state.status])
 
   // Detect game over (the store already calls game.finish() internally when
-  // a discard/aiTurn/playCanasta/extendMeld ends the game) and notify the
-  // parent screen.
+  // a discard/aiTurn/playCanasta/extendMeld ends the game). Antes de trocar
+  // pra tela de placar, segura 2s mostrando o banner "Fulano bateu!" (pedido
+  // do usuário: a rodada terminava "do nada", sem dizer quem bateu). O guard
+  // por ref evita reagendar o timeout a cada bump de version enquanto o
+  // banner está no ar.
+  const [batidaBanner, setBatidaBanner] = useState<string | null>(null)
+  const gameEndScheduledRef = useRef(false)
+  // Ref sempre-fresco pro callback: o timeout dispara 2s depois, fora do
+  // ciclo do efeito — sem cleanup de propósito (um cleanup + guard-por-ref
+  // cancelaria o timer num re-render e onGameEnd nunca rodaria, o mesmo
+  // bug do StrictMode documentado no efeito do turno da IA acima).
+  const onGameEndRef = useRef(onGameEnd)
+  onGameEndRef.current = onGameEnd
   useEffect(() => {
     if (!game) return
-    if (game.state.status === 'finished') {
-      onGameEnd()
-    }
-  }, [version, game, onGameEnd])
+    if (game.state.status !== 'finished') return
+    if (gameEndScheduledRef.current) return
+    gameEndScheduledRef.current = true
+
+    const closerSeat = game.state.closerSeat
+    const closerName = closerSeat !== undefined ? game.state.players[closerSeat]?.name : undefined
+    setBatidaBanner(closerName ? `🏆 ${closerName} bateu!` : '🏁 Fim da rodada!')
+    window.setTimeout(() => onGameEndRef.current(), 2000)
+  }, [version, game])
 
   // Banner do morto: varre as linhas NOVAS do registro a cada mudança (o
   // turno da IA adiciona várias de uma vez) e, se alguma anunciar a pega do
@@ -345,6 +361,24 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
       <CardFlyAnimation anim={pickupAnim} />
       <CardFlyAnimation anim={discardAnim} />
       <CardFlyAnimation anim={tableAnim} />
+
+      {/* Banner de BATIDA: "Fulano bateu!" por 2s antes do placar */}
+      <AnimatePresence>
+        {batidaBanner && (
+          <motion.div
+            key={batidaBanner}
+            initial={{ opacity: 0, scale: 0.6, y: -14 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ type: 'spring', stiffness: 280, damping: 18 }}
+            className="pointer-events-none fixed inset-x-0 top-1/3 z-[130] flex justify-center px-4"
+          >
+            <span className="rounded-2xl border-2 border-card-gold bg-black/85 px-8 py-4 text-center font-display text-2xl text-card-gold shadow-[0_0_40px_rgba(212,175,55,0.8)] backdrop-blur-sm sm:text-3xl">
+              {batidaBanner}
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Banner de destaque do morto (pega / virou monte) */}
       <AnimatePresence>
