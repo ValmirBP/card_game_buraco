@@ -8,27 +8,10 @@ import { otherSeatsInOrder } from '../../online/seatLayout'
 import { asCard, asCards } from '../../online/cardAdapter'
 import Seat from '../Gameplay/Seat'
 import MeldCardColumn from '../Gameplay/MeldCardColumn'
+import MeldRow from '../Gameplay/MeldRow'
 
 /** Footprint do MONTE — idêntico ao PILE_CARD_SIZE offline. */
 const PILE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-8 landscape:h-[2.9rem]'
-
-/** Espaçamento horizontal entre os jogos baixados, em paisagem.
- *
- * Com a mesa cheia as colunas passavam da largura do painel e, como a
- * fileira é `flex-nowrap` + `overflow-hidden` (pra não ter rolagem), elas
- * simplesmente SUMIAM - com 10 jogos, só 6 apareciam. Agora, conforme a
- * mesa enche, as colunas se SOBREPÕEM: cada uma cobre a direita da
- * anterior, e a parte ESQUERDA - que carrega rank+naipe de cada carta -
- * continua visível. Cabe até ~14 jogos sem cortar nada.
- *
- * Classes literais pro Tailwind conseguir gerá-las.
- */
-function meldRowSpacing(n: number): string {
-  if (n >= 11) return 'landscape:-space-x-7'
-  if (n >= 9) return 'landscape:-space-x-5'
-  if (n >= 7) return 'landscape:-space-x-3'
-  return 'landscape:space-x-1.5'
-}
 
 interface OnlineGameBoardProps {
   view: SeatView
@@ -305,7 +288,7 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
                   {isDropTarget ? 'Clique aqui para baixar as cartas selecionadas' : 'Nenhum jogo baixado ainda'}
                 </span>
               ) : (
-                <div className={`flex flex-wrap items-start gap-3 landscape:min-h-0 landscape:flex-1 landscape:flex-nowrap landscape:gap-0 landscape:overflow-hidden ${meldRowSpacing(team.melds.length)}`}>
+                <MeldRow count={team.melds.length}>
                   <AnimatePresence>
                     {team.melds.map((canasta, ci) => {
                       const meldCards = canasta.layout.map(entry => entry.card)
@@ -384,7 +367,7 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
                       <span>Baixar</span>
                     </button>
                   )}
-                </div>
+                </MeldRow>
               )}
             </div>
           )
