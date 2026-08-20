@@ -78,12 +78,17 @@ def _card(size, rank, suit, angle):
     d.rounded_rectangle([pad, pad, pad + w, pad + h], radius=int(size * 0.028),
                         fill=CREAM, outline=INK, width=max(1, int(size * 0.008)))
     color = RED if suit in ('hearts', 'diamonds') else INK
-    fs = int(h * 0.40)
+    fs = int(h * 0.34)
     try:
         font = ImageFont.truetype(FONT_BOLD, fs)
     except OSError:
         font = ImageFont.load_default()
-    d.text((pad + w * 0.20, pad + h * 0.10), rank, font=font, fill=color, anchor='ma')
+    # anchor 'mm' (centro do glifo) em vez de 'ma' (linha ASCENDENTE): a
+    # ascendente fica acima da altura das maiúsculas e varia por fonte, então
+    # o topo do J, do K e do A passava da borda da carta e era cortado (o Q
+    # escapava só por ser arredondado). Com o centro é previsível: basta
+    # colocá-lo a 22% da altura pra letra caber inteira.
+    d.text((pad + w * 0.26, pad + h * 0.22), rank, font=font, fill=color, anchor='mm')
     _suit(d, suit, pad + w * 0.21, pad + h * 0.62, w * 0.30, h * 0.22, color)
     return layer.rotate(angle, resample=Image.BICUBIC, expand=True)
 
