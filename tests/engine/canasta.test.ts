@@ -185,6 +185,28 @@ describe('Canasta', () => {
     })
   })
 
+  describe('sequências altas com Ás (regra do usuário: Q-K-A pode descer)', () => {
+    test('[Q,K,A] mesmo naipe -> válida, limpa, Ás alto (12-13-14)', () => {
+      const cards = [real('Q', 'spades'), real('K', 'spades'), real('A', 'spades')]
+      const canasta = new Canasta(cards)
+      expect(canasta.isClean).toBe(true)
+      expect(canasta.layout.map(l => l.representsValue)).toEqual([12, 13, 14])
+    })
+
+    test('[J,Q,K] estende com A (Ás alto no topo)', () => {
+      const canasta = new Canasta([real('J', 'hearts'), real('Q', 'hearts'), real('K', 'hearts')])
+      const extended = canasta.withExtraCards([real('A', 'hearts')])
+      expect(extended.cards).toHaveLength(4)
+      expect(extended.isClean).toBe(true)
+    })
+
+    test('[Q,K,A] estende com J (cresce pra baixo)', () => {
+      const canasta = new Canasta([real('Q', 'clubs'), real('K', 'clubs'), real('A', 'clubs')])
+      const extended = canasta.withExtraCards([real('J', 'clubs')])
+      expect(extended.layout.map(l => l.representsValue)).toEqual([11, 12, 13, 14])
+    })
+  })
+
   describe('Part A/B: 2-mesmo-naipe curinga, regra do 9, sujeira permanente', () => {
     test('[6♠,2♠,8♠] -> valid, clean, layout represents 7', () => {
       const cards = [real('6', 'spades'), two('spades'), real('8', 'spades')]

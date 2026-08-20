@@ -102,7 +102,7 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
   const inRoom = code !== null
 
   return (
-    <div className="flex h-full min-h-0 flex-col items-center justify-center gap-6 overflow-y-auto px-4 py-6 text-center landscape:justify-start landscape:gap-3 landscape:py-3">
+    <div className="flex h-full min-h-0 flex-col items-center justify-center gap-6 overflow-y-auto px-4 py-6 text-center landscape:justify-center landscape:gap-1.5 landscape:overflow-hidden landscape:py-1">
       <h1 className="font-display text-3xl text-card-gold drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)] sm:text-4xl landscape:text-xl">
         Jogar Online
       </h1>
@@ -120,9 +120,12 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
         </motion.p>
       )}
 
+      {/* Mesmo PADRÃO da tela inicial (Menu.tsx): em paisagem vira uma grade
+          de 2 colunas — esquerda com o nome/config, direita com os botões —
+          o que faz tudo caber sem rolagem. Em retrato continua empilhado. */}
       {!inRoom && (
-        <div className="w-full max-w-sm space-y-4">
-          <div>
+        <div className="grid w-full max-w-sm grid-cols-1 gap-4 landscape:max-w-3xl landscape:grid-cols-2 landscape:items-start landscape:gap-4 landscape:px-4">
+          <div className="space-y-4 landscape:space-y-1.5">
             <label htmlFor="online-name" className="sr-only">
               Seu nome
             </label>
@@ -132,11 +135,10 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
               placeholder="Seu nome"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="min-h-[44px] w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-center text-white placeholder-gray-400 shadow-inner outline-none backdrop-blur-sm transition focus:ring-4 focus:ring-card-gold/70"
+              className="min-h-[44px] w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-center text-white placeholder-gray-400 shadow-inner outline-none backdrop-blur-sm transition focus:ring-4 focus:ring-card-gold/70 landscape:min-h-0 landscape:py-1.5 landscape:text-sm"
             />
-          </div>
 
-          <div>
+            <div>
             <button
               type="button"
               onClick={() => setShowServerAddress((v) => !v)}
@@ -171,16 +173,17 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
                 </p>
               </motion.div>
             )}
+            </div>
           </div>
 
           {mode === 'choose' && (
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 landscape:gap-1.5">
               <motion.button
                 type="button"
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
                 onClick={() => setShowDifficulty(true)}
-                className="min-h-[44px] w-full rounded-xl bg-gradient-to-b from-card-gold-light to-card-gold px-6 py-3 font-bold text-black shadow-lg shadow-black/30 transition-colors hover:from-card-gold hover:to-card-gold-dark"
+                className="min-h-[44px] w-full rounded-xl bg-gradient-to-b from-card-gold-light to-card-gold px-6 py-3 font-bold text-black shadow-lg shadow-black/30 transition-colors hover:from-card-gold hover:to-card-gold-dark landscape:min-h-0 landscape:py-1.5 landscape:text-sm"
               >
                 Criar Sala
               </motion.button>
@@ -189,7 +192,7 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
                 onClick={() => setMode('join')}
-                className="min-h-[44px] w-full rounded-xl border-2 border-card-gold/70 bg-black/20 px-6 py-3 font-bold text-card-gold backdrop-blur-sm transition-colors hover:bg-card-gold/10"
+                className="min-h-[44px] w-full rounded-xl border-2 border-card-gold/70 bg-black/20 px-6 py-3 font-bold text-card-gold backdrop-blur-sm transition-colors hover:bg-card-gold/10 landscape:min-h-0 landscape:py-1.5 landscape:text-sm"
               >
                 Entrar em uma Sala
               </motion.button>
@@ -197,14 +200,14 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
           )}
 
           {mode === 'join' && (
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 landscape:gap-1.5">
               <input
                 type="text"
                 placeholder="Código da sala"
                 value={joinCode}
                 onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                 maxLength={5}
-                className="min-h-[44px] w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-center font-display text-2xl tracking-[0.3em] text-card-gold placeholder-gray-500 shadow-inner outline-none backdrop-blur-sm transition focus:ring-4 focus:ring-card-gold/70"
+                className="min-h-[44px] w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-center font-display text-2xl tracking-[0.3em] text-card-gold placeholder-gray-500 shadow-inner outline-none backdrop-blur-sm transition focus:ring-4 focus:ring-card-gold/70 landscape:min-h-0 landscape:py-1 landscape:text-lg"
               />
               <motion.button
                 type="button"
@@ -212,7 +215,7 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
                 whileTap={{ scale: 0.97 }}
                 onClick={handleJoin}
                 disabled={connection === 'connecting'}
-                className="min-h-[44px] w-full rounded-xl bg-gradient-to-b from-card-gold-light to-card-gold px-6 py-3 font-bold text-black shadow-lg shadow-black/30 transition-colors hover:from-card-gold hover:to-card-gold-dark disabled:opacity-50"
+                className="min-h-[44px] w-full rounded-xl bg-gradient-to-b from-card-gold-light to-card-gold px-6 py-3 font-bold text-black shadow-lg shadow-black/30 transition-colors hover:from-card-gold hover:to-card-gold-dark landscape:min-h-0 landscape:py-1.5 landscape:text-sm disabled:opacity-50"
               >
                 {connection === 'connecting' ? 'Conectando…' : 'Entrar'}
               </motion.button>
@@ -280,7 +283,7 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               onClick={startRoom}
-              className="min-h-[44px] w-full rounded-xl bg-gradient-to-b from-card-gold-light to-card-gold px-6 py-3 font-bold text-black shadow-lg shadow-black/30 transition-colors hover:from-card-gold hover:to-card-gold-dark"
+              className="min-h-[44px] w-full rounded-xl bg-gradient-to-b from-card-gold-light to-card-gold px-6 py-3 font-bold text-black shadow-lg shadow-black/30 transition-colors hover:from-card-gold hover:to-card-gold-dark landscape:min-h-0 landscape:py-1.5 landscape:text-sm"
             >
               Iniciar Partida
             </motion.button>

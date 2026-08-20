@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli'
 
 const config: CapacitorConfig = {
   appId: 'com.buraco.jogatina',
-  appName: 'Buraco Jogatina v23',
+  appName: 'Buraco Jogatina v24',
   // Vite builds the web app into dist/ — Capacitor bundles it into the APK,
   // so the game runs fully offline (single-player) inside a native WebView.
   webDir: 'dist',

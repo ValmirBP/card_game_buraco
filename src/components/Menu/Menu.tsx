@@ -54,16 +54,25 @@ export default function Menu({ onStart, onPlayOnline }: MenuProps) {
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col items-center justify-center gap-4 overflow-y-auto px-3 py-2 landscape:justify-center landscape:gap-1.5 landscape:overflow-hidden">
-      <div className="relative flex flex-col items-center pt-4 text-center landscape:pt-0">
-        <div className="pointer-events-none absolute -top-2 flex h-20 items-end justify-center sm:-top-4 sm:h-24 landscape:hidden">
+      {/* pt em paisagem abre espaço pro leque, que antes era landscape:hidden
+          (a tela inicial ficava sem carta nenhuma no celular). */}
+      <div className="relative flex flex-col items-center pt-4 text-center landscape:pt-14">
+        <div className="pointer-events-none absolute -top-2 flex h-20 origin-bottom items-end justify-center sm:-top-4 sm:h-24 landscape:-top-1 landscape:h-14 landscape:scale-[0.52]">
           {FAN_CARDS.map((f, i) => (
-            <div
+            <motion.div
               key={i}
               className="absolute"
-              style={{ transform: `translateX(${f.x}px) rotate(${f.rotate}deg)` }}
+              // x/rotate como props do Framer (NÃO um `transform` inline): o
+              // Framer gerencia a transform inteira e sobrescreveria a string
+              // CSS, empilhando as cartas todas no centro.
+              style={{ x: f.x, rotate: f.rotate }}
+              // Balanço leve e contínuo, defasado por carta: dá vida ao leque
+              // sem distrair (a mesa de verdade fica embaixo).
+              animate={{ y: [0, -5, 0] }}
+              transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut', delay: i * 0.22 }}
             >
               <CardComponent card={f.card} index={i} />
-            </div>
+            </motion.div>
           ))}
         </div>
         <h1 className="relative z-10 mt-16 mb-1 font-display text-4xl tracking-wide text-card-gold drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)] sm:mt-20 md:text-6xl landscape:mt-0 landscape:text-xl">

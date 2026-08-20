@@ -1,32 +1,16 @@
-import { useState, type CSSProperties, type MouseEvent } from 'react'
+import { useState, type MouseEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useOnlineStore } from '../../online/onlineStore'
-import { CardComponent, CardBack } from '../Card'
+import { CardBack } from '../Card'
 import { canExtendMeld, isValidCanasta } from '../../engine/utils'
 import type { SeatView, PlainCard } from '../../session/types'
 import { otherSeatsInOrder } from '../../online/seatLayout'
 import { asCard, asCards } from '../../online/cardAdapter'
 import Seat from '../Gameplay/Seat'
+import MeldCardColumn from '../Gameplay/MeldCardColumn'
 
-/** Footprint das cartas dos JOGOS baixados (colunas verticais) — idêntico ao
- * TABLE_CARD_SIZE do GameBoard.tsx offline (não exportado de lá pra não
- * acoplar os dois módulos; só os valores literais precisam bater). */
-const TABLE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-[4.25rem] landscape:h-[5.25rem]'
 /** Footprint do MONTE — idêntico ao PILE_CARD_SIZE offline. */
 const PILE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-8 landscape:h-[2.9rem]'
-/** Naipes/rank do canto grandes e legíveis — idêntico ao BIG_CORNER offline. */
-const BIG_CORNER = 'text-sm font-normal sm:text-base landscape:text-lg landscape:leading-none'
-
-/** Sobreposição vertical das cartas de um jogo, SÓ NO RETRATO — idêntico ao
- * meldStackSpacing offline (em paisagem as cartas ficam absolutas
- * distribuídas por porcentagem; ver GameBoard.tsx pra explicação completa). */
-function meldStackSpacing(n: number): string {
-  if (n >= 12) return 'space-y-[-4.9rem] sm:space-y-[-5.7rem]'
-  if (n >= 9) return 'space-y-[-4.7rem] sm:space-y-[-5.5rem]'
-  if (n >= 7) return 'space-y-[-4.5rem] sm:space-y-[-5.3rem]'
-  if (n >= 5) return 'space-y-[-4.3rem] sm:space-y-[-5.1rem]'
-  return 'space-y-[-4.2rem] sm:space-y-[-5rem]'
-}
 
 interface OnlineGameBoardProps {
   view: SeatView
@@ -303,7 +287,7 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
                   {isDropTarget ? 'Clique aqui para baixar as cartas selecionadas' : 'Nenhum jogo baixado ainda'}
                 </span>
               ) : (
-                <div className="scrollbar-gold flex flex-wrap items-start gap-3 landscape:min-h-0 landscape:flex-1 landscape:flex-nowrap landscape:items-stretch landscape:gap-2 landscape:overflow-x-auto landscape:overflow-y-hidden landscape:pb-1">
+                <div className="flex flex-wrap items-start gap-3 landscape:min-h-0 landscape:flex-1 landscape:flex-nowrap landscape:gap-1.5 landscape:overflow-hidden">
                   <AnimatePresence>
                     {team.melds.map((canasta, ci) => {
                       const meldCards = canasta.layout.map(entry => entry.card)
@@ -314,14 +298,13 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
                           asCards(selectedCardIndices.map(i => yourHand[i]).filter(Boolean))
                         )
                       const isClosed = canasta.isCanastra
-                      const lastIdx = canasta.layout.length - 1
                       return (
                         <motion.div
                           key={ci}
                           initial={{ opacity: 0, scale: 0.85 }}
                           animate={{ opacity: 1, scale: 1 }}
                           onClick={event => handleMeldClick(event, team.id, ci, meldCards)}
-                          className={`space-y-1 rounded-lg p-1 transition-shadow landscape:flex landscape:h-full landscape:min-h-0 landscape:flex-shrink-0 landscape:flex-col landscape:space-y-0.5 ${
+                          className={`shrink-0 space-y-1 rounded-lg p-1 transition-shadow landscape:space-y-0.5 landscape:p-0.5 ${
                             canClickToExtend
                               ? compatible
                                 ? 'cursor-pointer ring-2 ring-card-gold shadow-[0_0_14px_rgba(212,175,55,0.5)]'
@@ -329,40 +312,9 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
                               : ''
                           }`}
                         >
-                          {/* Paisagem: cartas em posição ABSOLUTA distribuídas
-                              por porcentagem da altura — TODAS cabem sem
-                              rolagem, qualquer quantidade (ver GameBoard
-                              offline pra explicação completa). */}
-                          <div
-                            className={`flex flex-col items-start rounded-lg ${meldStackSpacing(canasta.layout.length)} landscape:relative landscape:block landscape:min-h-0 landscape:w-[4.25rem] landscape:flex-1 ${
-                              isClosed ? 'ring-2 ring-card-gold/70' : ''
-                            }`}
-                          >
-                            {canasta.layout.map((slot, cii) => {
-                              const deitada = isClosed && cii === lastIdx
-                              return (
-                                <div
-                                  key={cii}
-                                  style={
-                                    {
-                                      zIndex: cii,
-                                      '--stack-frac': lastIdx > 0 ? cii / lastIdx : 0,
-                                      '--stack-i': cii,
-                                    } as CSSProperties
-                                  }
-                                  className={`${deitada ? 'origin-center rotate-90 ' : ''}landscape:absolute landscape:left-0 landscape:mt-0 landscape:top-[min(calc((100%-5.25rem)*var(--stack-frac)),calc(var(--stack-i)*1.4rem))]`}
-                                >
-                                  <CardComponent
-                                    card={asCard(slot.card)}
-                                    sizeClassName={TABLE_CARD_SIZE}
-                                    compactOnLandscape
-                                    cornerLayout="row"
-                                    cornerClassName={BIG_CORNER}
-                                  />
-                                </div>
-                              )
-                            })}
-                          </div>
+                          {/* Coluna estilo foto de referência (tiras fixas +
+                              última carta inteira) — ver MeldCardColumn. */}
+                          <MeldCardColumn cards={canasta.layout.map(e => asCard(e.card))} isClosed={isClosed} />
                           <div
                             className={`text-center text-xs font-semibold landscape:shrink-0 landscape:text-[9px] landscape:leading-tight ${
                               canasta.kind === 'real'
@@ -394,6 +346,26 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
                       )
                     })}
                   </AnimatePresence>
+
+                  {/* Slot de DOCK fixo pra baixar jogo novo com a mesa cheia
+                      — ver GameBoard offline. */}
+                  {team.id === myTeamId && (
+                    <button
+                      type="button"
+                      onClick={event => {
+                        event.stopPropagation()
+                        handleDropZoneClick()
+                      }}
+                      className={`flex h-24 w-20 shrink-0 flex-col items-center justify-center gap-1 self-start rounded-lg border-2 border-dashed text-xs transition-colors landscape:h-20 landscape:w-12 landscape:text-[9px] ${
+                        isDropTarget
+                          ? 'border-card-gold bg-card-gold/10 text-card-gold shadow-[0_0_12px_rgba(212,175,55,0.45)]'
+                          : 'border-white/20 text-gray-400'
+                      }`}
+                    >
+                      <span className="text-lg leading-none landscape:text-sm">⬇</span>
+                      <span>Baixar</span>
+                    </button>
+                  )}
                 </div>
               )}
             </div>

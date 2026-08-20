@@ -35,7 +35,7 @@ const FLY_ANIM_MS = 650
 // aqui (não importados) pra não acoplar Gameplay.tsx à estrutura interna
 // desses componentes; só os valores literais precisam bater.
 const GHOST_HAND_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-14 landscape:h-[4.25rem]'
-const GHOST_TABLE_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-[4.25rem] landscape:h-[5.25rem]'
+const GHOST_TABLE_SIZE = 'w-20 h-28 landscape:w-12 landscape:h-16'
 const GHOST_PILE_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-8 landscape:h-[2.9rem]'
 
 /** Entre os índices de cartas selecionadas na mão, acha o elemento
