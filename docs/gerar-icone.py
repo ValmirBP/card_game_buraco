@@ -1,6 +1,6 @@
 """
-Gera o ícone do Buraco Jogatina: um leque de cartas J Q K A sobre o feltro
-verde, com o curinga espiando por cima.
+Gera o ícone do Buraco Jogatina: um leque de cartas J Q K A sobre o
+feltro verde.
 
 Desenha em 4x e reduz com LANCZOS (antialias caseiro), porque as primitivas
 do PIL não têm suavização própria - sem isso as bordas das cartas e os
@@ -110,13 +110,12 @@ def _joker(size):
 
 
 def _art(canvas, size, cx, cy):
-    """Leque de cartas + curinga, centrado em (cx, cy)."""
+    """Leque de cartas, centrado em (cx, cy). Sem figura de curinga: o
+    bonequinho deixava o icone com cara infantil."""
     for rank, suit, angle, dx, dy in FAN:
         card = _card(size, rank, suit, angle)
         canvas.alpha_composite(card, (int(cx + dx * size - card.width / 2),
                                       int(cy + dy * size - card.height / 2)))
-    joker = _joker(size)
-    canvas.alpha_composite(joker, (int(cx - size * 0.56), int(cy - size * 0.60)))
 
 
 def foreground(px):
@@ -124,7 +123,7 @@ def foreground(px):
     img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
     # zona segura do ícone adaptativo: a arte fica no centro, com folga pro
     # recorte circular/squircle de qualquer launcher.
-    _art(img, size * 0.50, size * 0.52, size * 0.54)
+    _art(img, size * 0.62, size * 0.50, size * 0.50)
     return img.resize((px, px), Image.LANCZOS)
 
 
@@ -140,7 +139,7 @@ def legacy(px, round_icon=False):
         d.rounded_rectangle([0, 0, size - 1, size - 1], radius=int(size * 0.22), fill=FELT)
         d.rounded_rectangle([size * 0.035, size * 0.035, size * 0.965, size * 0.965],
                             radius=int(size * 0.19), outline=GOLD, width=max(1, int(size * 0.016)))
-    _art(img, size * 0.58, size * 0.52, size * 0.56)
+    _art(img, size * 0.76, size * 0.50, size * 0.50)
     return img.resize((px, px), Image.LANCZOS)
 
 
