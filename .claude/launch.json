@@ -8,21 +8,8 @@
         "run",
         "dev"
       ],
-      "cwd": ".worktrees/buraco-impl/projects/buraco-jogatina",
+      "cwd": "projects/buraco-jogatina",
       "port": 5173
-    },
-    {
-      "name": "buraco-stable",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
-        "dev",
-        "--",
-        "--port",
-        "5174"
-      ],
-      "cwd": ".worktrees/buraco-stable",
-      "port": 5174
     },
     {
       "name": "buraco-server",
@@ -31,7 +18,7 @@
         "run",
         "server"
       ],
-      "cwd": ".worktrees/buraco-impl/projects/buraco-jogatina",
+      "cwd": "projects/buraco-jogatina",
       "port": 3001
     }
   ]
