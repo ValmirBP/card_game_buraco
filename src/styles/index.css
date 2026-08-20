@@ -15,11 +15,15 @@
   /* Card face — marfim/creme (carta de baralho tradicional), não branco puro */
   --color-card-face: #f6efd8;
 
-  /* Suit colors — traditional 2-color deck: hearts/diamonds red, clubs/spades black */
-  --color-suit-hearts: #d4143c;
-  --color-suit-diamonds: #d4143c;
-  --color-suit-clubs: #16161a;
-  --color-suit-spades: #16161a;
+  /* Suit colors — baralho tradicional de 2 cores. Tons SUAVIZADOS sobre o
+     creme da carta (--color-card-face): o vermelho #d4143c e o quase-preto
+     #16161a ficavam com contraste duro demais, cansando a vista numa tela
+     de celular cheia de cartas pequenas. Estes são o vermelho e o grafite
+     de tinta impressa, ainda bem legíveis. */
+  --color-suit-hearts: #b3253f;
+  --color-suit-diamonds: #b3253f;
+  --color-suit-clubs: #33333a;
+  --color-suit-spades: #33333a;
 
   /* Display font for titles */
   --font-display: 'Righteous', 'Segoe UI', sans-serif;

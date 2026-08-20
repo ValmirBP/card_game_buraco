@@ -1,12 +1,5 @@
-import { CardComponent } from '../Card'
+import { CardComponent, SuitIcon } from '../Card'
 import type { Card as CardType } from '../../engine/card'
-
-const SUIT_SYMBOLS: Record<CardType['suit'], string> = {
-  hearts: '♥',
-  diamonds: '♦',
-  clubs: '♣',
-  spades: '♠',
-}
 
 const SUIT_COLOR_CLASS: Record<CardType['suit'], string> = {
   hearts: 'text-suit-hearts',
@@ -36,7 +29,7 @@ function CardStrip({ card }: { card: CardType }) {
       className={`flex h-6 w-20 shrink-0 items-center gap-1 rounded-sm border border-black/15 bg-card-face px-1.5 text-base font-bold leading-none landscape:h-[1.15rem] landscape:w-12 landscape:gap-0.5 landscape:px-1 landscape:text-[11px] ${SUIT_COLOR_CLASS[card.suit]}`}
     >
       <span>{card.rank}</span>
-      <span>{SUIT_SYMBOLS[card.suit]}</span>
+      <SuitIcon suit={card.suit} />
     </div>
   )
 }

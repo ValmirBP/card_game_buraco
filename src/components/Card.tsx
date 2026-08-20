@@ -32,11 +32,57 @@ interface CardProps {
   cornerLayout?: 'column' | 'row'
 }
 
-const SUIT_SYMBOLS: Record<CardType['suit'], string> = {
-  hearts: '♥',
-  diamonds: '♦',
-  clubs: '♣',
-  spades: '♠',
+/**
+ * Naipes desenhados em SVG, NÃO como caractere de fonte (♥♦♣♠).
+ *
+ * Motivo: a Roboto (fonte do Android) não tem os glifos de naipe, então o
+ * sistema caía na fonte de EMOJI, que desenha um bitmap com a cor embutida
+ * e ignora o `color` do CSS. Resultado medido na tela: espadas saíam
+ * (70,76,79) - cinza-azulado - em vez da cor do tema, e os vermelhos vinham
+ * num tom fixo mais berrante que o resto da carta. O seletor de texto
+ * (U+FE0E) não resolveu, porque sem nenhuma fonte de texto com o glifo o
+ * fallback volta pro emoji.
+ *
+ * Com SVG + `fill="currentColor"`, a cor é exatamente a do CSS
+ * (--color-suit-*), idêntica em qualquer aparelho, e o tamanho acompanha o
+ * font-size (1em) como se fosse texto.
+ */
+export function SuitIcon({ suit, className = '' }: { suit: CardType['suit']; className?: string }) {
+  const common = {
+    viewBox: '0 0 24 24',
+    fill: 'currentColor',
+    'aria-hidden': true as const,
+    className: `inline-block h-[1em] w-[1em] shrink-0 align-[-0.12em] ${className}`,
+  }
+  switch (suit) {
+    case 'hearts':
+      return (
+        <svg {...common}>
+          <path d="M12 21.6 4.2 13.8a5 5 0 1 1 7.1-7.1l.7.7.7-.7a5 5 0 1 1 7.1 7.1L12 21.6z" />
+        </svg>
+      )
+    case 'diamonds':
+      return (
+        <svg {...common}>
+          <path d="M12 1.8 21.2 12 12 22.2 2.8 12z" />
+        </svg>
+      )
+    case 'clubs':
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="6.6" r="4.1" />
+          <circle cx="6.6" cy="13.6" r="4.1" />
+          <circle cx="17.4" cy="13.6" r="4.1" />
+          <path d="M10.4 13.4h3.2l1.7 8.4H8.7z" />
+        </svg>
+      )
+    case 'spades':
+      return (
+        <svg {...common}>
+          <path d="M12 2.2C12 2.2 3 9.2 3 14.1a4.6 4.6 0 0 0 7.9 3.2c-.2 2-.9 3.7-1.9 4.5h6c-1-.8-1.7-2.5-1.9-4.5A4.6 4.6 0 0 0 21 14.1c0-4.9-9-11.9-9-11.9z" />
+        </svg>
+      )
+  }
 }
 
 const SUIT_COLOR_CLASS: Record<CardType['suit'], string> = {
@@ -249,13 +295,13 @@ export function CardComponent({
             className={`absolute flex items-center leading-[0.85] ${cornerFlexClass} ${cornerGap} ${suitClass} ${cornerTextClass}`}
           >
             <span className="font-bold tracking-tight">{card.rank}</span>
-            <span className={`${suitSpacingClass} text-[0.78em]`}>{SUIT_SYMBOLS[card.suit]}</span>
+            <SuitIcon suit={card.suit} className={`${suitSpacingClass} text-[0.78em]`} />
           </div>
           <div
             className={`absolute flex rotate-180 items-center leading-[0.85] ${cornerFlexClass} ${cornerGapBottom} ${suitClass} ${cornerTextClass}`}
           >
             <span className="font-bold tracking-tight">{card.rank}</span>
-            <span className={`${suitSpacingClass} text-[0.78em]`}>{SUIT_SYMBOLS[card.suit]}</span>
+            <SuitIcon suit={card.suit} className={`${suitSpacingClass} text-[0.78em]`} />
           </div>
           {/* Corpo da carta. Em PAISAGEM (o jogo de verdade, cartas
               pequenas): um ÚNICO naipe central — os naipes repetidos (pips)
@@ -271,7 +317,7 @@ export function CardComponent({
                   className={`absolute -translate-x-1/2 -translate-y-1/2 text-sm leading-none sm:text-base ${suitClass}`}
                   style={{ left: `${x}%`, top: `${y}%` }}
                 >
-                  {SUIT_SYMBOLS[card.suit]}
+                  <SuitIcon suit={card.suit} />
                 </span>
               ))}
             </div>
@@ -281,7 +327,7 @@ export function CardComponent({
               PIP_POSITIONS[card.rank] ? 'hidden landscape:flex' : 'flex'
             } ${centerTextClass} ${suitClass}`}
           >
-            {SUIT_SYMBOLS[card.suit]}
+            <SuitIcon suit={card.suit} />
           </div>
         </>
       )}
