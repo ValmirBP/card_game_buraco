@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#FFFFFF</color>
+    <!-- Fundo do ícone adaptativo: o mesmo verde do feltro da mesa
+         (color-card-green no tema CSS / backgroundColor do capacitor.config).
+         Era o #FFFFFF padrão do Capacitor, que deixava o ícone com uma
+         moldura branca destoando do jogo. -->
+    <color name="ic_launcher_background">#0f5132</color>
 </resources>
