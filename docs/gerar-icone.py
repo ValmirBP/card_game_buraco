@@ -45,6 +45,10 @@ def _spade(draw, cx, cy, w, h, color):
     )
 
 
+def _diamond(draw, cx, cy, w, h, color):
+    draw.polygon([(cx, cy - h / 2), (cx + w / 2, cy), (cx, cy + h / 2), (cx - w / 2, cy)], fill=color)
+
+
 def _card(size, angle, pip=None):
     """Uma carta creme com borda, já rotacionada (canvas transparente)."""
     w, h = int(size * 0.42), int(size * 0.60)
@@ -56,6 +60,8 @@ def _card(size, angle, pip=None):
                         outline=INK, width=max(1, int(size * 0.012)))
     if pip == 'heart':
         _heart(d, pad + w / 2, pad + h * 0.52, w * 0.52, h * 0.42, RED)
+    elif pip == 'diamond':
+        _diamond(d, pad + w * 0.66, pad + h * 0.34, w * 0.34, h * 0.30, RED)
     elif pip == 'spade':
         _spade(d, pad + w * 0.34, pad + h * 0.34, w * 0.40, h * 0.34, INK)
     return layer.rotate(angle, resample=Image.BICUBIC, expand=True)
@@ -64,7 +70,7 @@ def _card(size, angle, pip=None):
 def _fan(canvas, size, cx, cy):
     """Cola o leque de 3 cartas centrado em (cx, cy)."""
     spread = size * 0.26
-    for angle, dx, pip in ((20, -spread, 'spade'), (-20, spread, None), (0, 0, 'heart')):
+    for angle, dx, pip in ((20, -spread, 'spade'), (-20, spread, 'diamond'), (0, 0, 'heart')):
         card = _card(size, angle, pip)
         canvas.alpha_composite(card, (int(cx + dx - card.width / 2), int(cy - card.height / 2)))
 

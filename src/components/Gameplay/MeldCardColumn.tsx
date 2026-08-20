@@ -56,7 +56,27 @@ export default function MeldCardColumn({ cards, isClosed }: MeldCardColumnProps)
     <div className={`flex flex-col items-center rounded-md ${isClosed ? 'ring-2 ring-card-gold/70' : ''}`}>
       {cards.map((card, i) =>
         i === lastIdx ? (
-          <div key={i} className={isClosed ? 'my-2 origin-center rotate-90' : ''}>
+          <div
+            key={i}
+            // Canastra fechada: a carta deitada tem que ficar POR CIMA da
+            // pilha, cruzada, como numa mesa de verdade.
+            // `rotate-90` é só visual - a CAIXA de layout continua em pé
+            // (w-12 x h-16 em paisagem), entao sobra um vao morto de
+            // (16-12)/2 = 8px em cima e embaixo, e o `my-2` de antes ainda
+            // somava 8px de cada lado: a carta acabava flutuando longe da
+            // pilha. As margens negativas anulam esse vao E puxam a carta
+            // pra cima da ultima tira; z-10 garante que ela desenhe por
+            // cima, nao por baixo.
+            // A sobreposicao e pequena de proposito: encosta na pilha (parece
+            // apoiada em cima) SEM cobrir o rank da carta de baixo - com uma
+            // sobreposicao maior que a altura de uma tira, a carta anterior
+            // sumia inteira e nao dava pra contar a canastra.
+            className={
+              isClosed
+                ? 'relative z-10 origin-center rotate-90 -mt-6 -mb-4 landscape:-mt-[0.875rem] landscape:-mb-2'
+                : ''
+            }
+          >
             <CardComponent
               card={card}
               sizeClassName={FULL_CARD_SIZE}
