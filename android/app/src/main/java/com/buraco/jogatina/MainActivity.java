@@ -22,8 +22,19 @@ public class MainActivity extends BridgeActivity {
         // paisagem, sem isso sobra uma faixa nas bordas onde fica o notch.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             WindowManager.LayoutParams lp = getWindow().getAttributes();
+            // ALWAYS (API 30+), não SHORT_EDGES: SHORT_EDGES só deixa o
+            // conteúdo entrar no recorte das bordas CURTAS. Neste jogo, que
+            // roda travado em paisagem, o furo da câmera fica numa borda
+            // LATERAL - com SHORT_EDGES a janela era recuada ali e sobrava
+            // uma faixa onde a moldura de madeira da mesa não chegava,
+            // mostrando o fundo liso da janela. Com ALWAYS a WebView cobre a
+            // tela inteira e a moldura acompanha a borda real do aparelho.
+            // Os elementos que ficariam ATRÁS do furo já se protegem sozinhos
+            // com env(safe-area-inset-*) (ver GameBoard.tsx).
             lp.layoutInDisplayCutoutMode =
-                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+                    ? WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+                    : WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
             getWindow().setAttributes(lp);
         }
         hideSystemBars();

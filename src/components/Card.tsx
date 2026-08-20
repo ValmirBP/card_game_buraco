@@ -174,9 +174,13 @@ export function CardComponent({
     : compactOnLandscape
       ? 'text-sm sm:text-base landscape:text-[10px] landscape:leading-none'
       : 'text-sm sm:text-base'
+  // Naipe central: em paisagem a carta é pequena (56x68 na mão) e mostrada
+  // em "meia carta", então um glifo grande demais tomava conta dela toda -
+  // o usuário reclamou de "naipes muito grandes". text-sm mantém o naipe
+  // legível e proporcional ao rank do canto.
   const centerTextClass = compactOnLandscape
-    ? 'text-4xl sm:text-5xl landscape:text-xl'
-    : 'text-4xl sm:text-5xl'
+    ? 'text-2xl sm:text-3xl landscape:text-sm'
+    : 'text-2xl sm:text-3xl'
   const cornerGap = compactOnLandscape ? 'left-2 top-1.5 landscape:left-1 landscape:top-0.5' : 'left-2 top-1.5'
   const cornerGapBottom = compactOnLandscape
     ? 'bottom-1.5 right-2 landscape:bottom-0.5 landscape:right-1'
@@ -236,16 +240,22 @@ export function CardComponent({
         <>
           {/* Índice do canto (estilo carta real): rank em cima, naipe logo
               abaixo bem juntinho (leading tight + tucking), no topo-esquerdo e
-              espelhado no rodapé-direito. */}
-          <div className={`absolute flex items-center leading-[0.85] ${cornerFlexClass} ${cornerGap} ${suitClass}`}>
-            <span className={`font-bold tracking-tight ${cornerTextClass}`}>{card.rank}</span>
-            <span className={`${suitSpacingClass} ${cornerTextClass}`}>{SUIT_SYMBOLS[card.suit]}</span>
+              espelhado no rodapé-direito.
+              O tamanho da fonte vai no CONTAINER e o naipe usa 0.78em: assim
+              ele fica sempre PROPORCIONALMENTE menor que o rank, em qualquer
+              contexto (mão, mesa, descarte), como numa carta impressa - antes
+              os dois tinham o mesmo tamanho e o naipe pesava demais. */}
+          <div
+            className={`absolute flex items-center leading-[0.85] ${cornerFlexClass} ${cornerGap} ${suitClass} ${cornerTextClass}`}
+          >
+            <span className="font-bold tracking-tight">{card.rank}</span>
+            <span className={`${suitSpacingClass} text-[0.78em]`}>{SUIT_SYMBOLS[card.suit]}</span>
           </div>
           <div
-            className={`absolute flex rotate-180 items-center leading-[0.85] ${cornerFlexClass} ${cornerGapBottom} ${suitClass}`}
+            className={`absolute flex rotate-180 items-center leading-[0.85] ${cornerFlexClass} ${cornerGapBottom} ${suitClass} ${cornerTextClass}`}
           >
-            <span className={`font-bold tracking-tight ${cornerTextClass}`}>{card.rank}</span>
-            <span className={`${suitSpacingClass} ${cornerTextClass}`}>{SUIT_SYMBOLS[card.suit]}</span>
+            <span className="font-bold tracking-tight">{card.rank}</span>
+            <span className={`${suitSpacingClass} text-[0.78em]`}>{SUIT_SYMBOLS[card.suit]}</span>
           </div>
           {/* Corpo da carta. Em PAISAGEM (o jogo de verdade, cartas
               pequenas): um ÚNICO naipe central — os naipes repetidos (pips)

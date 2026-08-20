@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli'
 
 const config: CapacitorConfig = {
   appId: 'com.buraco.jogatina',
-  appName: 'Buraco Jogatina v25',
+  appName: 'Buraco Jogatina v26',
   // Vite builds the web app into dist/ — Capacitor bundles it into the APK,
   // so the game runs fully offline (single-player) inside a native WebView.
   webDir: 'dist',
@@ -23,6 +23,24 @@ const config: CapacitorConfig = {
     // (src/components/Online/QrScanner.tsx) para de funcionar em silêncio,
     // sem erro visível.
     androidScheme: 'http',
+  },
+  plugins: {
+    SystemBars: {
+      // Em Android 15+ (API 35) o plugin SystemBars do Capacitor aplica
+      // padding no PAI da WebView igual aos insets de systemBars +
+      // displayCutout (ver SystemBars.initWindowInsetsListener). Num jogo
+      // travado em paisagem isso empurrava a WebView 128px pra dentro na
+      // borda do furo da câmera, e sobrava uma faixa onde a moldura de
+      // madeira da mesa não chegava - dava pra ver o fundo liso da janela
+      // ali. 'disable' desliga esse tratamento; a WebView cobre a tela
+      // inteira e a moldura acompanha a borda real do aparelho.
+      //
+      // Só desativa a injeção das variáveis --safe-area-inset-* do
+      // Capacitor, que este projeto NÃO usa: o CSS usa o env(safe-area-
+      // inset-*) nativo (viewport-fit=cover no index.html), que continua
+      // protegendo os elementos de canto (ver GameBoard.tsx).
+      insetsHandling: 'disable',
+    },
   },
 }
 
