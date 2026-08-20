@@ -8,7 +8,7 @@
         "run",
         "dev"
       ],
-      "cwd": "projects/buraco-jogatina",
+      "cwd": "buraco-jogatina",
       "port": 5173
     },
     {
@@ -18,7 +18,7 @@
         "run",
         "server"
       ],
-      "cwd": "projects/buraco-jogatina",
+      "cwd": "buraco-jogatina",
       "port": 3001
     }
   ]
