@@ -15,6 +15,13 @@ const config: CapacitorConfig = {
     // WebView lança SecurityError síncrono ao tentar `new WebSocket(...)`,
     // antes mesmo de tentar conectar). 'http' faz a página carregar em
     // http://localhost, onde ws:// é permitido normalmente.
+    //
+    // NÃO defina `hostname` junto: a página PRECISA continuar em
+    // http://localhost. `localhost` é a única origem http que conta como
+    // CONTEXTO SEGURO - com qualquer outro hostname o WebView remove
+    // `navigator.mediaDevices`, e o leitor de QR da tela Online
+    // (src/components/Online/QrScanner.tsx) para de funcionar em silêncio,
+    // sem erro visível.
     androidScheme: 'http',
   },
 }

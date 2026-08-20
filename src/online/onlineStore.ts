@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { AIDifficulty } from '../engine/ai'
 import type { Intent, SeatView } from '../session/types'
 import { resolveWsUrl } from './wsUrl'
+import { parseJoinLink } from './joinLink'
 
 const SERVER_ADDRESS_STORAGE_KEY = 'buraco-server-address'
 
@@ -65,6 +66,11 @@ interface OnlineState {
 
   create: (name: string, difficulty: AIDifficulty) => void
   join: (code: string, name: string) => void
+  /** Entra numa sala a partir do texto CRU de um QR lido (ver joinLink.ts):
+   * configura o endereço do servidor embutido no link e já entra. Retorna
+   * false se o texto não for um convite válido — aí o leitor segue lendo em
+   * vez de fechar. */
+  joinFromScannedLink: (raw: string, name: string) => boolean
   start: () => void
   sendIntent: (intent: Intent) => void
   nextRound: () => void
@@ -230,6 +236,22 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
     reconnectAttempts = 0
     lastJoin = { name, code }
     connect(() => send({ type: 'join', code, name }))
+  },
+
+  joinFromScannedLink: (raw, name) => {
+    const link = parseJoinLink(raw)
+    // Sem código não dá pra entrar em sala nenhuma (ex.: QR de Wi-Fi, ou um
+    // link só com o servidor): o leitor continua lendo.
+    if (!link || !link.code) return false
+    // O endereço vem ANTES do join: connect() lê serverAddress via
+    // getState() (ver connect/resolveWsUrl), e setServerAddress grava
+    // sincronamente - então o join já sai apontando pro servidor do QR,
+    // que é justamente o passo manual que o segundo aparelho tinha que
+    // fazer à mão. Link sem servidor (ex.: localhost, descartado por
+    // parseJoinLink) mantém o endereço já configurado.
+    if (link.serverAddress) get().setServerAddress(link.serverAddress)
+    get().join(link.code, name)
+    return true
   },
 
   start: () => send({ type: 'start' }),

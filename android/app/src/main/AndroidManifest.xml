@@ -47,4 +47,14 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- CAMERA: leitor de QR da tela Online (src/components/Online/QrScanner.tsx),
+         que usa getUserMedia + BarcodeDetector dentro do próprio WebView (sem
+         plugin nativo). A página carrega de http://localhost (ver
+         capacitor.config.ts androidScheme), que conta como contexto seguro,
+         então a câmera é permitida - mas só se a permissão estiver declarada
+         aqui. `required=false` pra o app continuar instalável num aparelho
+         sem câmera (lá o botão "Escanear QR" simplesmente não aparece). -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 </manifest>

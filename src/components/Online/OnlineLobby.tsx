@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import QRCode from 'qrcode'
 import { Capacitor } from '@capacitor/core'
 import { useOnlineStore, joinUrlFor } from '../../online/onlineStore'
 import DifficultySelector from '../Menu/DifficultySelector'
+import QrScanner, { canScanQr } from './QrScanner'
 import type { AIDifficulty } from '../../engine/ai'
 
 /** Room code from a `?sala=CODE` invite link, read once on first render.
@@ -42,12 +43,29 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
   const setServerAddress = useOnlineStore((s) => s.setServerAddress)
   const createRoom = useOnlineStore((s) => s.create)
   const joinRoom = useOnlineStore((s) => s.join)
+  const joinFromScannedLink = useOnlineStore((s) => s.joinFromScannedLink)
   const startRoom = useOnlineStore((s) => s.start)
   const clearError = useOnlineStore((s) => s.clearError)
 
   const [inviteCode] = useState(readInviteCodeFromUrl)
   const [name, setName] = useState('Você')
   const [joinCode, setJoinCode] = useState(inviteCode ?? '')
+  const [showScanner, setShowScanner] = useState(false)
+  // Calculado uma vez: a câmera/decodificador existem neste aparelho? Só
+  // mostra o botão onde ele de fato funciona (ver canScanQr).
+  const [scanSupported] = useState(canScanQr)
+
+  /**
+   * QR lido: delega pro store, que configura o endereço do servidor embutido
+   * no link e entra na sala — o passo manual ("digite o IP do computador")
+   * que o segundo aparelho tinha que fazer. Retorna false pra QR que não é
+   * um convite, pro scanner continuar lendo em vez de fechar.
+   */
+  const handleScan = (raw: string): boolean => {
+    const entered = joinFromScannedLink(raw, name.trim() || 'Você')
+    if (entered) setShowScanner(false)
+    return entered
+  }
   const [mode, setMode] = useState<'choose' | 'create' | 'join'>(inviteCode ? 'join' : 'choose')
   const [showDifficulty, setShowDifficulty] = useState(false)
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
@@ -87,6 +105,11 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
       cancelled = true
     }
   }, [code, serverUrl])
+
+  // Um QR só serve pra quem escaneia se apontar pra um endereço alcançável
+  // NA REDE. Sem serverUrl ele viraria window.location.origin (localhost no
+  // APK) - ver o aviso na tela da sala.
+  const qrUsable = Boolean(qrDataUrl) && Boolean(serverUrl)
 
   const handleCreate = (difficulty: AIDifficulty) => {
     setShowDifficulty(false)
@@ -196,6 +219,19 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
               >
                 Entrar em uma Sala
               </motion.button>
+              {/* Caminho SEM digitação: lê o QR do outro celular e já
+                  configura endereço do servidor + código da sala. */}
+              {scanSupported && (
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => setShowScanner(true)}
+                  className="min-h-[44px] w-full rounded-xl border-2 border-card-gold/70 bg-black/20 px-6 py-3 font-bold text-card-gold backdrop-blur-sm transition-colors hover:bg-card-gold/10 landscape:min-h-0 landscape:py-1.5 landscape:text-sm"
+                >
+                  📷 Escanear QR
+                </motion.button>
+              )}
             </div>
           )}
 
@@ -241,13 +277,23 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
             <p className="mt-2 text-xs text-gray-400">Compartilhe este código para outros entrarem</p>
           </div>
 
-          {qrDataUrl && (
+          {/* Sem `serverUrl` (servidor sem IP de LAN — ver lanBaseUrl em
+              server/lanAddress.ts), joinUrlFor cai em window.location.origin,
+              que dentro do APK é http://localhost: um QR que aponta pro
+              PRÓPRIO aparelho de quem escaneia e nunca conecta. Melhor
+              avisar do que desenhar um QR inútil. */}
+          {qrUsable ? (
             <div className="flex flex-col items-center gap-2">
               <div className="rounded-2xl bg-white p-3 shadow-lg">
-                <img src={qrDataUrl} alt="QR code para entrar na sala" width={200} height={200} className="block" />
+                <img src={qrDataUrl!} alt="QR code para entrar na sala" width={200} height={200} className="block" />
               </div>
               <p className="text-xs text-gray-400">Aponte a câmera do outro celular para entrar</p>
             </div>
+          ) : (
+            <p className="rounded-xl bg-amber-500/15 px-4 py-2 text-xs text-amber-200">
+              O servidor não informou um endereço de rede, então o QR não funcionaria. Compartilhe o código
+              acima e o IP do computador manualmente.
+            </p>
           )}
 
           <div className="space-y-2 text-left">
@@ -304,6 +350,10 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
       {showDifficulty && (
         <DifficultySelector onSelect={handleCreate} onCancel={() => setShowDifficulty(false)} />
       )}
+
+      <AnimatePresence>
+        {showScanner && <QrScanner onScan={handleScan} onClose={() => setShowScanner(false)} />}
+      </AnimatePresence>
     </div>
   )
 }
