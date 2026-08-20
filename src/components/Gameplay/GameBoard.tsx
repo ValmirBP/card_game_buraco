@@ -42,6 +42,26 @@ const HAND_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-14 landscape:h-[4.
 /** Naipes/rank do canto grandes e legíveis (usado na mão e no descarte). */
 const BIG_CORNER = 'text-sm font-normal sm:text-base landscape:text-lg landscape:leading-none'
 
+/** Espaçamento horizontal entre os jogos baixados, em paisagem.
+ *
+ * Com a mesa cheia as colunas passavam da largura do painel e, como a
+ * fileira é `flex-nowrap` + `overflow-hidden` (pra não ter rolagem), elas
+ * simplesmente SUMIAM - com 10 jogos baixados, só 6 apareciam. Agora,
+ * conforme a mesa enche, as colunas se SOBREPÕEM: cada uma cobre a direita
+ * da anterior, e a parte ESQUERDA - que carrega rank+naipe de cada carta -
+ * continua visível. Medido no aparelho: com 10 jogos + o slot "Baixar",
+ * as 11 colunas cabem exatas nos 383px do painel, com 32px aparecendo de
+ * cada uma (suficiente pra ler rank+naipe).
+ *
+ * Classes literais pro Tailwind conseguir gerá-las.
+ */
+function meldRowSpacing(n: number): string {
+  if (n >= 11) return 'landscape:-space-x-7'
+  if (n >= 9) return 'landscape:-space-x-5'
+  if (n >= 7) return 'landscape:-space-x-3'
+  return 'landscape:space-x-1.5'
+}
+
 /** The 4-seat table: opponents/partner around a center that shows the draw
  * pile, discard pile (with a small fan of the last few cards), the two
  * mortos (crossed face-down cards until taken), and the two teams' melds. */
@@ -313,7 +333,7 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
                   {isDropTarget ? 'Clique aqui para baixar as cartas selecionadas' : 'Nenhum jogo baixado ainda'}
                 </span>
               ) : (
-                <div className="flex flex-wrap items-start gap-3 landscape:min-h-0 landscape:flex-1 landscape:flex-nowrap landscape:gap-1.5 landscape:overflow-hidden">
+                <div className={`flex flex-wrap items-start gap-3 landscape:min-h-0 landscape:flex-1 landscape:flex-nowrap landscape:gap-0 landscape:overflow-hidden ${meldRowSpacing(team.melds.length)}`}>
                   <AnimatePresence>
                     {team.melds.map((canasta, ci) => {
                       const compatible =
