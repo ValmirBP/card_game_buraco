@@ -2,7 +2,7 @@
 Gera o ícone do Buraco Jogatina: um leque de cartas J Q K A sobre o
 feltro verde.
 
-Desenha em 4x e reduz com LANCZOS (antialias caseiro), porque as primitivas
+Desenha em 8x e reduz com LANCZOS (antialias caseiro), porque as primitivas
 do PIL não têm suavização própria - sem isso as bordas das cartas e os
 naipes ficam serrilhados nos tamanhos pequenos.
 
@@ -16,7 +16,7 @@ Rodar:  python3 docs/gerar-icone.py android/app/src/main/res
 """
 from PIL import Image, ImageDraw, ImageFont
 
-SS = 4  # supersampling
+SS = 8  # supersampling
 
 FELT = (15, 81, 50, 255)        # #0f5132
 CREAM = (246, 239, 216, 255)    # #f6efd8
@@ -48,12 +48,15 @@ def _suit(draw, kind, cx, cy, w, h, color):
     elif kind == 'diamonds':
         draw.polygon([(cx, cy - h / 2), (cx + w / 2, cy), (cx, cy + h / 2), (cx - w / 2, cy)], fill=color)
     elif kind == 'clubs':
-        r = w / 3.4
-        draw.ellipse([cx - r, cy - h / 2, cx + r, cy - h / 2 + 2 * r], fill=color)
-        draw.ellipse([cx - w / 2, cy - r * 0.2, cx - w / 2 + 2 * r, cy - r * 0.2 + 2 * r], fill=color)
-        draw.ellipse([cx + w / 2 - 2 * r, cy - r * 0.2, cx + w / 2, cy - r * 0.2 + 2 * r], fill=color)
-        draw.polygon([(cx - w * 0.13, cy + h / 2), (cx + w * 0.13, cy + h / 2),
-                      (cx + w * 0.05, cy + h * 0.1), (cx - w * 0.05, cy + h * 0.1)], fill=color)
+        # Três lóbulos com centros explícitos e raio menor que a distância
+        # entre eles: assim eles se tocam mas continuam distinguíveis. Com o
+        # raio antigo (w/3.4) os círculos se sobrepunham quase todos e o
+        # naipe virava um borrão redondo nos tamanhos pequenos.
+        r = w * 0.27
+        for lx, ly in ((cx, cy - h * 0.20), (cx - w * 0.25, cy + h * 0.08), (cx + w * 0.25, cy + h * 0.08)):
+            draw.ellipse([lx - r, ly - r, lx + r, ly + r], fill=color)
+        draw.polygon([(cx - w * 0.17, cy + h / 2), (cx + w * 0.17, cy + h / 2),
+                      (cx + w * 0.06, cy + h * 0.05), (cx - w * 0.06, cy + h * 0.05)], fill=color)
     elif kind == 'spades':
         # Espada = coração de cabeça pra baixo + cabo. As duas bolhas ficam
         # CENTRADAS em cx ± w/4 (raio w/4), então a borda externa delas cai
@@ -89,7 +92,7 @@ def _card(size, rank, suit, angle):
     # escapava só por ser arredondado). Com o centro é previsível: basta
     # colocá-lo a 22% da altura pra letra caber inteira.
     d.text((pad + w * 0.26, pad + h * 0.22), rank, font=font, fill=color, anchor='mm')
-    _suit(d, suit, pad + w * 0.21, pad + h * 0.62, w * 0.30, h * 0.22, color)
+    _suit(d, suit, pad + w * 0.26, pad + h * 0.60, w * 0.40, h * 0.28, color)
     return layer.rotate(angle, resample=Image.BICUBIC, expand=True)
 
 
