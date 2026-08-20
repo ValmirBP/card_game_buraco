@@ -1,8 +1,32 @@
+# Dependências e artefatos de build
 node_modules/
 dist/
 .vite/
+coverage/
+build/
+
+# Worktrees de desenvolvimento: são checkouts do PRÓPRIO repositório
+# (git worktree list), com node_modules e saídas de build dentro. Commitar
+# isso duplicaria o repo inteiro e somaria centenas de MB.
+.worktrees/
+.claude/worktrees/
+
+# Ambientes virtuais Python (o markdown-to-audio-telegram tem um .venv de
+# 260 MB) e áudios gerados
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Ambiente/local
 *.local
 .env
 .env.local
-coverage/
+
+# macOS
 .DS_Store
+
+# Projeto SEPARADO, com repositório git próprio (tem .git dentro). Deixado
+# fora deste repo de propósito: aninhá-lo aqui viraria um gitlink/submódulo
+# meio-quebrado, e ele carrega .venv de 260 MB + áudios gerados.
+markdown-to-audio-telegram/

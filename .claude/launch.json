@@ -2,10 +2,37 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "buraco-dev",
+      "name": "buraco",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "cwd": ".worktrees/buraco-impl/projects/buraco-jogatina",
       "port": 5173
+    },
+    {
+      "name": "buraco-stable",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "5174"
+      ],
+      "cwd": ".worktrees/buraco-stable",
+      "port": 5174
+    },
+    {
+      "name": "buraco-server",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "server"
+      ],
+      "cwd": ".worktrees/buraco-impl/projects/buraco-jogatina",
+      "port": 3001
     }
   ]
 }
