@@ -125,7 +125,7 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
   const inRoom = code !== null
 
   return (
-    <div className="flex h-full min-h-0 flex-col items-center justify-center gap-6 overflow-y-auto px-4 py-6 text-center landscape:justify-center landscape:gap-1.5 landscape:overflow-hidden landscape:py-1">
+    <div className="flex h-full min-h-0 flex-col items-center justify-center gap-6 overflow-y-auto px-4 py-6 text-center landscape:justify-start landscape:gap-1.5 landscape:overflow-y-auto landscape:py-1">
       <h1 className="font-display text-3xl text-card-gold drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)] sm:text-4xl landscape:text-xl">
         Jogar Online
       </h1>
@@ -267,14 +267,18 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
         </div>
       )}
 
+      {/* Mesmo padrão do bloco !inRoom: em paisagem vira grade de 2 colunas
+          (esquerda = código + QR, direita = assentos + iniciar), senão o
+          painel empilhado estoura a altura de um celular e "Iniciar Partida"
+          fica fora da tela, sem rolagem pra alcançar. */}
       {inRoom && (
-        <div className="w-full max-w-sm space-y-6">
-          <div className="rounded-2xl border border-card-gold/40 bg-black/25 p-6 shadow-lg backdrop-blur-sm">
-            <p className="text-xs uppercase tracking-wide text-gray-300">Código da sala</p>
-            <p className="font-display text-5xl tracking-[0.3em] text-card-gold drop-shadow-[0_2px_10px_rgba(212,175,55,0.5)]">
+        <div className="w-full max-w-sm space-y-6 landscape:max-w-3xl landscape:grid landscape:grid-cols-2 landscape:items-start landscape:gap-x-4 landscape:gap-y-1.5 landscape:space-y-0 landscape:px-4">
+          <div className="rounded-2xl border border-card-gold/40 bg-black/25 p-6 shadow-lg backdrop-blur-sm landscape:col-start-1 landscape:row-start-1 landscape:p-2">
+            <p className="text-xs uppercase tracking-wide text-gray-300 landscape:text-[10px]">Código da sala</p>
+            <p className="font-display text-5xl tracking-[0.3em] text-card-gold drop-shadow-[0_2px_10px_rgba(212,175,55,0.5)] landscape:text-3xl">
               {code}
             </p>
-            <p className="mt-2 text-xs text-gray-400">Compartilhe este código para outros entrarem</p>
+            <p className="mt-2 text-xs text-gray-400 landscape:mt-0.5 landscape:text-[10px]">Compartilhe este código para outros entrarem</p>
           </div>
 
           {/* Sem `serverUrl` (servidor sem IP de LAN — ver lanBaseUrl em
@@ -283,35 +287,35 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
               PRÓPRIO aparelho de quem escaneia e nunca conecta. Melhor
               avisar do que desenhar um QR inútil. */}
           {qrUsable ? (
-            <div className="flex flex-col items-center gap-2">
-              <div className="rounded-2xl bg-white p-3 shadow-lg">
-                <img src={qrDataUrl!} alt="QR code para entrar na sala" width={200} height={200} className="block" />
+            <div className="flex flex-col items-center gap-2 landscape:col-start-1 landscape:row-start-2 landscape:gap-1">
+              <div className="rounded-2xl bg-white p-3 shadow-lg landscape:p-1.5">
+                <img src={qrDataUrl!} alt="QR code para entrar na sala" width={200} height={200} className="block landscape:h-28 landscape:w-28" />
               </div>
-              <p className="text-xs text-gray-400">Aponte a câmera do outro celular para entrar</p>
+              <p className="text-xs text-gray-400 landscape:text-[10px]">Aponte a câmera do outro celular para entrar</p>
             </div>
           ) : (
-            <p className="rounded-xl bg-amber-500/15 px-4 py-2 text-xs text-amber-200">
+            <p className="rounded-xl bg-amber-500/15 px-4 py-2 text-xs text-amber-200 landscape:col-start-1 landscape:row-start-2 landscape:py-1 landscape:text-[10px]">
               O servidor não informou um endereço de rede, então o QR não funcionaria. Compartilhe o código
               acima e o IP do computador manualmente.
             </p>
           )}
 
-          <div className="space-y-2 text-left">
+          <div className="space-y-2 text-left landscape:col-start-2 landscape:row-start-1 landscape:space-y-1">
             {SEAT_LABELS.map((label, i) => {
               const seatInfo = lobby.find((s) => s.index === i)
               const isYou = seat === i
               return (
                 <div
                   key={i}
-                  className={`flex items-center justify-between rounded-xl border px-4 py-2.5 ${
+                  className={`flex items-center justify-between rounded-xl border px-4 py-2.5 landscape:py-1 ${
                     isYou ? 'border-card-gold bg-card-gold/10' : 'border-white/10 bg-white/5'
                   }`}
                 >
-                  <span className="text-sm text-gray-200">
+                  <span className="text-sm text-gray-200 landscape:text-xs">
                     {seatInfo?.name ?? label}
                     {isYou ? ' (você)' : ''}
                   </span>
-                  <span className="text-xs text-gray-400">
+                  <span className="text-xs text-gray-400 landscape:text-[10px]">
                     {seatInfo?.kind === 'human'
                       ? seatInfo.connected
                         ? '🧑 humano'
@@ -329,12 +333,12 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               onClick={startRoom}
-              className="min-h-[44px] w-full rounded-xl bg-gradient-to-b from-card-gold-light to-card-gold px-6 py-3 font-bold text-black shadow-lg shadow-black/30 transition-colors hover:from-card-gold hover:to-card-gold-dark landscape:min-h-0 landscape:py-1.5 landscape:text-sm"
+              className="min-h-[44px] w-full rounded-xl bg-gradient-to-b from-card-gold-light to-card-gold px-6 py-3 font-bold text-black shadow-lg shadow-black/30 transition-colors hover:from-card-gold hover:to-card-gold-dark landscape:col-start-2 landscape:row-start-2 landscape:mt-1 landscape:min-h-0 landscape:py-1.5 landscape:text-sm"
             >
               Iniciar Partida
             </motion.button>
           ) : (
-            <p className="text-sm text-gray-300">Aguardando o host iniciar a partida…</p>
+            <p className="text-sm text-gray-300 landscape:col-start-2 landscape:row-start-2 landscape:mt-1 landscape:text-xs">Aguardando o host iniciar a partida…</p>
           )}
         </div>
       )}
