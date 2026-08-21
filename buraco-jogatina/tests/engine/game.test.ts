@@ -1520,4 +1520,57 @@ describe('Game', () => {
     clone.state.deck.pop()
     expect(clone.state.deck.length).not.toBe(game.state.deck.length)
   })
+
+  /** Regressão: playCanasta passava só o meld NOVO para wouldEmptyHandIllegally,
+   * em vez da mesa resultante. Como canCloseWithMelds só olha a lista recebida,
+   * a canastra limpa já baixada ficava invisível e a batida era recusada — com
+   * a UI liberando o botão, porque o helper dela sempre olhou a lista inteira. */
+  test('permite bater baixando um jogo novo quando o time JA tem canastra limpa na mesa', () => {
+    const game = new Game(makeFourPlayers())
+    const s = game.state
+    const teamA = s.teams.find(t => t.id === 'A')!
+    teamA.melds = [cleanCanastra()]
+    teamA.hasTakenMorto = true
+    s.mortos = []
+    s.currentPlayerIndex = 0
+
+    const player = s.players[0]
+    while (player.hand.getCards().length > 0) player.hand.removeCard(0)
+    const mao = [
+      new Card('spades', '4', false),
+      new Card('spades', '5', false),
+      new Card('spades', '6', false),
+    ]
+    mao.forEach(c => player.hand.addCard(c))
+
+    expect(game.canClose(teamA)).toBe(true)
+    // a UI e o motor precisam concordar
+    expect(game.wouldPlayCanastaEmptyHandIllegally(mao)).toBe(false)
+    expect(game.playCanasta(mao)).toBe(true)
+    expect(player.hand.getCards().length).toBe(0)
+  })
+
+  /** O outro lado da mesma regra: SEM canastra limpa (nem na mesa, nem no jogo
+   * que está sendo baixado), esvaziar a mão continua proibido. */
+  test('continua recusando esvaziar a mao quando o time nao pode fechar', () => {
+    const game = new Game(makeFourPlayers())
+    const s = game.state
+    const teamA = s.teams.find(t => t.id === 'A')!
+    teamA.melds = []
+    teamA.hasTakenMorto = true
+    s.mortos = []
+    s.currentPlayerIndex = 0
+
+    const player = s.players[0]
+    while (player.hand.getCards().length > 0) player.hand.removeCard(0)
+    const mao = [
+      new Card('spades', '4', false),
+      new Card('spades', '5', false),
+      new Card('spades', '6', false),
+    ]
+    mao.forEach(c => player.hand.addCard(c))
+
+    expect(game.playCanasta(mao)).toBe(false)
+    expect(player.hand.getCards().length).toBe(3)
+  })
 })

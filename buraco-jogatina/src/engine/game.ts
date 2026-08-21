@@ -204,7 +204,11 @@ export class Game {
     if (indicesToRemove === null) return false
 
     const team = this.getTeamOfCurrentPlayer()
-    if (this.wouldEmptyHandIllegally(player, cards.length, team, [canasta])) return false
+    // A lista precisa ser a mesa RESULTANTE, não só o jogo novo: canCloseWithMelds
+    // só enxerga o que recebe, então passar [canasta] escondia a canastra limpa
+    // que o time já tinha baixado e recusava a batida. extendMeld (abaixo) e o
+    // helper wouldPlayCanastaEmptyHandIllegally sempre passaram a lista inteira.
+    if (this.wouldEmptyHandIllegally(player, cards.length, team, [...team.melds, canasta])) return false
 
     for (const idx of indicesToRemove) {
       player.hand.removeCard(idx)
