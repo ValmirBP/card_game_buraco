@@ -3,30 +3,21 @@ import type { ReactNode } from 'react'
 
 /** Espaçamento horizontal entre os jogos baixados, em paisagem.
  *
- * HISTÓRICO: antes a fileira era `overflow-hidden` e as colunas se
- * sobrepunham cada vez mais pra caber TUDO sem rolagem. Com 10 jogos
- * sobravam só 28px de cada coluna de 48px — "vira uma zona", e não dava pra
- * rolar pro lado pra ver o resto (relato do usuário).
+ * HISTÓRICO: a fileira já foi `overflow-hidden`, e as colunas se sobrepunham
+ * cada vez mais pra caber TUDO sem rolagem. Depois passou a rolar, mas MANTIVE
+ * uma sobreposição de 12px (-space-x-3) — e é isso que o usuário ainda via
+ * como "amontoado" a partir do 9º jogo: uma coluna cobrindo a borda da outra.
  *
- * Agora a sobreposição tem PISO: ela para em -space-x-3, que deixa 40px de
- * cada coluna à mostra (rank + naipe + boa parte da carta). Passando disso,
- * a fileira ROLA na horizontal em vez de espremer mais.
+ * Agora NÃO há sobreposição nenhuma: um respiro fixo de 6px entre cada jogo,
+ * cada carta inteira e separada. Quando os jogos passam da largura do painel,
+ * a fileira simplesmente ROLA na horizontal (overflow-x-auto abaixo). Nada é
+ * espremido; o que não cabe fica a um arraste de distância.
  *
- * Os degraus são calibrados pro painel real de 383px (coluna de 52px com o
- * padding) pra que a rolagem só comece no 9º jogo - e, uma vez começada, as
- * colunas NÃO encolham mais:
- *   ate 4 jogos -> folga de 6px  (52 + 4x58 = 284px)
- *   5 a 6       -> encostadas    (52 + 6x52 = 364px)
- *   7 a 8       -> -12px         (52 + 8x40 = 372px)  <- ultimo que cabe
- *   9+          -> -12px, ROLA, sempre com 40px de cada coluna à mostra
- * Antes, pra caber tudo sem rolar, 9 jogos eram espremidos até 28px e 11
- * até 20px - era o que o usuário descreveu como "vira uma zona".
- *
- * Classes literais pro Tailwind conseguir gerá-las.
+ * Constante de propósito: o espaçamento não muda mais com a quantidade de
+ * jogos. Recebe `n` só pra manter a assinatura estável para os chamadores.
+ * Classe literal pro Tailwind conseguir gerá-la.
  */
-export function meldRowSpacing(n: number): string {
-  if (n >= 7) return 'landscape:-space-x-3'
-  if (n >= 5) return 'landscape:space-x-0'
+export function meldRowSpacing(_n: number): string {
   return 'landscape:space-x-1.5'
 }
 
