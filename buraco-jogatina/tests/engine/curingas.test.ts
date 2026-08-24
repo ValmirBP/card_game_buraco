@@ -143,6 +143,44 @@ describe('baixar um trio com curinga pelo caminho do jogo (Game.playCanasta)', (
     expect(jogar(trio)).toBe(false)
     expect(naMao()).toBe(3) // nada foi removido
   })
+
+  /**
+   * O caso EXATO relatado pelo usuário: 3, 5 e 2, todos do mesmo naipe. O 2
+   * (mesmo naipe) preenche o buraco do 4 -> sequência 3-4-5, canastra limpa.
+   * É um jogo válido; baixa numa mão normal. Só é recusado se a mão tiver
+   * 4 cartas ou menos (baixar deixaria <2 e o jogador não pode bater).
+   */
+  describe('caso relatado: 3, 5 e 2 do mesmo naipe', () => {
+    it('forma um jogo válido: 3-4(2)-5, canastra limpa', () => {
+      const trio = [C('3'), C('5'), two('hearts')]
+      expect(isValidCanasta(trio)).toBe(true)
+      const c = new Canasta(trio)
+      expect(c.isClean).toBe(true)
+      // o 2 representa o 4 (o buraco entre 3 e 5)
+      const slotDo2 = c.layout.find(e => e.card.rank === '2')!.representsValue
+      expect(slotDo2).toBe(4)
+    })
+
+    it('baixa numa mão de 11 cartas (mão -> 8, jogo na mesa)', () => {
+      const trio = [C('3'), C('5'), two('hearts')]
+      const filler = ['K', '9', 'J', 'Q', '7', '4', '8', '10'].map(
+        (r, i) => new Card((['clubs', 'spades', 'diamonds'] as Suit[])[i % 3], r as Rank, false)
+      )
+      const { jogar, naMao } = jogoComMao([...trio, ...filler])
+      expect(jogar(trio)).toBe(true)
+      expect(naMao()).toBe(8)
+    })
+
+    it('só é recusado com 4 cartas ou menos na mão (deixaria <2 sem poder bater)', () => {
+      const trio = [C('3'), C('5'), two('hearts')]
+      // 4 cartas: baixar 3 deixaria 1 -> recusa
+      const quase = jogoComMao([...trio, new Card('clubs', 'K', false)])
+      expect(quase.jogar(trio)).toBe(false)
+      // 5 cartas: baixar 3 deixaria 2 -> permite
+      const ok = jogoComMao([...trio, new Card('clubs', 'K', false), new Card('spades', '9', false)])
+      expect(ok.jogar(trio)).toBe(true)
+    })
+  })
 })
 
 describe('curinga = 2 do MESMO naipe', () => {
