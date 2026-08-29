@@ -1,4 +1,4 @@
-import { useState, type MouseEvent } from 'react'
+import { useEffect, useRef, useState, type MouseEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useOnlineStore } from '../../online/onlineStore'
 import { CardBack } from '../Card'
@@ -12,6 +12,25 @@ import MeldRow from '../Gameplay/MeldRow'
 
 /** Footprint do MONTE — idêntico ao PILE_CARD_SIZE offline. */
 const PILE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-8 landscape:h-[2.9rem]'
+/** Footprints dos fantasmas de animação — idênticos aos GHOST_*_SIZE de
+ * Gameplay.tsx (offline). Repetidos aqui de propósito (não importados), pra
+ * não acoplar este arquivo à estrutura interna de PlayerHand/MeldCardColumn
+ * — só os valores literais precisam bater. */
+const GHOST_HAND_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-14 landscape:h-[4.25rem]'
+const GHOST_TABLE_SIZE = 'w-20 h-28 landscape:w-12 landscape:h-16'
+
+/** Entre os índices de cartas selecionadas na mão, acha o elemento
+ * `[data-hand-index]` MAIS À ESQUERDA na tela — ver a mesma função em
+ * Gameplay.tsx (offline) para a explicação completa. */
+function leftmostHandCardRect(cardIndices: number[]): DOMRect | undefined {
+  const rects = cardIndices
+    .map(i => document.querySelector(`[data-hand-index="${i}"]`)?.getBoundingClientRect())
+    .filter((r): r is DOMRect => Boolean(r))
+  if (rects.length === 0) {
+    return document.getElementById('player-hand-anchor')?.getBoundingClientRect()
+  }
+  return rects.reduce((leftmost, r) => (r.left < leftmost.left ? r : leftmost))
+}
 
 interface OnlineGameBoardProps {
   view: SeatView
@@ -76,12 +95,40 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
   const canClickDeck = isMyTurn && phase === 'draw'
   const canClickDropZone = isMyTurn && phase === 'play' && selectedCardIndices.length >= 3
 
+  // Fantasma da COMPRA: ao contrário do offline (que muta o estado local e
+  // síncrono, lendo a carta comprada na hora), aqui a carta só é conhecida
+  // depois que o servidor responde com o novo `state`. `pendingDrawRef`
+  // marca "acabei de pedir pra comprar"; o efeito abaixo, disparado quando
+  // a mão CRESCE, consome a marca e anima com a última carta da mão nova —
+  // sem confundir com o crescimento da mão por pegar o descarte ou o morto,
+  // que já têm (ou não precisam de) fantasma próprio.
+  const pendingDrawRef = useRef(false)
+  const prevHandLenRef = useRef(yourHand.length)
+  useEffect(() => {
+    const prevLen = prevHandLenRef.current
+    prevHandLenRef.current = yourHand.length
+    if (!pendingDrawRef.current) return
+    pendingDrawRef.current = false
+    if (yourHand.length <= prevLen) return // intent recusada (chegou um error, não um novo state)
+
+    const fromRect = document.getElementById('deck-pile')?.getBoundingClientRect()
+    const toRect = document.getElementById('player-hand-anchor')?.getBoundingClientRect()
+    const drawnCard = yourHand[yourHand.length - 1]
+    if (fromRect && toRect && drawnCard) {
+      useOnlineStore
+        .getState()
+        .playDrawAnim({ fromRect, toRect, card: asCard(drawnCard), sizeClassName: GHOST_HAND_SIZE })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só reage ao TAMANHO da mão, não à identidade do array (novo a cada state)
+  }, [yourHand.length])
+
   const handleDeckClick = () => {
     if (!isMyTurn) return
     if (phase !== 'draw') {
       flashHint('Descarte uma carta antes de comprar de novo.')
       return
     }
+    pendingDrawRef.current = true
     sendIntent({ type: 'draw' })
   }
 
@@ -95,6 +142,17 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
     if (!isValidCanasta(asCards(selectedCards))) {
       flashHint('Essa seleção não forma um jogo válido (sequência do mesmo naipe ou trinca de Áses).')
       return
+    }
+
+    const fromRect = leftmostHandCardRect(selectedCardIndices)
+    const toRect = document.getElementById('meld-drop-zone')?.getBoundingClientRect()
+    if (fromRect && toRect) {
+      useOnlineStore.getState().playTableAnim({
+        fromRect,
+        toRect,
+        cards: asCards(selectedCards.slice(0, 4)),
+        sizeClassName: GHOST_TABLE_SIZE,
+      })
     }
     sendIntent({ type: 'playCanasta', cardIndices: selectedCardIndices })
   }
@@ -110,6 +168,17 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
     if (!canExtendMeld(asCards(meldCards), asCards(selectedCards))) {
       flashHint('Essa seleção não estende esse jogo. Escolha cartas que continuem a sequência (ou mais Áses).')
       return
+    }
+
+    const fromRect = leftmostHandCardRect(selectedCardIndices)
+    const toRect = event.currentTarget.getBoundingClientRect()
+    if (fromRect) {
+      useOnlineStore.getState().playTableAnim({
+        fromRect,
+        toRect,
+        cards: asCards(selectedCards.slice(0, 4)),
+        sizeClassName: GHOST_TABLE_SIZE,
+      })
     }
     sendIntent({ type: 'extendMeld', meldIndex, cardIndices: selectedCardIndices })
   }

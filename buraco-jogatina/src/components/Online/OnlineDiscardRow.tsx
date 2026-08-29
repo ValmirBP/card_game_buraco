@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useOnlineStore } from '../../online/onlineStore'
 import { CardComponent } from '../Card'
-import { asCard } from '../../online/cardAdapter'
+import { asCard, asCards } from '../../online/cardAdapter'
 import type { SeatView } from '../../session/types'
 
 // Idêntico ao DiscardRow offline: mesmo footprint da mão, pras duas fileiras
@@ -25,7 +25,7 @@ export default function OnlineDiscardRow({ view }: OnlineDiscardRowProps) {
   const sendIntent = useOnlineStore(s => s.sendIntent)
   const [hint, setHint] = useState<string | null>(null)
 
-  const { discardPile, status, currentSeat, phase } = view
+  const { discardPile, status, currentSeat, phase, yourHand } = view
   const isMyTurn = status === 'playing' && currentSeat === view.seat
   const canClickToDraw = isMyTurn && phase === 'draw' && discardPile.length > 0
   const canClickToDiscard = isMyTurn && phase === 'play' && selectedCardIndices.length === 1
@@ -42,6 +42,20 @@ export default function OnlineDiscardRow({ view }: OnlineDiscardRowProps) {
         flashHint('O descarte está vazio.')
         return
       }
+      // Ao contrário da COMPRA (draw), aqui as cartas que vão pra mão já são
+      // conhecidas ANTES de mandar a intent (é a pilha inteira, visível no
+      // cliente) — dá pra animar na hora do clique, como o offline faz.
+      const fromRect = (document.getElementById('discard-top') ?? document.getElementById('discard-pile'))
+        ?.getBoundingClientRect()
+      const toRect = document.getElementById('player-hand-anchor')?.getBoundingClientRect()
+      if (fromRect && toRect && discardPile.length > 0) {
+        useOnlineStore.getState().playPickupAnim({
+          fromRect,
+          toRect,
+          cards: asCards(discardPile.slice(-3)),
+          sizeClassName: HAND_CARD_SIZE,
+        })
+      }
       sendIntent({ type: 'takeDiscard' })
       return
     }
@@ -54,7 +68,21 @@ export default function OnlineDiscardRow({ view }: OnlineDiscardRowProps) {
       flashHint('Selecione apenas 1 carta para descartar.')
       return
     }
-    sendIntent({ type: 'discard', cardIndex: selectedCardIndices[0] })
+    const idx = selectedCardIndices[0]
+    const cardEl = document.querySelector(`[data-hand-index="${idx}"]`)
+    const fromRect = (cardEl ?? document.getElementById('player-hand-anchor'))?.getBoundingClientRect()
+    const toRect = (document.getElementById('discard-top') ?? document.getElementById('discard-pile'))
+      ?.getBoundingClientRect()
+    const card = yourHand[idx]
+    if (fromRect && toRect && card) {
+      useOnlineStore.getState().playDiscardAnim({
+        fromRect,
+        toRect,
+        cards: [asCard(card)],
+        sizeClassName: HAND_CARD_SIZE,
+      })
+    }
+    sendIntent({ type: 'discard', cardIndex: idx })
   }
 
   return (

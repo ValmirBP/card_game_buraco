@@ -144,4 +144,73 @@ describe('ProtocolServer', () => {
     // Should be back to seat 0 (human) since seats 1-3 are AI.
     expect(latest.view.currentSeat).toBe(0)
   })
+
+  it('chooseSeat move o convidado e rebroadcasta lobby pros dois lados', async () => {
+    const server = makeServer()
+    const host = new FakeSocket()
+    const guest = new FakeSocket()
+    server.registerConnection('c1', host)
+    server.registerConnection('c2', guest)
+
+    await server.handleMessage('c1', { type: 'create', name: 'Host', difficulty: 'medium' })
+    await server.handleMessage('c2', { type: 'join', code: (host.ofType('joined')[0] as any).code, name: 'Bob' })
+
+    await server.handleMessage('c2', { type: 'chooseSeat', seatIndex: 3 })
+
+    const lastLobby = guest.ofType('lobby').at(-1) as any
+    expect(lastLobby.seats[3]).toMatchObject({ index: 3, kind: 'human', name: 'Bob' })
+    expect(lastLobby.seats[1]).toMatchObject({ kind: 'ai' })
+    // O host também recebe o lobby atualizado.
+    expect((host.ofType('lobby').at(-1) as any).seats[3]).toMatchObject({ name: 'Bob' })
+  })
+
+  it('depois de chooseSeat, uma intent do convidado usa o NOVO assento', async () => {
+    const server = makeServer()
+    const host = new FakeSocket()
+    const guest = new FakeSocket()
+    server.registerConnection('c1', host)
+    server.registerConnection('c2', guest)
+
+    await server.handleMessage('c1', { type: 'create', name: 'Host', difficulty: 'medium' })
+    await server.handleMessage('c2', { type: 'join', code: (host.ofType('joined')[0] as any).code, name: 'Bob' })
+    // Bob entrou no assento 1; escolhe o assento 3 antes de começar.
+    await server.handleMessage('c2', { type: 'chooseSeat', seatIndex: 3 })
+    await server.handleMessage('c1', { type: 'start' })
+
+    // A ordem dos turnos começa no assento 0 (o anfitrião) e passa pelo 1 e
+    // 2 (IA, com aiTurnDelayMs=0) antes de chegar no 3, onde Bob está agora.
+    await server.handleMessage('c1', { type: 'intent', intent: { type: 'draw' } })
+    await server.handleMessage('c1', { type: 'intent', intent: { type: 'discard', cardIndex: 0 } })
+    await new Promise((r) => setTimeout(r, 0))
+    await new Promise((r) => setTimeout(r, 0))
+
+    const latest = guest.ofType('state').at(-1) as any
+    expect(latest.view.currentSeat).toBe(3)
+
+    // Uma intent do convidado só é válida se o servidor souber que ele
+    // agora está no assento 3, não mais no 1 (onde entrou originalmente).
+    await server.handleMessage('c2', { type: 'intent', intent: { type: 'draw' } })
+    expect(guest.ofType('error')).toHaveLength(0)
+  })
+
+  it('chooseSeat recusa mover o anfitrião', async () => {
+    const server = makeServer()
+    const host = new FakeSocket()
+    server.registerConnection('c1', host)
+    await server.handleMessage('c1', { type: 'create', name: 'Host', difficulty: 'medium' })
+
+    await server.handleMessage('c1', { type: 'chooseSeat', seatIndex: 1 })
+    expect(host.ofType('error')).toHaveLength(1)
+  })
+
+  it('rename atualiza o nome e rebroadcasta lobby', async () => {
+    const server = makeServer()
+    const host = new FakeSocket()
+    server.registerConnection('c1', host)
+    await server.handleMessage('c1', { type: 'create', name: 'Host', difficulty: 'medium' })
+
+    await server.handleMessage('c1', { type: 'rename', name: 'Novo Nome' })
+    const lastLobby = host.ofType('lobby').at(-1) as any
+    expect(lastLobby.seats[0].name).toBe('Novo Nome')
+  })
 })

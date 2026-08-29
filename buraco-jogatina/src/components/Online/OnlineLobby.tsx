@@ -46,6 +46,8 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
   const joinFromScannedLink = useOnlineStore((s) => s.joinFromScannedLink)
   const startRoom = useOnlineStore((s) => s.start)
   const clearError = useOnlineStore((s) => s.clearError)
+  const chooseSeat = useOnlineStore((s) => s.chooseSeat)
+  const renameSeat = useOnlineStore((s) => s.rename)
 
   const [inviteCode] = useState(readInviteCodeFromUrl)
   const [name, setName] = useState('Você')
@@ -358,25 +360,40 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
             {SEAT_LABELS.map((label, i) => {
               const seatInfo = lobby.find((s) => s.index === i)
               const isYou = seat === i
+              // "Escolher o lado que quer entrar": qualquer convidado (não
+              // o anfitrião, que trava a sala pra sempre se sair do
+              // assento 0 - ver rooms.ts) pode tocar num assento AI livre
+              // pra se mudar pra lá, antes da partida começar.
+              const canMoveHere = !isYou && !isHost && seatInfo?.kind === 'ai'
+
+              if (isYou) {
+                return <YourSeatRow key={i} name={seatInfo?.name ?? label} onRename={renameSeat} />
+              }
+
               return (
-                <div
+                <button
                   key={i}
-                  className={`flex items-center justify-between rounded-xl border px-4 py-2.5 landscape:py-1 ${
-                    isYou ? 'border-card-gold bg-card-gold/10' : 'border-white/10 bg-white/5'
+                  type="button"
+                  disabled={!canMoveHere}
+                  onClick={canMoveHere ? () => chooseSeat(i) : undefined}
+                  className={`flex w-full items-center justify-between rounded-xl border px-4 py-2.5 text-left landscape:py-1 ${
+                    canMoveHere
+                      ? 'cursor-pointer border-white/10 bg-white/5 transition-colors hover:border-card-gold/60 hover:bg-card-gold/10'
+                      : 'border-white/10 bg-white/5'
                   }`}
                 >
-                  <span className="text-sm text-gray-200 landscape:text-xs">
-                    {seatInfo?.name ?? label}
-                    {isYou ? ' (você)' : ''}
-                  </span>
-                  <span className="text-xs text-gray-400 landscape:text-[10px]">
+                  <span className="text-sm text-gray-200 landscape:text-xs">{seatInfo?.name ?? label}</span>
+                  <span className="flex items-center gap-1.5 text-xs text-gray-400 landscape:text-[10px]">
+                    {canMoveHere && (
+                      <span className="text-card-gold landscape:hidden">Toque para entrar aqui</span>
+                    )}
                     {seatInfo?.kind === 'human'
                       ? seatInfo.connected
                         ? '🧑 humano'
                         : '🧑 humano (offline)'
                       : '🤖 IA'}
                   </span>
-                </div>
+                </button>
               )
             })}
           </div>
@@ -412,6 +429,76 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
       <AnimatePresence>
         {showScanner && <QrScanner onScan={handleScan} onClose={() => setShowScanner(false)} />}
       </AnimatePresence>
+    </div>
+  )
+}
+
+interface YourSeatRowProps {
+  name: string
+  onRename: (name: string) => void
+}
+
+/** Sua própria linha na lista de assentos: nome + "(você)" e um lápis pra
+ * editar — toca, digita, confirma (Enter ou ✓) ou cancela (Esc ou ✕). Vale
+ * tanto pro anfitrião quanto pra convidados: renomear não tem a mesma
+ * restrição de trocar de assento (ver rooms.ts `rename`). */
+function YourSeatRow({ name, onRename }: YourSeatRowProps) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(name)
+
+  const commit = () => {
+    const trimmed = draft.trim()
+    if (trimmed && trimmed !== name) onRename(trimmed)
+    setEditing(false)
+  }
+
+  const cancel = () => {
+    setDraft(name)
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1.5 rounded-xl border border-card-gold bg-card-gold/10 px-3 py-2 landscape:py-1">
+        <input
+          autoFocus
+          type="text"
+          value={draft}
+          maxLength={24}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commit()
+            if (e.key === 'Escape') cancel()
+          }}
+          className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-sm text-white outline-none focus:ring-2 focus:ring-card-gold/70 landscape:text-xs"
+        />
+        <button type="button" onClick={commit} className="shrink-0 px-1 text-card-gold" aria-label="Confirmar nome">
+          ✓
+        </button>
+        <button type="button" onClick={cancel} className="shrink-0 px-1 text-gray-400" aria-label="Cancelar edição">
+          ✕
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-center justify-between rounded-xl border border-card-gold bg-card-gold/10 px-4 py-2.5 landscape:py-1">
+      <span className="flex min-w-0 items-center gap-1.5 text-sm text-gray-200 landscape:text-xs">
+        <span className="truncate">{name} (você)</span>
+        <button
+          type="button"
+          onClick={() => {
+            setDraft(name)
+            setEditing(true)
+          }}
+          className="shrink-0 text-gray-400 underline decoration-dotted underline-offset-2 hover:text-card-gold"
+          aria-label="Editar nome"
+        >
+          ✎
+        </button>
+      </span>
+      <span className="shrink-0 text-xs text-gray-400 landscape:text-[10px]">🧑 humano</span>
     </div>
   )
 }

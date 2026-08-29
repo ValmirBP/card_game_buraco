@@ -11,6 +11,8 @@ export type ClientMessage =
   | { type: 'start' }
   | { type: 'intent'; intent: Intent }
   | { type: 'nextRound' }
+  | { type: 'chooseSeat'; seatIndex: number }
+  | { type: 'rename'; name: string }
 
 export interface LobbySeatView {
   index: number
@@ -139,9 +141,44 @@ export class ProtocolServer {
         return this.handleIntent(connId, raw.intent)
       case 'nextRound':
         return this.handleIntent(connId, { type: 'nextRound' })
+      case 'chooseSeat':
+        return this.handleChooseSeat(connId, raw.seatIndex)
+      case 'rename':
+        return this.handleRename(connId, raw.name)
       default:
         this.sendError(connId, 'mensagem desconhecida')
     }
+  }
+
+  private handleChooseSeat(connId: string, seatIndex: number): void {
+    const state = this.connStates.get(connId)
+    if (!state) {
+      this.sendError(connId, 'voce nao esta em nenhuma sala')
+      return
+    }
+    const result = this.rooms.chooseSeat(state.roomCode, connId, seatIndex)
+    if ('error' in result) {
+      this.sendError(connId, result.error)
+      return
+    }
+    // O assento mudou - connStates precisa acompanhar, senão a próxima
+    // intent/start deste jogador seria avaliada com o assento ANTIGO.
+    this.connStates.set(connId, { roomCode: state.roomCode, seat: result.seat })
+    this.broadcastLobby(state.roomCode)
+  }
+
+  private handleRename(connId: string, name: string): void {
+    const state = this.connStates.get(connId)
+    if (!state) {
+      this.sendError(connId, 'voce nao esta em nenhuma sala')
+      return
+    }
+    const result = this.rooms.rename(state.roomCode, connId, name)
+    if ('error' in result) {
+      this.sendError(connId, result.error)
+      return
+    }
+    this.broadcastLobby(state.roomCode)
   }
 
   private handleCreate(connId: string, name: string, difficulty: Difficulty): void {

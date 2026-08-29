@@ -9,11 +9,16 @@ import DrawAnimation, { type DrawAnimState } from './DrawAnimation'
 import CardFlyAnimation, { type FlyAnimState } from './CardFlyAnimation'
 import AiDrawAnimation, { type BackFlyState } from './AiDrawAnimation'
 import { canTakeDiscardPile } from './discardRules'
+import ExitButton from '../ExitButton'
 
 export type TurnPhase = 'draw' | 'play'
 
 interface GameplayProps {
   onGameEnd: () => void
+  /** Sair da partida em andamento (com confirmação — ver App.tsx). Sem
+   * isso, o único jeito de sair no meio do jogo era o botão voltar do
+   * Android, que nem sequer era tratado (minimizava o app inteiro). */
+  onExit: () => void
 }
 
 // Pausa antes de cada jogada da IA — 2s pra dar tempo de ver a "compra"
@@ -53,7 +58,7 @@ function leftmostHandCardRect(cardIndices: number[]): DOMRect | undefined {
   return rects.reduce((leftmost, r) => (r.left < leftmost.left ? r : leftmost))
 }
 
-export default function Gameplay({ onGameEnd }: GameplayProps) {
+export default function Gameplay({ onGameEnd, onExit }: GameplayProps) {
   // `version` MUST be selected alongside `game`: `game` is a mutable engine
   // instance whose object reference never changes across actions, so
   // Zustand/React would otherwise never re-render this component (or any
@@ -336,9 +341,13 @@ export default function Gameplay({ onGameEnd }: GameplayProps) {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2 landscape:gap-0.5">
-      {/* Placar (topo, altura automática) */}
-      <div className="shrink-0">
-        <Scoreboard />
+      {/* Placar (topo, altura automática) + saída — mesmo tratamento do
+          modo online (ver OnlineGameplay.tsx), pedido do usuário. */}
+      <div className="flex shrink-0 items-start gap-2 landscape:gap-1.5">
+        <ExitButton onClick={onExit} />
+        <div className="min-w-0 flex-1">
+          <Scoreboard />
+        </div>
       </div>
 
       {/* Mesa — ocupa o espaço flexível do meio. Em retrato rola

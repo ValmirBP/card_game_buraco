@@ -3,6 +3,8 @@ import type { AIDifficulty } from '../engine/ai'
 import type { Intent, SeatView } from '../session/types'
 import { resolveWsUrl } from './wsUrl'
 import { parseJoinLink } from './joinLink'
+import type { DrawAnimState } from '../components/Gameplay/DrawAnimation'
+import type { FlyAnimState } from '../components/Gameplay/CardFlyAnimation'
 
 const SERVER_ADDRESS_STORAGE_KEY = 'buraco-server-address'
 
@@ -33,6 +35,8 @@ type ClientMessage =
   | { type: 'start' }
   | { type: 'intent'; intent: Intent }
   | { type: 'nextRound' }
+  | { type: 'chooseSeat'; seatIndex: number }
+  | { type: 'rename'; name: string }
 
 type ServerMessage =
   | { type: 'joined'; code: string; seat: number; isHost: boolean; serverUrl?: string }
@@ -64,6 +68,25 @@ interface OnlineState {
    * selectedCardIndices — indices into `view.yourHand`. */
   selectedCardIndices: number[]
 
+  /** Fantasmas de animação — mesma ideia do modo offline (Gameplay.tsx),
+   * só que vivendo no store em vez de useState local: OnlineGameBoard.tsx e
+   * OnlineDiscardRow.tsx disparam essas ações no momento do clique (onde
+   * ainda sabem QUAIS cartas/retângulos estão envolvidos), e
+   * OnlineGameplay.tsx só lê e renderiza os componentes de fantasma
+   * (DrawAnimation/CardFlyAnimation), compartilhados com o offline.
+   * `drawAnim` é a exceção: como a carta comprada só é conhecida depois da
+   * resposta do servidor (ao contrário do offline, que muta local e
+   * síncrono), quem dispara é um efeito em OnlineGameBoard.tsx reagindo ao
+   * tamanho da mão crescer, não o clique em si. */
+  drawAnim: DrawAnimState | null
+  pickupAnim: FlyAnimState | null
+  discardAnim: FlyAnimState | null
+  tableAnim: FlyAnimState | null
+  playDrawAnim: (anim: Omit<DrawAnimState, 'id'>) => void
+  playPickupAnim: (anim: Omit<FlyAnimState, 'id'>) => void
+  playDiscardAnim: (anim: Omit<FlyAnimState, 'id'>) => void
+  playTableAnim: (anim: Omit<FlyAnimState, 'id'>) => void
+
   create: (name: string, difficulty: AIDifficulty) => void
   join: (code: string, name: string) => void
   /** Entra numa sala a partir do texto CRU de um QR lido (ver joinLink.ts):
@@ -79,6 +102,13 @@ interface OnlineState {
   clearSelection: () => void
   clearError: () => void
   setServerAddress: (address: string) => void
+  /** "Escolher o lado que quer entrar": move você pra outro assento AI
+   * livre, antes da partida começar — como times são fixos por assento
+   * (0/2 = Nós, 1/3 = Eles), escolher o assento é escolher o lado. O
+   * anfitrião (assento 0) não pode se mover (ver rooms.ts). */
+  chooseSeat: (seatIndex: number) => void
+  /** Renomeia você na sala atual, antes da partida começar. */
+  rename: (name: string) => void
 }
 
 /** Builds the shareable "join this room" URL for the given room code, using
@@ -225,6 +255,10 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
   serverUrl: null,
   serverAddress: loadStoredServerAddress(),
   selectedCardIndices: [],
+  drawAnim: null,
+  pickupAnim: null,
+  discardAnim: null,
+  tableAnim: null,
 
   create: (name, difficulty) => {
     reconnectAttempts = 0
@@ -286,6 +320,10 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
       errorMsg: null,
       serverUrl: null,
       selectedCardIndices: [],
+      drawAnim: null,
+      pickupAnim: null,
+      discardAnim: null,
+      tableAnim: null,
     })
   },
 
@@ -308,5 +346,44 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
       // localStorage indisponível (ex.: modo privado) - só não persiste
       // entre sessões, sem quebrar o app.
     }
+  },
+
+  chooseSeat: (seatIndex) => send({ type: 'chooseSeat', seatIndex }),
+
+  rename: (name) => send({ type: 'rename', name }),
+
+  // Duração de cada fantasma DEVE acompanhar a animação real (ver TOTAL_S
+  // de DrawAnimation.tsx e DURATION_S de CardFlyAnimation.tsx) + pequena
+  // folga — mesmos valores usados pelo Gameplay.tsx offline.
+  playDrawAnim: (anim) => {
+    const id = Date.now()
+    set({ drawAnim: { id, ...anim } })
+    window.setTimeout(() => {
+      set((s) => (s.drawAnim?.id === id ? { drawAnim: null } : {}))
+    }, 2250)
+  },
+
+  playPickupAnim: (anim) => {
+    const id = Date.now()
+    set({ pickupAnim: { id, ...anim } })
+    window.setTimeout(() => {
+      set((s) => (s.pickupAnim?.id === id ? { pickupAnim: null } : {}))
+    }, 650)
+  },
+
+  playDiscardAnim: (anim) => {
+    const id = Date.now()
+    set({ discardAnim: { id, ...anim } })
+    window.setTimeout(() => {
+      set((s) => (s.discardAnim?.id === id ? { discardAnim: null } : {}))
+    }, 650)
+  },
+
+  playTableAnim: (anim) => {
+    const id = Date.now()
+    set({ tableAnim: { id, ...anim } })
+    window.setTimeout(() => {
+      set((s) => (s.tableAnim?.id === id ? { tableAnim: null } : {}))
+    }, 650)
   },
 }))

@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useOnlineStore } from '../../online/onlineStore'
 import OnlineGameBoard from './OnlineGameBoard'
 import OnlinePlayerHand from './OnlinePlayerHand'
 import OnlineDiscardRow from './OnlineDiscardRow'
 import OnlineResult from './OnlineResult'
+import DrawAnimation from '../Gameplay/DrawAnimation'
+import CardFlyAnimation from '../Gameplay/CardFlyAnimation'
+import ExitButton from '../ExitButton'
 import type { TeamId } from '../../engine/gameState'
 
 const TEAM_LABEL: Record<'A' | 'B', string> = { A: 'Nós', B: 'Eles' }
@@ -23,6 +26,10 @@ export default function OnlineGameplay({ onBackToMenu }: OnlineGameplayProps) {
   const log = useOnlineStore(s => s.log)
   const errorMsg = useOnlineStore(s => s.errorMsg)
   const clearError = useOnlineStore(s => s.clearError)
+  const drawAnim = useOnlineStore(s => s.drawAnim)
+  const pickupAnim = useOnlineStore(s => s.pickupAnim)
+  const discardAnim = useOnlineStore(s => s.discardAnim)
+  const tableAnim = useOnlineStore(s => s.tableAnim)
 
   // Rodada terminou: segura 2s mostrando o banner "Fulano bateu!" sobre a
   // mesa antes de trocar pro placar (igual ao Gameplay offline). Volta a
@@ -38,10 +45,35 @@ export default function OnlineGameplay({ onBackToMenu }: OnlineGameplayProps) {
     return () => clearTimeout(timeoutId)
   }, [status])
 
+  // Banner do MORTO (pega / vira monte) — mesma técnica do Gameplay offline:
+  // varre as linhas NOVAS do log a cada mudança e mostra um banner quando
+  // alguma anuncia o evento. Começa apontando pro fim do log ATUAL (não 0),
+  // senão reabriria a sala/reconectaria e mostraria de novo avisos antigos.
+  const [mortoBanner, setMortoBanner] = useState<string | null>(null)
+  const seenLogLenRef = useRef(log.length)
+  const bannerTimeoutRef = useRef<number | null>(null)
+  useEffect(() => {
+    const newEntries = log.slice(seenLogLenRef.current)
+    seenLogLenRef.current = log.length
+    const mortoEntry = [...newEntries].reverse().find(e => /pegou o morto|virou o novo monte/i.test(e))
+    if (!mortoEntry) return
+    setMortoBanner(/virou o novo monte/i.test(mortoEntry) ? '🔄 O morto virou o novo monte!' : `🎴 ${mortoEntry}`)
+    if (bannerTimeoutRef.current) window.clearTimeout(bannerTimeoutRef.current)
+    bannerTimeoutRef.current = window.setTimeout(() => setMortoBanner(null), 2600)
+  }, [log])
+
   if (!view) return null
 
   if (view.status === 'finished' && resultReady) {
     return <OnlineResult view={view} onBackToMenu={onBackToMenu} />
+  }
+
+  // Sair da partida em andamento (com confirmação — mesmo texto/mesma ação
+  // do voltar de hardware do Android pra este mesmo estado, ver App.tsx).
+  const handleExit = () => {
+    if (window.confirm('Sair da partida em andamento? Você será desconectado dos outros jogadores.')) {
+      onBackToMenu()
+    }
   }
 
   const closerName = view.closerSeat !== undefined ? view.players[view.closerSeat]?.name : undefined
@@ -73,8 +105,40 @@ export default function OnlineGameplay({ onBackToMenu }: OnlineGameplayProps) {
         )}
       </AnimatePresence>
 
-      {/* Placar — mesmo tratamento visual do Scoreboard.tsx offline */}
-      <div className="shrink-0 z-40 rounded-xl border border-card-gold/30 bg-black/40 px-2 py-1 shadow-[0_4px_16px_rgba(0,0,0,0.35)] backdrop-blur-md landscape:rounded-md landscape:px-1.5 landscape:py-0">
+      {/* Fantasmas de animação — mesmos componentes do offline
+          (DrawAnimation/CardFlyAnimation), disparados por OnlineGameBoard.tsx
+          e OnlineDiscardRow.tsx e lidos aqui via onlineStore. Sem o
+          equivalente de AiDrawAnimation: o servidor roda os turnos remotos
+          no seu próprio ritmo, sem um evento local pra ancorar esse
+          fantasma (ver comentário em onlineStore.ts). */}
+      <DrawAnimation anim={drawAnim} />
+      <CardFlyAnimation anim={pickupAnim} />
+      <CardFlyAnimation anim={discardAnim} />
+      <CardFlyAnimation anim={tableAnim} />
+
+      {/* Banner de destaque do morto (pega / virou monte) — ver Gameplay offline */}
+      <AnimatePresence>
+        {mortoBanner && (
+          <motion.div
+            key={mortoBanner}
+            initial={{ opacity: 0, scale: 0.7, y: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+            className="pointer-events-none fixed inset-x-0 top-1/3 z-[120] flex justify-center px-4"
+          >
+            <span className="rounded-2xl border-2 border-card-gold bg-black/80 px-6 py-3 text-center font-display text-lg text-card-gold shadow-[0_0_30px_rgba(212,175,55,0.7)] backdrop-blur-sm sm:text-2xl">
+              {mortoBanner}
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Placar + saída — mesmo tratamento do modo offline (ver
+          Gameplay.tsx), pedido do usuário. */}
+      <div className="flex shrink-0 items-start gap-2 landscape:gap-1.5">
+        <ExitButton onClick={handleExit} />
+        <div className="z-40 min-w-0 flex-1 rounded-xl border border-card-gold/30 bg-black/40 px-2 py-1 shadow-[0_4px_16px_rgba(0,0,0,0.35)] backdrop-blur-md landscape:rounded-md landscape:px-1.5 landscape:py-0">
         <div className="mx-auto flex max-w-7xl flex-nowrap items-center justify-center gap-2 landscape:gap-1.5">
           {sortedTeams.map(team => {
             const isMine = team.id === myTeamId
@@ -105,6 +169,7 @@ export default function OnlineGameplay({ onBackToMenu }: OnlineGameplayProps) {
               </div>
             )
           })}
+        </div>
         </div>
       </div>
 

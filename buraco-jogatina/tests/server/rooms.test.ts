@@ -117,4 +117,87 @@ describe('RoomManager', () => {
     expect(rm.findRoomByConn('conn-2')?.code).toBe(code)
     expect(rm.findRoomByConn('unknown')).toBeUndefined()
   })
+
+  describe('chooseSeat', () => {
+    it('moves a guest to a different free AI seat, freeing the old one', () => {
+      const rm = new RoomManager()
+      const { code } = rm.createRoom('conn-host', 'Host', 'medium')
+      rm.joinRoom(code, 'conn-2', 'Bob')
+
+      const result = rm.chooseSeat(code, 'conn-2', 3)
+      expect(result).toEqual({ seat: 3 })
+
+      const room = rm.getRoom(code)!
+      expect(room.seats[3]).toMatchObject({ kind: 'human', name: 'Bob', connId: 'conn-2' })
+      expect(room.seats[1]).toMatchObject({ kind: 'ai', name: 'IA 2', connId: undefined })
+    })
+
+    it('escolher o próprio assento é um no-op', () => {
+      const rm = new RoomManager()
+      const { code } = rm.createRoom('conn-host', 'Host', 'medium')
+      rm.joinRoom(code, 'conn-2', 'Bob')
+      expect(rm.chooseSeat(code, 'conn-2', 1)).toEqual({ seat: 1 })
+      expect(rm.getRoom(code)!.seats[1]).toMatchObject({ kind: 'human', name: 'Bob' })
+    })
+
+    it('recusa mover para um assento já ocupado por outro humano', () => {
+      const rm = new RoomManager()
+      const { code } = rm.createRoom('conn-host', 'Host', 'medium')
+      rm.joinRoom(code, 'conn-2', 'Bob')
+      rm.joinRoom(code, 'conn-3', 'Carol')
+      expect(rm.chooseSeat(code, 'conn-2', 2)).toEqual({ error: expect.any(String) })
+    })
+
+    it('o anfitrião (assento 0) nunca pode trocar de assento', () => {
+      const rm = new RoomManager()
+      const { code } = rm.createRoom('conn-host', 'Host', 'medium')
+      expect(rm.chooseSeat(code, 'conn-host', 1)).toEqual({ error: expect.any(String) })
+      expect(rm.getRoom(code)!.seats[0]).toMatchObject({ kind: 'human', connId: 'conn-host' })
+    })
+
+    it('recusa depois que a partida começou', () => {
+      const rm = new RoomManager()
+      const { code } = rm.createRoom('conn-host', 'Host', 'medium')
+      rm.joinRoom(code, 'conn-2', 'Bob')
+      rm.startRoom(code, 'conn-host')
+      expect(rm.chooseSeat(code, 'conn-2', 3)).toEqual({ error: expect.any(String) })
+    })
+
+    it('recusa para quem não está em nenhuma sala', () => {
+      const rm = new RoomManager()
+      const { code } = rm.createRoom('conn-host', 'Host', 'medium')
+      expect(rm.chooseSeat(code, 'conn-desconhecido', 1)).toEqual({ error: expect.any(String) })
+    })
+  })
+
+  describe('rename', () => {
+    it('renomeia o assento do chamador e reflete em room.seats', () => {
+      const rm = new RoomManager()
+      const { code } = rm.createRoom('conn-host', 'Host', 'medium')
+      rm.joinRoom(code, 'conn-2', 'Bob')
+      expect(rm.rename(code, 'conn-2', 'Roberto')).toEqual({ seat: 1 })
+      expect(rm.getRoom(code)!.seats[1].name).toBe('Roberto')
+    })
+
+    it('apara espaços e corta nomes muito longos', () => {
+      const rm = new RoomManager()
+      const { code } = rm.createRoom('conn-host', 'Host', 'medium')
+      rm.rename(code, 'conn-host', '   ' + 'A'.repeat(50) + '   ')
+      expect(rm.getRoom(code)!.seats[0].name).toBe('A'.repeat(24))
+    })
+
+    it('recusa nome vazio (só espaços)', () => {
+      const rm = new RoomManager()
+      const { code } = rm.createRoom('conn-host', 'Host', 'medium')
+      expect(rm.rename(code, 'conn-host', '   ')).toEqual({ error: expect.any(String) })
+      expect(rm.getRoom(code)!.seats[0].name).toBe('Host')
+    })
+
+    it('recusa depois que a partida começou (o nome exibido já está congelado no GameSession)', () => {
+      const rm = new RoomManager()
+      const { code } = rm.createRoom('conn-host', 'Host', 'medium')
+      rm.startRoom(code, 'conn-host')
+      expect(rm.rename(code, 'conn-host', 'Outro Nome')).toEqual({ error: expect.any(String) })
+    })
+  })
 })

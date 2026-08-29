@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { App as CapacitorApp } from '@capacitor/app'
 import { Layout } from './components/Layout'
 import Menu, { type BotNames } from './components/Menu/Menu'
 import Gameplay from './components/Gameplay/Gameplay'
@@ -75,6 +76,80 @@ export default function App() {
     setScreen('menu')
   }
 
+  /** Sai de uma partida OFFLINE em andamento (com confirmação, já que
+   * abandona a rodada em curso) — usado tanto pelo botão na tela
+   * (ExitButton, dentro de Gameplay.tsx) quanto pelo voltar de hardware do
+   * Android (ver o listener abaixo), pra garantir o MESMO comportamento
+   * pelos dois caminhos. */
+  const handleExitGameplay = () => {
+    if (window.confirm('Sair da partida em andamento? Seu progresso desta rodada será perdido.')) {
+      handleBackToMenu()
+    }
+  }
+
+  /** Mesma ideia de handleExitGameplay, só que pro modo ONLINE — chamado
+   * pelo ExitButton dentro de OnlineGameplay.tsx. */
+  const handleExitOnlineGameplay = () => {
+    if (window.confirm('Sair da partida em andamento? Você será desconectado dos outros jogadores.')) {
+      handleOnlineBackToMenu()
+    }
+  }
+
+  // Botão voltar de hardware do Android: sem este listener, o padrão do
+  // WebView é MINIMIZAR O APP INTEIRO em qualquer tela, já que este é um
+  // SPA de tela única sem histórico de navegação real pro WebView voltar -
+  // era assim em toda tela, offline e online, mesmo no meio de uma partida
+  // (relato do usuário: "em momento nenhum tem um botão de voltar"). Mapeia
+  // CADA tela pra uma ação sensata, com a MESMA confirmação que o botão na
+  // tela usa nos casos que abandonam algo em andamento.
+  //
+  // `screenRef` existe porque o listener é registrado UMA VEZ (o efeito
+  // roda só na montagem) - sem o ref, o closure capturaria o `screen` da
+  // primeira renderização pra sempre.
+  const screenRef = useRef(screen)
+  screenRef.current = screen
+  useEffect(() => {
+    const sub = CapacitorApp.addListener('backButton', () => {
+      switch (screenRef.current) {
+        case 'menu':
+          void CapacitorApp.exitApp()
+          break
+        case 'gameplay':
+          handleExitGameplay()
+          break
+        case 'result':
+          // Nada a perder aqui (a rodada já terminou) - mesmo destino do
+          // "Voltar ao Menu" que a tela já mostra, sem confirmação.
+          handleBackToMenu()
+          break
+        case 'onlineLobby':
+          // Ainda escolhendo criar/entrar (nenhuma sala envolvida) -> vai
+          // direto pro menu. Já dentro de uma sala (esperando ou jogando)
+          // -> confirma antes de sair e desconectar.
+          if (useOnlineStore.getState().code === null) {
+            setScreen('menu')
+          } else if (window.confirm('Sair da sala?')) {
+            handleOnlineBackToMenu()
+          }
+          break
+        case 'onlineGameplay':
+          // A rodada já terminou e o placar está na tela (OnlineResult,
+          // dentro de OnlineGameplay) -> nada a perder, sem confirmação.
+          // Partida ainda em andamento -> mesma confirmação do ExitButton.
+          if (useOnlineStore.getState().view?.status === 'finished') {
+            handleOnlineBackToMenu()
+          } else {
+            handleExitOnlineGameplay()
+          }
+          break
+      }
+    })
+    return () => {
+      void sub.then(handle => handle.remove())
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- listener registrado uma vez só; screenRef sempre traz o valor atual
+  }, [])
+
   const fitScreen =
     screen === 'gameplay' ||
     screen === 'onlineGameplay' ||
@@ -87,7 +162,9 @@ export default function App() {
       {screen === 'menu' && (
         <Menu onStart={handleStart} onPlayOnline={() => setScreen('onlineLobby')} />
       )}
-      {screen === 'gameplay' && game && <Gameplay onGameEnd={() => setScreen('result')} />}
+      {screen === 'gameplay' && game && (
+        <Gameplay onGameEnd={() => setScreen('result')} onExit={handleExitGameplay} />
+      )}
       {screen === 'result' && game && (
         <Result onBackToMenu={handleBackToMenu} onNextRound={handleNextRound} onNewMatch={handleNewMatch} />
       )}
