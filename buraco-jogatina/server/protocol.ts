@@ -23,10 +23,11 @@ export interface LobbySeatView {
 
 export type ServerMessage =
   | { type: 'joined'; code: string; seat: number; isHost: boolean; serverUrl?: string }
-  | { type: 'lobby'; code: string; seats: LobbySeatView[]; isHost: boolean; serverUrl?: string }
+  | { type: 'lobby'; code: string; seat: number; seats: LobbySeatView[]; isHost: boolean; serverUrl?: string }
   | { type: 'state'; view: SeatView }
   | { type: 'log'; lines: string[] }
   | { type: 'error'; message: string }
+  | { type: 'roomClosed'; reason: string }
 
 interface ConnState {
   roomCode: string
@@ -34,8 +35,11 @@ interface ConnState {
 }
 
 /** Between AI turns, wait this long before applying+broadcasting the next
- * one, purely for pacing on the client. Set to 0 in tests. */
-const DEFAULT_AI_TURN_DELAY_MS = 700
+ * one, purely for pacing on the client - mesmos 2s do AI_THINK_DELAY_MS do
+ * modo offline (Gameplay.tsx), pra dar tempo de acompanhar a jogada em vez
+ * de tudo acontecer instantâneo (relato do usuário: "os bots estão muito
+ * rápidos"). Set to 0 in tests. */
+const DEFAULT_AI_TURN_DELAY_MS = 2000
 
 export class ProtocolServer {
   private rooms = new RoomManager()
@@ -55,6 +59,23 @@ export class ProtocolServer {
 
   handleClose(connId: string): void {
     const state = this.connStates.get(connId)
+
+    // O ANFITRIÃO (assento 0) caiu: a sala inteira acaba, não só o assento
+    // dele. Sem seats[0].connId, startRoom nunca mais autoriza ninguém a
+    // iniciar - deixar a sala "zumbi" esperando ele reconectar travaria o
+    // jogo pros outros pra sempre (pedido do usuário: "quando o host cai a
+    // sala deve cair junto"). Avisa quem ainda estiver conectado.
+    if (state?.seat === 0) {
+      const remaining = this.rooms.closeRoom(state.roomCode)
+      for (const otherConnId of remaining) {
+        this.send(otherConnId, { type: 'roomClosed', reason: 'O anfitrião saiu da sala.' })
+        this.connStates.delete(otherConnId)
+      }
+      this.sockets.delete(connId)
+      this.connStates.delete(connId)
+      return
+    }
+
     this.rooms.leaveRoom(connId)
     this.sockets.delete(connId)
     this.connStates.delete(connId)
@@ -85,9 +106,16 @@ export class ProtocolServer {
     if (!room) return
     for (const seat of room.seats) {
       if (!seat.connId) continue
+      // `seat: seat.index` é o assento ATUAL desta conexão específica -
+      // sem isso, quem troca de assento via chooseSeat só recebe a lista
+      // de assentos (sem saber qual É o dele), e o cliente continuava
+      // achando que estava no assento ANTIGO (o destaque "(você)" e o
+      // lápis de editar nome ficavam grudados lá, agora ocupado por uma
+      // IA - relato do usuário: "o nome não vai e fica em destaque").
       this.send(seat.connId, {
         type: 'lobby',
         code: room.code,
+        seat: seat.index,
         seats: this.lobbySeats(room),
         isHost: seat.index === 0,
         serverUrl: this.serverUrl,

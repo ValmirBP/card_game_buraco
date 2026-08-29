@@ -40,10 +40,11 @@ type ClientMessage =
 
 type ServerMessage =
   | { type: 'joined'; code: string; seat: number; isHost: boolean; serverUrl?: string }
-  | { type: 'lobby'; code: string; seats: LobbySeat[]; isHost: boolean; serverUrl?: string }
+  | { type: 'lobby'; code: string; seat: number; seats: LobbySeat[]; isHost: boolean; serverUrl?: string }
   | { type: 'state'; view: SeatView }
   | { type: 'log'; lines: string[] }
   | { type: 'error'; message: string }
+  | { type: 'roomClosed'; reason: string }
 
 interface OnlineState {
   connection: ConnectionStatus
@@ -54,6 +55,12 @@ interface OnlineState {
   view: SeatView | null
   log: string[]
   errorMsg: string | null
+  /** Motivo pelo qual a sala foi fechada à força (hoje só "o anfitrião
+   * saiu") - diferente de errorMsg (uma jogada recusada, a sala continua
+   * de pé): aqui a sala JÁ NÃO EXISTE MAIS, então quem vê isso precisa
+   * sair da tela online, não só dispensar um aviso. App.tsx observa este
+   * campo pra voltar ao menu sozinho quando ele aparece. */
+  roomClosedReason: string | null
   /** LAN base URL reported by the server (e.g. `http://192.168.2.169:3001`),
    * used to build a join link/QR that works from another device. Falls back
    * to window.location.origin when the server didn't find a LAN IP. */
@@ -101,6 +108,7 @@ interface OnlineState {
   toggleCardSelection: (index: number) => void
   clearSelection: () => void
   clearError: () => void
+  clearRoomClosedReason: () => void
   setServerAddress: (address: string) => void
   /** "Escolher o lado que quer entrar": move você pra outro assento AI
    * livre, antes da partida começar — como times são fixos por assento
@@ -131,6 +139,25 @@ let intentionalClose = false
 // sucedida (onopen) e a cada novo create()/join() explícito.
 let reconnectAttempts = 0
 const MAX_RECONNECT_ATTEMPTS = 5
+
+/** Fecha a conexão e cancela qualquer reconexão pendente — usado tanto por
+ * leave() (saída intencional) quanto pelo handler de 'roomClosed' (a sala
+ * foi fechada à força porque o anfitrião saiu, ver server/protocol.ts
+ * handleClose). Sem marcar intentionalClose, o onclose do socket tentaria
+ * reconectar numa sala que já não existe mais. */
+function teardownConnection(): void {
+  intentionalClose = true
+  lastJoin = null
+  reconnectAttempts = 0
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer)
+    reconnectTimer = null
+  }
+  if (socket) {
+    socket.close()
+    socket = null
+  }
+}
 
 function send(msg: ClientMessage): void {
   if (socket && socket.readyState === WebSocket.OPEN) {
@@ -226,6 +253,7 @@ function handleServerMessage(msg: ServerMessage): void {
     case 'lobby':
       useOnlineStore.setState({
         code: msg.code,
+        seat: msg.seat,
         isHost: msg.isHost,
         lobby: msg.seats,
         serverUrl: msg.serverUrl || null,
@@ -240,6 +268,29 @@ function handleServerMessage(msg: ServerMessage): void {
     case 'error':
       useOnlineStore.setState({ errorMsg: msg.message })
       break
+    case 'roomClosed':
+      // A sala JÁ NÃO EXISTE MAIS no servidor (o anfitrião saiu) - mesma
+      // limpeza de leave(), mas preservando o motivo pra App.tsx mostrar e
+      // então levar de volta ao menu sozinho (ver o efeito lá).
+      teardownConnection()
+      useOnlineStore.setState({
+        connection: 'idle',
+        code: null,
+        seat: null,
+        isHost: false,
+        lobby: [],
+        view: null,
+        log: [],
+        errorMsg: null,
+        serverUrl: null,
+        selectedCardIndices: [],
+        drawAnim: null,
+        pickupAnim: null,
+        discardAnim: null,
+        tableAnim: null,
+        roomClosedReason: msg.reason,
+      })
+      break
   }
 }
 
@@ -252,6 +303,7 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
   view: null,
   log: [],
   errorMsg: null,
+  roomClosedReason: null,
   serverUrl: null,
   serverAddress: loadStoredServerAddress(),
   selectedCardIndices: [],
@@ -298,17 +350,7 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
   nextRound: () => send({ type: 'nextRound' }),
 
   leave: () => {
-    intentionalClose = true
-    lastJoin = null
-    reconnectAttempts = 0
-    if (reconnectTimer) {
-      clearTimeout(reconnectTimer)
-      reconnectTimer = null
-    }
-    if (socket) {
-      socket.close()
-      socket = null
-    }
+    teardownConnection()
     set({
       connection: 'idle',
       code: null,
@@ -324,6 +366,7 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
       pickupAnim: null,
       discardAnim: null,
       tableAnim: null,
+      roomClosedReason: null,
     })
   },
 
@@ -337,6 +380,8 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
   clearSelection: () => set({ selectedCardIndices: [] }),
 
   clearError: () => set({ errorMsg: null }),
+
+  clearRoomClosedReason: () => set({ roomClosedReason: null }),
 
   setServerAddress: (address) => {
     set({ serverAddress: address })

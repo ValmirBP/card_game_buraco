@@ -6,6 +6,7 @@ import { useOnlineStore, joinUrlFor } from '../../online/onlineStore'
 import DifficultySelector from '../Menu/DifficultySelector'
 import QrScanner, { canScanQr } from './QrScanner'
 import type { AIDifficulty } from '../../engine/ai'
+import { loadStoredPlayerName, savePlayerName } from '../../playerName'
 
 /** Room code from a `?sala=CODE` invite link, read once on first render.
  * Used to pre-fill the join view so scanning the QR from OnlineLobby just
@@ -47,10 +48,18 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
   const startRoom = useOnlineStore((s) => s.start)
   const clearError = useOnlineStore((s) => s.clearError)
   const chooseSeat = useOnlineStore((s) => s.chooseSeat)
-  const renameSeat = useOnlineStore((s) => s.rename)
+  const renameSeatOnServer = useOnlineStore((s) => s.rename)
+  // Persiste também quando o nome é editado DENTRO da sala (lápis na sua
+  // linha), não só na tela inicial - a mesma chave compartilhada garante
+  // que os dois sentidos fiquem sincronizados (edita em qualquer lugar,
+  // reflete em todos os outros).
+  const renameSeat = (newName: string) => {
+    savePlayerName(newName)
+    renameSeatOnServer(newName)
+  }
 
   const [inviteCode] = useState(readInviteCodeFromUrl)
-  const [name, setName] = useState('Você')
+  const [name, setName] = useState(loadStoredPlayerName)
   // "Criar Sala" no APK instalado sobe o servidor embutido NESTE aparelho
   // (ver src/online/nativeHostServer.ts) antes de criar a sala — nenhum
   // computador precisa estar ligado. hostStarting cobre o intervalo entre
@@ -211,7 +220,10 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
               type="text"
               placeholder="Seu nome"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value)
+                savePlayerName(e.target.value)
+              }}
               className="min-h-[44px] w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-center text-white placeholder-gray-400 shadow-inner outline-none backdrop-blur-sm transition focus:ring-4 focus:ring-card-gold/70 landscape:min-h-0 landscape:py-1.5 landscape:text-sm"
             />
 
@@ -356,17 +368,37 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
             </p>
           )}
 
+          {/* Time = assento par/ímpar (0/2 = A, 1/3 = B — fixo no motor, ver
+              createGameState em engine/gameState.ts). "Nós"/"Eles" é
+              relativo ao SEU assento atual, igual à mesa de jogo
+              (OnlineGameBoard.tsx) — mesmas cores (dourado/magenta), pra
+              não reaprender um código de cor novo quando a partida começa.
+              Só calculável depois que `seat` chega (ver o bug corrigido em
+              onlineStore.ts: a mensagem 'lobby' agora informa o PRÓPRIO
+              assento de quem recebe, não só a lista geral). */}
           <div className="space-y-2 text-left landscape:col-start-2 landscape:row-start-1 landscape:space-y-1">
+            {seat !== null && (
+              <p className="text-xs text-gray-300 landscape:text-[10px]">
+                Você está no{' '}
+                <span className="font-semibold text-card-gold">Time Nós</span> (assentos{' '}
+                {seat % 2 === 0 ? '1 e 3' : '2 e 4'})
+              </p>
+            )}
             {SEAT_LABELS.map((label, i) => {
               const seatInfo = lobby.find((s) => s.index === i)
               const isYou = seat === i
+              const isMyTeam = seat === null ? i === 0 : i % 2 === seat % 2
               // "Escolher o lado que quer entrar": qualquer convidado (não
               // o anfitrião, que trava a sala pra sempre se sair do
               // assento 0 - ver rooms.ts) pode tocar num assento AI livre
               // pra se mudar pra lá, antes da partida começar.
               const canMoveHere = !isYou && !isHost && seatInfo?.kind === 'ai'
+              const teamBorder = isMyTeam ? 'border-card-gold/60' : 'border-fuchsia-400/40'
 
               if (isYou) {
+                // Sua própria linha é sempre "Nós" por definição (isMyTeam
+                // é trivialmente true quando i === seat) — sem prop de cor
+                // aqui; YourSeatRow já é dourado fixo.
                 return <YourSeatRow key={i} name={seatInfo?.name ?? label} onRename={renameSeat} />
               }
 
@@ -376,13 +408,20 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
                   type="button"
                   disabled={!canMoveHere}
                   onClick={canMoveHere ? () => chooseSeat(i) : undefined}
-                  className={`flex w-full items-center justify-between rounded-xl border px-4 py-2.5 text-left landscape:py-1 ${
+                  className={`flex w-full items-center justify-between rounded-xl border ${teamBorder} px-4 py-2.5 text-left landscape:py-1 ${
                     canMoveHere
-                      ? 'cursor-pointer border-white/10 bg-white/5 transition-colors hover:border-card-gold/60 hover:bg-card-gold/10'
-                      : 'border-white/10 bg-white/5'
+                      ? `cursor-pointer bg-white/5 transition-colors ${isMyTeam ? 'hover:bg-card-gold/10' : 'hover:bg-fuchsia-500/10'}`
+                      : 'bg-white/5'
                   }`}
                 >
-                  <span className="text-sm text-gray-200 landscape:text-xs">{seatInfo?.name ?? label}</span>
+                  <span className="flex items-center gap-1.5 text-sm text-gray-200 landscape:text-xs">
+                    <span
+                      className={`shrink-0 text-[10px] font-semibold landscape:text-[9px] ${isMyTeam ? 'text-card-gold' : 'text-fuchsia-300'}`}
+                    >
+                      {isMyTeam ? 'NÓS' : 'ELES'}
+                    </span>
+                    {seatInfo?.name ?? label}
+                  </span>
                   <span className="flex items-center gap-1.5 text-xs text-gray-400 landscape:text-[10px]">
                     {canMoveHere && (
                       <span className="text-card-gold landscape:hidden">Toque para entrar aqui</span>

@@ -6,6 +6,7 @@ import RulesModal from './RulesModal'
 import type { AIDifficulty } from '../../engine/ai'
 import { Card as EngineCard } from '../../engine/card'
 import { CardComponent } from '../Card'
+import { loadStoredPlayerName, savePlayerName } from '../../playerName'
 
 export interface BotNames {
   partner: string
@@ -36,7 +37,7 @@ const FAN_CARDS: { card: EngineCard; rotate: number; x: number }[] = [
 export default function Menu({ onStart, onPlayOnline }: MenuProps) {
   const [showDifficulty, setShowDifficulty] = useState(false)
   const [showRules, setShowRules] = useState(false)
-  const [playerName, setPlayerName] = useState('Você')
+  const [playerName, setPlayerName] = useState(loadStoredPlayerName)
   const [showNameEditor, setShowNameEditor] = useState(false)
   const [botNames, setBotNames] = useState<BotNames>(DEFAULT_BOT_NAMES)
 
@@ -93,7 +94,10 @@ export default function Menu({ onStart, onPlayOnline }: MenuProps) {
               type="text"
               placeholder="Seu nome"
               value={playerName}
-              onChange={e => setPlayerName(e.target.value)}
+              onChange={e => {
+                setPlayerName(e.target.value)
+                savePlayerName(e.target.value)
+              }}
               className="min-h-[44px] w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-center text-white placeholder-gray-400 shadow-inner outline-none backdrop-blur-sm transition focus:ring-4 focus:ring-card-gold/70 landscape:min-h-0 landscape:py-1.5 landscape:text-sm"
             />
           </div>

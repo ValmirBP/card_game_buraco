@@ -176,6 +176,26 @@ export class RoomManager {
     seat.connId = undefined
   }
 
+  /**
+   * Remove a sala inteira — usado quando o ANFITRIÃO cai: sem ele (dono do
+   * assento 0), ninguém mais consegue iniciar a partida (startRoom exige
+   * especificamente `seats[0].connId`), então deixar a sala "zumbi"
+   * esperando ele reconectar - como o resto da reconexão faz pra
+   * convidados - só travaria o jogo pros outros pra sempre. Devolve os
+   * connIds dos assentos humanos AINDA conectados (exceto quem causou a
+   * saída, que já foi removido antes disso rodar), pra o protocolo avisar
+   * cada um antes de fechar de vez.
+   */
+  closeRoom(code: string): string[] {
+    const room = this.rooms.get(code)
+    if (!room) return []
+    const connIds = room.seats
+      .filter((s): s is RoomSeat & { connId: string } => s.kind === 'human' && s.connId !== undefined)
+      .map((s) => s.connId)
+    this.rooms.delete(code)
+    return connIds
+  }
+
   startRoom(code: string, byConnId: string): { ok: true } | ErrorResult {
     const room = this.rooms.get(code)
     if (!room) return { error: 'room not found' }

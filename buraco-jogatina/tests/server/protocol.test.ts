@@ -160,8 +160,16 @@ describe('ProtocolServer', () => {
     const lastLobby = guest.ofType('lobby').at(-1) as any
     expect(lastLobby.seats[3]).toMatchObject({ index: 3, kind: 'human', name: 'Bob' })
     expect(lastLobby.seats[1]).toMatchObject({ kind: 'ai' })
-    // O host também recebe o lobby atualizado.
-    expect((host.ofType('lobby').at(-1) as any).seats[3]).toMatchObject({ name: 'Bob' })
+    // Regressão: a mensagem 'lobby' precisa dizer ao PRÓPRIO Bob que agora
+    // é o assento 3, não só a lista geral - sem isso o cliente continua
+    // achando que está no assento 1 (o destaque "(você)" e o lápis de
+    // editar nome ficavam presos lá, agora uma IA - relato do usuário).
+    expect(lastLobby.seat).toBe(3)
+    // O host também recebe o lobby atualizado, com o PRÓPRIO assento dele
+    // (0) intacto - trocar assento de outra pessoa não pode mexer no meu.
+    const hostLobby = host.ofType('lobby').at(-1) as any
+    expect(hostLobby.seats[3]).toMatchObject({ name: 'Bob' })
+    expect(hostLobby.seat).toBe(0)
   })
 
   it('depois de chooseSeat, uma intent do convidado usa o NOVO assento', async () => {
@@ -212,5 +220,62 @@ describe('ProtocolServer', () => {
     await server.handleMessage('c1', { type: 'rename', name: 'Novo Nome' })
     const lastLobby = host.ofType('lobby').at(-1) as any
     expect(lastLobby.seats[0].name).toBe('Novo Nome')
+  })
+
+  describe('anfitrião cai (handleClose)', () => {
+    it('avisa os convidados ainda conectados que a sala fechou', async () => {
+      const server = makeServer()
+      const host = new FakeSocket()
+      const guest = new FakeSocket()
+      server.registerConnection('c1', host)
+      server.registerConnection('c2', guest)
+
+      await server.handleMessage('c1', { type: 'create', name: 'Host', difficulty: 'medium' })
+      await server.handleMessage('c2', { type: 'join', code: (host.ofType('joined')[0] as any).code, name: 'Bob' })
+
+      server.handleClose('c1') // o anfitrião cai
+
+      const closed = guest.ofType('roomClosed')
+      expect(closed).toHaveLength(1)
+      expect((closed[0] as any).reason).toMatch(/anfitrião/i)
+    })
+
+    it('a sala deixa de existir - uma tentativa de entrar depois falha', async () => {
+      const server = makeServer()
+      const host = new FakeSocket()
+      const guest = new FakeSocket()
+      const latecomer = new FakeSocket()
+      server.registerConnection('c1', host)
+      server.registerConnection('c2', guest)
+      server.registerConnection('c3', latecomer)
+
+      await server.handleMessage('c1', { type: 'create', name: 'Host', difficulty: 'medium' })
+      const code = (host.ofType('joined')[0] as any).code
+      await server.handleMessage('c2', { type: 'join', code, name: 'Bob' })
+
+      server.handleClose('c1')
+
+      await server.handleMessage('c3', { type: 'join', code, name: 'Tarde Demais' })
+      expect(latecomer.ofType('error')).toHaveLength(1)
+    })
+
+    it('um convidado comum caindo NÃO fecha a sala - só o anfitrião faz isso', async () => {
+      const server = makeServer()
+      const host = new FakeSocket()
+      const guest = new FakeSocket()
+      server.registerConnection('c1', host)
+      server.registerConnection('c2', guest)
+
+      await server.handleMessage('c1', { type: 'create', name: 'Host', difficulty: 'medium' })
+      await server.handleMessage('c2', { type: 'join', code: (host.ofType('joined')[0] as any).code, name: 'Bob' })
+
+      server.handleClose('c2') // um convidado comum cai, não o anfitrião
+
+      expect(host.ofType('roomClosed')).toHaveLength(0)
+      // o assento do convidado fica marcado offline, mas a sala continua -
+      // o comportamento de reconexão de sempre (rooms.test.ts já cobre).
+      const lastLobby = host.ofType('lobby').at(-1) as any
+      expect(lastLobby.seats[1]).toMatchObject({ kind: 'human', name: 'Bob', connected: false })
+    })
   })
 })

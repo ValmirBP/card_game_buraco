@@ -67,6 +67,21 @@ export default function App() {
     setScreen('menu')
   }
 
+  // A sala foi fechada à força (hoje só "o anfitrião saiu" - ver
+  // server/protocol.ts handleClose) - o onlineStore já fez a limpeza da
+  // conexão sozinho (ver o case 'roomClosed' em onlineStore.ts); só falta
+  // avisar quem ainda estava lá e tirá-lo da tela online, já que a sala
+  // não existe mais (pedido do usuário: "a sala deve cair junto... um
+  // aviso na tela dos outros jogadores").
+  const roomClosedReason = useOnlineStore(s => s.roomClosedReason)
+  useEffect(() => {
+    if (!roomClosedReason) return
+    void import('./online/nativeHostServer').then(({ stopNativeHost }) => stopNativeHost())
+    window.alert(roomClosedReason)
+    useOnlineStore.getState().clearRoomClosedReason()
+    setScreen('menu')
+  }, [roomClosedReason])
+
   const handleOnlineBackToMenu = () => {
     // No-op se este aparelho não estava hospedando (ver stopNativeHost em
     // nativeHostServer.ts) - sempre seguro chamar, mesmo quem só entrou
