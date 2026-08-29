@@ -67,6 +67,10 @@ export default function App() {
   }
 
   const handleOnlineBackToMenu = () => {
+    // No-op se este aparelho não estava hospedando (ver stopNativeHost em
+    // nativeHostServer.ts) - sempre seguro chamar, mesmo quem só entrou
+    // como convidado na sala de outra pessoa.
+    void import('./online/nativeHostServer').then(({ stopNativeHost }) => stopNativeHost())
     useOnlineStore.getState().leave()
     setScreen('menu')
   }

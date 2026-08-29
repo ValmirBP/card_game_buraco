@@ -14,6 +14,11 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // Registro de plugin custom precisa vir ANTES de super.onCreate()
+        // (é aí que a Bridge do Capacitor é montada). HostServerPlugin é o
+        // servidor WebSocket embutido que deixa este celular ser o host de
+        // uma partida online - ver HostServerPlugin.java.
+        registerPlugin(HostServerPlugin.class);
         super.onCreate(savedInstanceState);
         // Fundo da janela = verde do feltro, pra qualquer área não coberta pela
         // WebView (ex.: faixa do recorte da câmera) não aparecer branca/preta.

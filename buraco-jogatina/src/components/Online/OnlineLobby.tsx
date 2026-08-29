@@ -49,6 +49,14 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
 
   const [inviteCode] = useState(readInviteCodeFromUrl)
   const [name, setName] = useState('Você')
+  // "Criar Sala" no APK instalado sobe o servidor embutido NESTE aparelho
+  // (ver src/online/nativeHostServer.ts) antes de criar a sala — nenhum
+  // computador precisa estar ligado. hostStarting cobre o intervalo entre
+  // o clique e o servidor responder; hostError é só dessa etapa (falha
+  // aqui nunca chega a abrir um WebSocket, então não é o `errorMsg` do
+  // store, que é sobre a CONEXÃO).
+  const [hostStarting, setHostStarting] = useState(false)
+  const [hostError, setHostError] = useState<string | null>(null)
   const [joinCode, setJoinCode] = useState(inviteCode ?? '')
   const [showScanner, setShowScanner] = useState(false)
   // Calculado uma vez: a câmera/decodificador existem neste aparelho? Só
@@ -111,8 +119,33 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
   // APK) - ver o aviso na tela da sala.
   const qrUsable = Boolean(qrDataUrl) && Boolean(serverUrl)
 
-  const handleCreate = (difficulty: AIDifficulty) => {
+  const handleCreate = async (difficulty: AIDifficulty) => {
     setShowDifficulty(false)
+    setHostError(null)
+
+    // No app instalado, este aparelho vira o próprio host: sobe o
+    // servidor embutido (Java-WebSocket dentro do APK, ver
+    // HostServerPlugin.java) e usa o IP de rede DELE MESMO, em vez de
+    // pedir o IP de um computador que o usuário talvez nem tenha por
+    // perto. No navegador (não-nativo) nada muda — cria a sala como
+    // sempre, contra o serverAddress já configurado.
+    if (Capacitor.isNativePlatform()) {
+      setHostStarting(true)
+      const { startNativeHost } = await import('../../online/nativeHostServer')
+      const info = await startNativeHost()
+      setHostStarting(false)
+      if (!info) {
+        setHostError('Não foi possível criar o servidor neste aparelho. Tente novamente.')
+        return
+      }
+      // Sem IP de rede (ex.: sem Wi-Fi conectado): ainda assim usa
+      // 127.0.0.1 pra ESTE aparelho conseguir se conectar ao próprio
+      // servidor e jogar sozinho contra as IAs — só o QR/convite pra
+      // outros aparelhos é que não vai funcionar (mesmo aviso que já
+      // existe pra um servidor de desktop sem LAN, via `qrUsable`).
+      setServerAddress(info.address ? `${info.address}:${info.port}` : `127.0.0.1:${info.port}`)
+    }
+
     createRoom(name.trim() || 'Você', difficulty)
   }
 
@@ -138,6 +171,25 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
         >
           {errorMsg}
           <button type="button" onClick={clearError} className="ml-2 underline">
+            ok
+          </button>
+        </motion.p>
+      )}
+
+      {hostStarting && (
+        <p className="w-full max-w-sm rounded-xl bg-card-gold/10 px-4 py-2 text-sm text-card-gold">
+          Criando o servidor neste aparelho…
+        </p>
+      )}
+
+      {hostError && (
+        <motion.p
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-sm rounded-xl bg-red-500/15 px-4 py-2 text-sm text-red-200"
+        >
+          {hostError}
+          <button type="button" onClick={() => setHostError(null)} className="ml-2 underline">
             ok
           </button>
         </motion.p>
@@ -191,8 +243,9 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
                   className="min-h-[40px] w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-center text-sm text-white placeholder-gray-500 shadow-inner outline-none backdrop-blur-sm transition focus:ring-4 focus:ring-card-gold/70"
                 />
                 <p className="mt-1 text-[10px] text-gray-500">
-                  Obrigatório no app instalado (APK): digite o IP e a porta do computador rodando o servidor
-                  (ex.: 192.168.2.142:3001). No navegador, geralmente pode deixar vazio.
+                  Só necessário pra ENTRAR na sala de outra pessoa (digite o IP e a porta do aparelho que
+                  criou a sala, ex.: 192.168.2.142:3001) — escanear o QR preenche isso sozinho. Pra CRIAR
+                  uma sala no app instalado, não precisa digitar nada: este aparelho vira o servidor.
                 </p>
               </motion.div>
             )}
@@ -206,9 +259,10 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
                 onClick={() => setShowDifficulty(true)}
-                className="min-h-[44px] w-full rounded-xl bg-gradient-to-b from-card-gold-light to-card-gold px-6 py-3 font-bold text-black shadow-lg shadow-black/30 transition-colors hover:from-card-gold hover:to-card-gold-dark landscape:min-h-0 landscape:py-1.5 landscape:text-sm"
+                disabled={hostStarting}
+                className="min-h-[44px] w-full rounded-xl bg-gradient-to-b from-card-gold-light to-card-gold px-6 py-3 font-bold text-black shadow-lg shadow-black/30 transition-colors hover:from-card-gold hover:to-card-gold-dark landscape:min-h-0 landscape:py-1.5 landscape:text-sm disabled:opacity-50"
               >
-                Criar Sala
+                {hostStarting ? 'Criando…' : 'Criar Sala'}
               </motion.button>
               <motion.button
                 type="button"
