@@ -5,7 +5,7 @@ import { GameState, Team, TeamId, TeamScoreBreakdown, createGameState, teamOfSea
 import { isValidCanasta, canExtendMeld, scoreCardValue } from './utils'
 
 export const HAND_SIZE = 11
-const MORTO_SIZE = 11
+export const MORTO_SIZE = 11
 const MORTO_COUNT = 2
 
 export class Game {

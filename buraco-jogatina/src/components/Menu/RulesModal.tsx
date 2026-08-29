@@ -1,6 +1,6 @@
 import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
-import { HAND_SIZE } from '../../engine/game'
+import { HAND_SIZE, MORTO_SIZE } from '../../engine/game'
 import { canastaPoints } from '../../engine/utils'
 import { MATCH_TARGET } from '../../store/gameStore'
 
@@ -42,7 +42,8 @@ export default function RulesModal({ onClose }: RulesModalProps) {
           <div>
             <h3 className="font-bold text-white">Objetivo</h3>
             <p>
-              Ser a primeira dupla a bater (esvaziar a mão), formando o máximo de canastras
+              Jogam 4 pessoas, em 2 duplas fixas sentadas em lados opostos da mesa. Ser a
+              primeira dupla a bater (esvaziar a mão), formando o máximo de canastras
               (sequências de 7+ cartas) possível. A partida vai até {MATCH_TARGET} pontos,
               somando várias rodadas.
             </p>
@@ -51,16 +52,36 @@ export default function RulesModal({ onClose }: RulesModalProps) {
             <h3 className="font-bold text-white">Preparação</h3>
             <p>
               Cada jogador recebe {HAND_SIZE} cartas. O restante do baralho forma o monte de
-              compra (com 2 mortos reservados à parte), e a primeira carta virada inicia o
-              descarte.
+              compra (com 2 mortos reservados à parte — veja abaixo), e a primeira carta virada
+              inicia o descarte.
+            </p>
+          </div>
+          <div>
+            <h3 className="font-bold text-white">O Morto</h3>
+            <p>
+              Cada dupla tem direito a um morto: um monte reservado de {MORTO_SIZE} cartas
+              viradas para baixo. Assim que um jogador da dupla esvazia a mão pela primeira
+              vez, ele pega automaticamente o morto como cartas novas e continua jogando — é
+              isso que dá à dupla o direito de bater de vez (veja "Bater" abaixo). Se o monte de
+              compra acabar antes de alguém pegar um morto, esse morto vira o novo monte.
+            </p>
+          </div>
+          <div>
+            <h3 className="font-bold text-white">Curingas</h3>
+            <p>
+              O coringa e qualquer carta 2 podem substituir a carta que falta no meio de uma
+              sequência (por exemplo, 5-6-8 de copas mais um curinga forma 5-6-7-8). Cada jogo
+              aceita no máximo 1 curinga.
             </p>
           </div>
           <div>
             <h3 className="font-bold text-white">Seu Turno</h3>
             <p>
-              1. Compre uma carta do monte (ou pegue a pilha de descarte). 2. Baixe ou estenda
-              jogos (3 ou mais cartas em sequência do mesmo naipe, com no máximo 1 curinga; ou
-              uma trinca de 2+ Áses). 3. Descarte uma carta para encerrar o turno.
+              1. Compre uma carta do monte (ou pegue a pilha de descarte inteira). 2. Baixe ou
+              estenda jogos (3 ou mais cartas em sequência do mesmo naipe, com no máximo 1
+              curinga; ou uma trinca de 2+ Áses). 3. Descarte uma carta para encerrar o turno.
+              Atenção: se o descarte tinha só 1 carta quando você o pegou, essa carta específica
+              não pode voltar pro descarte nesse mesmo turno.
             </p>
           </div>
           <div>
