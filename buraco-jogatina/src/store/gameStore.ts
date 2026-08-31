@@ -5,6 +5,7 @@ import { AIPlayer, AIDifficulty, GameStateForAI } from '../engine/ai'
 import { Card } from '../engine/card'
 import { scoreCardValue } from '../engine/utils'
 import type { Team, TeamId } from '../engine/gameState'
+import { saveGame, loadSavedGame, clearSavedGame } from './gamePersistence'
 
 /** Max meld actions (play_canasta/extend_meld) the AI is allowed to make in a
  * single turn before we force it to discard. Guards against an infinite loop
@@ -159,6 +160,13 @@ export interface GameStore {
    * keeping `matchScores`/`matchCanastras`. No-op once `matchWinner` is
    * set (the match already ended). */
   startNextRound: () => void
+  /** Restaura a partida salva em localStorage (ver gamePersistence.ts),
+   * substituindo qualquer partida em andamento. Retorna true se havia uma
+   * partida válida pra restaurar, false se não havia nenhuma ou se o que
+   * estava salvo era inválido/incompatível (nesse caso a entrada corrompida
+   * já foi limpa por loadSavedGame). Usado pelo botão "Continuar partida"
+   * no Menu. */
+  resumeSavedGame: () => boolean
 }
 
 const DIFFICULTY_LABEL: Record<string, string> = {
@@ -622,5 +630,49 @@ export const useGameStore = create<GameStore>((set, get) => {
       roundFinalized: false,
     })
   },
+
+  resumeSavedGame: () => {
+    const loaded = loadSavedGame()
+    if (!loaded) return false
+
+    set({
+      game: loaded.game,
+      version: get().version + 1,
+      selectedCardIndices: [],
+      matchScores: loaded.store.matchScores,
+      matchCanastras: loaded.store.matchCanastras,
+      round: loaded.store.round,
+      matchWinner: loaded.store.matchWinner,
+      previousMatchScores: loaded.store.previousMatchScores,
+      matchConfig: loaded.store.matchConfig,
+      gameLog: loaded.store.gameLog,
+      roundFinalized: loaded.store.roundFinalized,
+    })
+    return true
+  },
   }
+})
+
+// Persiste automaticamente a partida em andamento a cada ação que muda o
+// `game` ou o incrementa `version` (toda jogada), pra "Continuar partida"
+// no Menu sempre refletir o último estado antes do app fechar/cair - sem
+// precisar espalhar a chamada de saveGame em cada action acima. `game: null`
+// (resetGame ou nunca iniciado) limpa a entrada: sair da partida de
+// propósito não deixa nada pra retomar depois.
+useGameStore.subscribe((state, prevState) => {
+  if (state.game === prevState.game && state.version === prevState.version) return
+  if (!state.game) {
+    clearSavedGame()
+    return
+  }
+  saveGame(state.game, {
+    matchScores: state.matchScores,
+    matchCanastras: state.matchCanastras,
+    round: state.round,
+    matchWinner: state.matchWinner,
+    previousMatchScores: state.previousMatchScores,
+    matchConfig: state.matchConfig,
+    gameLog: state.gameLog,
+    roundFinalized: state.roundFinalized,
+  })
 })

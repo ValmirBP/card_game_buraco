@@ -17,6 +17,10 @@ export interface BotNames {
 interface MenuProps {
   onStart: (difficulty: AIDifficulty, playerName: string, names: BotNames) => void
   onPlayOnline: () => void
+  /** true quando há uma partida offline salva (fechou o app sem sair pelo
+   * botão) esperando ser retomada - ver App.tsx/gamePersistence.ts. */
+  canResume?: boolean
+  onResume?: () => void
 }
 
 const DEFAULT_BOT_NAMES: BotNames = {
@@ -34,7 +38,7 @@ const FAN_CARDS: { card: EngineCard; rotate: number; x: number }[] = [
   { card: new EngineCard('hearts', '10'), rotate: 18, x: 78 },
 ]
 
-export default function Menu({ onStart, onPlayOnline }: MenuProps) {
+export default function Menu({ onStart, onPlayOnline, canResume, onResume }: MenuProps) {
   const [showDifficulty, setShowDifficulty] = useState(false)
   const [showRules, setShowRules] = useState(false)
   const [playerName, setPlayerName] = useState(loadStoredPlayerName)
@@ -163,6 +167,17 @@ export default function Menu({ onStart, onPlayOnline }: MenuProps) {
 
         {/* Coluna direita (paisagem): ações principais */}
         <div className="flex w-full flex-col gap-3 landscape:gap-1.5">
+          {canResume && onResume && (
+            <motion.button
+              type="button"
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={onResume}
+              className="min-h-[44px] w-full rounded-xl border-2 border-emerald-400 bg-emerald-500/20 px-6 py-3 font-bold text-emerald-300 shadow-lg shadow-black/30 backdrop-blur-sm transition-colors hover:bg-emerald-500/30 landscape:min-h-0 landscape:py-1.5 landscape:text-sm"
+            >
+              Continuar partida
+            </motion.button>
+          )}
           <motion.button
             type="button"
             whileHover={{ scale: 1.03 }}

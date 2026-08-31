@@ -7,6 +7,7 @@ import Result from './components/Result/Result'
 import OnlineLobby from './components/Online/OnlineLobby'
 import OnlineGameplay from './components/Online/OnlineGameplay'
 import { useGameStore } from './store/gameStore'
+import { hasSavedGame } from './store/gamePersistence'
 import { useOnlineStore } from './online/onlineStore'
 import type { AIDifficulty } from './engine/ai'
 
@@ -33,6 +34,10 @@ export default function App() {
   const [lastDifficulty, setLastDifficulty] = useState<AIDifficulty>('medium')
   const [lastPlayerName, setLastPlayerName] = useState('Você')
   const [lastBotNames, setLastBotNames] = useState<BotNames>(DEFAULT_BOT_NAMES)
+  // Sinaliza pro Menu mostrar "Continuar partida" - checado só uma vez, na
+  // abertura do app (não em cada render). Um link de convite de sala (
+  // hasRoomInviteParam) tem prioridade sobre isso, então nem checa.
+  const [canResume, setCanResume] = useState(() => !hasRoomInviteParam() && hasSavedGame())
 
   const game = useGameStore(s => s.game)
   // `version` selected alongside `game` per the store's reactivity contract:
@@ -45,7 +50,22 @@ export default function App() {
     setLastDifficulty(difficulty)
     setLastPlayerName(playerName)
     setLastBotNames(names)
+    setCanResume(false)
     setScreen('gameplay')
+  }
+
+  // "Continuar partida" no Menu - restaura o Game salvo (ver
+  // gamePersistence.ts) e pousa direto na tela certa: 'gameplay' se a
+  // rodada ainda está rolando, 'result' se ela já tinha terminado (placar
+  // esperando "Próxima rodada"/"Nova partida") no momento em que o app
+  // fechou. Se o que estava salvo não deu pra restaurar (corrompido/
+  // incompatível), resumeSavedGame já limpou a entrada - só tira o botão.
+  const handleResume = () => {
+    const resumed = useGameStore.getState().resumeSavedGame()
+    setCanResume(false)
+    if (!resumed) return
+    const status = useGameStore.getState().game?.state.status
+    setScreen(status === 'finished' ? 'result' : 'gameplay')
   }
 
   // Match just ended (matchWinner set) -> start a brand-new match with the
@@ -64,6 +84,7 @@ export default function App() {
 
   const handleBackToMenu = () => {
     useGameStore.getState().resetGame()
+    setCanResume(false)
     setScreen('menu')
   }
 
@@ -175,7 +196,12 @@ export default function App() {
   return (
     <Layout fit={fitScreen}>
       {screen === 'menu' && (
-        <Menu onStart={handleStart} onPlayOnline={() => setScreen('onlineLobby')} />
+        <Menu
+          onStart={handleStart}
+          onPlayOnline={() => setScreen('onlineLobby')}
+          canResume={canResume}
+          onResume={handleResume}
+        />
       )}
       {screen === 'gameplay' && game && (
         <Gameplay onGameEnd={() => setScreen('result')} onExit={handleExitGameplay} />
