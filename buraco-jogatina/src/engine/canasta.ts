@@ -11,19 +11,6 @@ import {
 
 export type CanastaType = 'sequence' | 'aces'
 
-export interface CanastaOptions {
-  /**
-   * When true, forces this meld to be treated as dirty regardless of what
-   * the fresh analysis of `cards` says. Used to persist "sujeira
-   * permanente" (Part A.4/A.3 - regra do 9): once a meld has gone dirty
-   * (e.g. a same-suit-2 curinga plus a real 9), it must never look clean
-   * again, even if a later card composition would re-analyze as clean.
-   * Optional and defaults to false for backward compatibility with
-   * existing callers (store/UI) that construct Canasta with just `cards`.
-   */
-  wasDirty?: boolean
-}
-
 export class Canasta {
   readonly cards: Card[]
   readonly isClean: boolean
@@ -31,8 +18,6 @@ export class Canasta {
   readonly points: number
   readonly type: CanastaType
   readonly layout: MeldLayoutEntry[]
-  /** Whether this meld (or any earlier version it was extended from) has ever been dirty - see CanastaOptions.wasDirty. */
-  readonly wasDirty: boolean
   /**
    * Canastra kind for UI/bonus purposes: 'simples' (below 7 cards, no
    * bonus), 'limpa' (7+ clean), 'suja' (7+ dirty), 'quinhentos' (13-card
@@ -41,7 +26,7 @@ export class Canasta {
    */
   readonly kind: CanastaKind
 
-  constructor(cards: Card[], options: CanastaOptions = {}) {
+  constructor(cards: Card[]) {
     const analysis = analyzeMeld(cards)
     if (!analysis) {
       throw new Error(
@@ -52,9 +37,17 @@ export class Canasta {
     this.type = analysis.type
     this.layout = analysis.layout
 
-    const forcedDirty = options.wasDirty ?? false
-    this.isClean = !forcedDirty && analysis.isClean
-    this.wasDirty = forcedDirty || !analysis.isClean
+    // isClean é SEMPRE recalculado do zero a partir da composição atual das
+    // cartas - nunca "gruda" suja pra sempre. Regra oficial do Jogatina: se
+    // o curinga que suja o jogo é um 2 do MESMO naipe, e a carta que ele
+    // substituía é comprada depois (via extendMeld), a canastra pode voltar
+    // a ficar limpa - o 2 passa a ocupar sua própria posição natural na
+    // sequência. analyzeMeld já decide isso corretamente por si só (ver
+    // "Interpretation 1" em analyzeSequence, utils.ts): um 2 de OUTRO naipe
+    // ou um joker nunca "viram" carta natural daquele naipe, então uma
+    // canastra suja por eles NUNCA reanalisa como limpa - só o 2 do mesmo
+    // naipe tem esse caminho de volta.
+    this.isClean = analysis.isClean
 
     this.isCanastra = this.cards.length >= 7
     this.kind = computeCanastaKind(this.cards.length, this.isClean, this.layout)
@@ -74,20 +67,21 @@ export class Canasta {
    * Returns a new Canasta with `added` cards merged in, validating that the
    * combination is still a legal meld (extended sequence, or an ace trio
    * with more aces). Throws if the extension would be invalid. Does not
-   * mutate this instance. A dirty (unclean) meld stays dirty when extended -
-   * its curinga is never removed, only recomputed from the full card set -
-   * and, per "sujeira permanente" (Part A.4), stays dirty even if a fresh
-   * analysis of the extended card set would otherwise look clean (e.g. the
-   * regra-do-9 case where the same-suit curinga would later appear natural).
+   * mutate this instance. isClean é recalculado do zero pra composição
+   * resultante (ver o construtor) - uma canastra suja por um 2 do MESMO
+   * naipe pode voltar a ficar limpa aqui, se a carta que faltava for
+   * exatamente o que `added` traz (regra oficial do Jogatina); sujeira por
+   * joker ou 2 de outro naipe nunca reanalisa como limpa, então o efeito
+   * prático pra esses casos é o mesmo de antes.
    */
   withExtraCards(added: Card[]): Canasta {
     if (!canExtendMeld(this.cards, added)) {
       throw new Error('Invalid meld extension')
     }
-    return new Canasta([...this.cards, ...added], { wasDirty: this.wasDirty })
+    return new Canasta([...this.cards, ...added])
   }
 
   clone(): Canasta {
-    return new Canasta([...this.cards], { wasDirty: this.wasDirty })
+    return new Canasta([...this.cards])
   }
 }

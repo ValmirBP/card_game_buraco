@@ -637,9 +637,10 @@ describe('Game', () => {
     // jogo (playCanasta + extendMeld - o mesmo caminho usado pelo offline e
     // pelo servidor online): baixa 3-4-5-6-7-[2 no lugar do 8]-9 (nasce
     // suja, pois o 9 entrou com o 2 fora da posição natural) e depois
-    // estende com o 8 real. O 2 desliza pra posição natural, mas a canastra
-    // CONTINUA suja - sujeira é permanente, naipes iguais não a salvam.
-    test('sujeira permanente sobrevive ao extendMeld do fluxo completo (exemplo 3..7+2(=8)+9, depois 8 real)', () => {
+    // estende com o 8 real. O 2 desliza pra posição natural e a canastra
+    // FICA LIMPA - regra oficial do Jogatina, corrigida a pedido do usuário
+    // em 2026-08-31 (antes, ela ficava suja pra sempre).
+    test('completar a sequência com a carta real volta a limpar a canastra (exemplo 3..7+2(=8)+9, depois 8 real)', () => {
       const players = makeFourPlayers()
       const meldCards = [
         new Card('spades', '3', false),
@@ -665,9 +666,9 @@ describe('Game', () => {
       expect(teamA.melds[0].kind).toBe('suja')
 
       expect(game.extendMeld(0, [eight])).toBe(true)
-      // Análise fresca de 2..9 diria "limpa" - mas a sujeira é permanente.
-      expect(teamA.melds[0].isClean).toBe(false)
-      expect(teamA.melds[0].kind).toBe('suja')
+      // O 2 desliza pra posição natural (2..9, sequência completa) - limpa.
+      expect(teamA.melds[0].isClean).toBe(true)
+      expect(teamA.melds[0].kind).toBe('limpa')
       expect(teamA.melds[0].cards).toHaveLength(8)
     })
 
