@@ -57,6 +57,12 @@ export interface SeatPlayerView {
   kind: SeatKind
   handCount: number
   teamId: TeamId
+  /** false quando este é um assento HUMANO cuja conexão caiu (o assento
+   * continua reservado pro mesmo nome - ver RoomManager.leaveRoom/joinRoom).
+   * Sempre true pra assentos de IA. Preenchido pelo protocolo do servidor
+   * (server/protocol.ts broadcastState), não pelo GameSession em si - a
+   * sessão não tem noção de rede, só de assentos/cartas. */
+  connected: boolean
 }
 
 export interface SeatTeamView {
@@ -90,4 +96,10 @@ export interface SeatView {
    * banner "Fulano bateu!" antes do placar. */
   closerSeat?: number
   log: string[]
+  /** true enquanto QUALQUER assento humano estiver desconectado (ver
+   * `players[].connected` acima) — a partida fica congelada (nenhuma intent
+   * é aceita de ninguém, turnos de IA não avançam) até todo mundo voltar.
+   * Preenchido pelo protocolo do servidor, sempre false vindo direto do
+   * GameSession (que não sabe de rede). */
+  paused: boolean
 }

@@ -7,6 +7,7 @@ import type { DrawAnimState } from '../components/Gameplay/DrawAnimation'
 import type { FlyAnimState } from '../components/Gameplay/CardFlyAnimation'
 
 const SERVER_ADDRESS_STORAGE_KEY = 'buraco-server-address'
+const LAST_ROOM_STORAGE_KEY = 'buraco-last-online-room'
 
 /** Lido uma vez no boot: lembra o último endereço de servidor digitado, pra
  * o usuário não ter que retitar o IP do PC toda vez que abrir o app. Vazio
@@ -17,6 +18,50 @@ function loadStoredServerAddress(): string {
     return window.localStorage.getItem(SERVER_ADDRESS_STORAGE_KEY) ?? ''
   } catch {
     return ''
+  }
+}
+
+/** Código + nome da ÚLTIMA sala em que este aparelho esteve — pedido do
+ * usuário: "manter o código da última sala para o jogador que saiu
+ * reconectar". `lastJoin` (módulo, em memória) já guarda isso ENQUANTO o
+ * app continua aberto, mas se o app for fechado/morto (comum no Android em
+ * segundo plano) esse estado some — persistir em localStorage é o que
+ * sobrevive a isso, pra oferecer "Reconectar à sala X" ao reabrir. Servidor
+ * já aceita reconexão por nome igual no MEIO de uma partida (ver
+ * server/rooms.ts joinRoom), então isso também cobre "continuar de onde
+ * parou", não só voltar pro lobby. */
+export interface LastRoomInfo {
+  code: string
+  name: string
+}
+
+function loadLastRoom(): LastRoomInfo | null {
+  try {
+    const raw = window.localStorage.getItem(LAST_ROOM_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (typeof parsed?.code === 'string' && typeof parsed?.name === 'string' && parsed.code && parsed.name) {
+      return { code: parsed.code, name: parsed.name }
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+function saveLastRoom(info: LastRoomInfo): void {
+  try {
+    window.localStorage.setItem(LAST_ROOM_STORAGE_KEY, JSON.stringify(info))
+  } catch {
+    // localStorage indisponível - só não persiste, não quebra o app.
+  }
+}
+
+function clearLastRoom(): void {
+  try {
+    window.localStorage.removeItem(LAST_ROOM_STORAGE_KEY)
+  } catch {
+    // idem acima.
   }
 }
 
@@ -71,6 +116,10 @@ interface OnlineState {
    * default vazio) tentaria conectar no próprio aparelho e nunca
    * funcionaria. Persistido em localStorage (ver resolveWsUrl em wsUrl.ts). */
   serverAddress: string
+  /** Código+nome da última sala (ver loadLastRoom acima) — sobrevive ao app
+   * fechar/reabrir. null quando nunca entrou numa sala, ou depois de sair
+   * de propósito / a sala ter sido fechada (ver leave()/roomClosed). */
+  lastRoom: LastRoomInfo | null
   /** Local UI-only selection state, mirrors the single-player store's
    * selectedCardIndices — indices into `view.yourHand`. */
   selectedCardIndices: number[]
@@ -101,6 +150,10 @@ interface OnlineState {
    * false se o texto não for um convite válido — aí o leitor segue lendo em
    * vez de fechar. */
   joinFromScannedLink: (raw: string, name: string) => boolean
+  /** Tenta reentrar na última sala (ver `lastRoom`) — no-op se não houver
+   * nenhuma. Usado pelo botão "Reconectar à sala X" no OnlineLobby quando o
+   * app reabre com uma partida em andamento em outro lugar. */
+  reconnectToLastRoom: () => void
   start: () => void
   sendIntent: (intent: Intent) => void
   nextRound: () => void
@@ -240,16 +293,24 @@ function connect(onOpen: () => void): void {
 
 function handleServerMessage(msg: ServerMessage): void {
   switch (msg.type) {
-    case 'joined':
+    case 'joined': {
       lastJoin = { name: lastJoin?.name ?? '', code: msg.code, difficulty: lastJoin?.difficulty }
+      // Persiste código+nome pra sobreviver o app fechar/reabrir (ver
+      // loadLastRoom acima) - grava em TODO join bem-sucedido, seja criando
+      // sala nova ou reconectando numa existente, então "a última" sempre
+      // reflete a mais recente.
+      const lastRoom = lastJoin.name ? { code: msg.code, name: lastJoin.name } : null
+      if (lastRoom) saveLastRoom(lastRoom)
       useOnlineStore.setState({
         code: msg.code,
         seat: msg.seat,
         isHost: msg.isHost,
         errorMsg: null,
         serverUrl: msg.serverUrl || null,
+        lastRoom: lastRoom ?? useOnlineStore.getState().lastRoom,
       })
       break
+    }
     case 'lobby':
       useOnlineStore.setState({
         code: msg.code,
@@ -271,8 +332,10 @@ function handleServerMessage(msg: ServerMessage): void {
     case 'roomClosed':
       // A sala JÁ NÃO EXISTE MAIS no servidor (o anfitrião saiu) - mesma
       // limpeza de leave(), mas preservando o motivo pra App.tsx mostrar e
-      // então levar de volta ao menu sozinho (ver o efeito lá).
+      // então levar de volta ao menu sozinho (ver o efeito lá). Sem sala,
+      // não há nada pra "Reconectar" — limpa o código guardado também.
       teardownConnection()
+      clearLastRoom()
       useOnlineStore.setState({
         connection: 'idle',
         code: null,
@@ -289,6 +352,7 @@ function handleServerMessage(msg: ServerMessage): void {
         discardAnim: null,
         tableAnim: null,
         roomClosedReason: msg.reason,
+        lastRoom: null,
       })
       break
   }
@@ -306,6 +370,7 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
   roomClosedReason: null,
   serverUrl: null,
   serverAddress: loadStoredServerAddress(),
+  lastRoom: loadLastRoom(),
   selectedCardIndices: [],
   drawAnim: null,
   pickupAnim: null,
@@ -340,6 +405,12 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
     return true
   },
 
+  reconnectToLastRoom: () => {
+    const { lastRoom } = get()
+    if (!lastRoom) return
+    get().join(lastRoom.code, lastRoom.name)
+  },
+
   start: () => send({ type: 'start' }),
 
   sendIntent: (intent) => {
@@ -351,6 +422,11 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
 
   leave: () => {
     teardownConnection()
+    // Saída INTENCIONAL (botão "Sair"/"Voltar ao Menu") - mesmo espírito do
+    // resetGame() offline: abandonar de propósito não deixa nada pra
+    // "Reconectar" depois (diferente de uma queda/wifi, que preserva
+    // lastRoom pro botão de reconexão no OnlineLobby).
+    clearLastRoom()
     set({
       connection: 'idle',
       code: null,
@@ -367,6 +443,7 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
       discardAnim: null,
       tableAnim: null,
       roomClosedReason: null,
+      lastRoom: null,
     })
   },
 

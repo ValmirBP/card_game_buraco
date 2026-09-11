@@ -278,4 +278,115 @@ describe('ProtocolServer', () => {
       expect(lastLobby.seats[1]).toMatchObject({ kind: 'human', name: 'Bob', connected: false })
     })
   })
+
+  describe('pausa e reconexão no meio da partida', () => {
+    async function setupStartedRoom() {
+      const server = makeServer()
+      const host = new FakeSocket()
+      const guest = new FakeSocket()
+      server.registerConnection('c1', host)
+      server.registerConnection('c2', guest)
+      await server.handleMessage('c1', { type: 'create', name: 'Host', difficulty: 'medium' })
+      const code = (host.ofType('joined')[0] as any).code
+      await server.handleMessage('c2', { type: 'join', code, name: 'Bob' })
+      await server.handleMessage('c1', { type: 'start' })
+      return { server, host, guest, code }
+    }
+
+    it('um convidado caindo no meio da partida marca o assento offline E pausa - visível no `state`, não só no `lobby`', async () => {
+      const { server, host, guest } = await setupStartedRoom()
+
+      server.handleClose('c2') // Bob cai no meio da partida
+
+      const latest = host.ofType('state').at(-1) as any
+      expect(latest.view.paused).toBe(true)
+      expect(latest.view.players[1]).toMatchObject({ name: 'Bob', connected: false })
+      void guest
+    })
+
+    it('enquanto pausada, uma intent de QUALQUER assento (inclusive de quem está conectado) é recusada', async () => {
+      const { server, host } = await setupStartedRoom()
+
+      server.handleClose('c2') // Bob (assento 1) cai
+      const errorsBefore = host.ofType('error').length
+
+      await server.handleMessage('c1', { type: 'intent', intent: { type: 'draw' } })
+
+      expect(host.ofType('error').length).toBeGreaterThan(errorsBefore)
+      // Nenhum state novo por causa dessa intent recusada (só o da queda).
+      const statesAfterClose = host.ofType('state')
+      const lastView = statesAfterClose.at(-1) as any
+      expect(lastView.view.phase).toBe('draw') // não avançou pra 'play'
+    })
+
+    it('turnos de IA não avançam enquanto pausada', async () => {
+      const server = makeServer()
+      const host = new FakeSocket()
+      const guest = new FakeSocket()
+      server.registerConnection('c1', host)
+      server.registerConnection('c2', guest)
+      await server.handleMessage('c1', { type: 'create', name: 'Host', difficulty: 'medium' })
+      const code = (host.ofType('joined')[0] as any).code
+      // Bob assume o assento 1 (senão seria IA) - assim o assento 2 (Nós,
+      // parceiro) e 3 (Eles) continuam IA, prontos pra "avançar" se a pausa
+      // não estivesse segurando.
+      await server.handleMessage('c2', { type: 'join', code, name: 'Bob' })
+      await server.handleMessage('c1', { type: 'start' })
+      // Assento 0 (host) joga e passa a vez pro 1 (Bob, humano) - turnos de
+      // IA só começariam depois do assento 1.
+      await server.handleMessage('c1', { type: 'intent', intent: { type: 'draw' } })
+      await server.handleMessage('c1', { type: 'intent', intent: { type: 'discard', cardIndex: 0 } })
+
+      server.handleClose('c2') // Bob cai bem quando é a vez dele
+
+      // Dá espaço pra qualquer loop de IA (que NÃO deveria rodar) terminar.
+      await new Promise((r) => setTimeout(r, 0))
+      await new Promise((r) => setTimeout(r, 0))
+
+      const latest = host.ofType('state').at(-1) as any
+      expect(latest.view.currentSeat).toBe(1) // ainda esperando Bob, ninguém "jogou por ele"
+      expect(latest.view.paused).toBe(true)
+    })
+
+    it('reconectar com o MESMO nome no meio da partida: recebe o estado atual e a pausa é levantada pros dois lados', async () => {
+      const { server, host, guest, code } = await setupStartedRoom()
+
+      server.handleClose('c2') // Bob cai
+      expect((host.ofType('state').at(-1) as any).view.paused).toBe(true)
+
+      const guestBack = new FakeSocket()
+      server.registerConnection('c2-new', guestBack)
+      await server.handleMessage('c2-new', { type: 'join', code, name: 'Bob' })
+
+      // Quem voltou recebe joined + um state (não fica preso na tela de
+      // lobby - ver o efeito em OnlineLobby.tsx que troca de tela ao
+      // receber `view`).
+      expect(guestBack.ofType('joined')).toHaveLength(1)
+      expect(guestBack.ofType('state').length).toBeGreaterThanOrEqual(1)
+      expect((guestBack.ofType('joined')[0] as any).seat).toBe(1)
+
+      // E quem ficou (host) também vê a pausa acabar.
+      const hostLatest = host.ofType('state').at(-1) as any
+      expect(hostLatest.view.paused).toBe(false)
+      expect(hostLatest.view.players[1]).toMatchObject({ connected: true })
+      void guest
+    })
+
+    it('depois de reconectar, uma intent do assento que voltou funciona normalmente de novo', async () => {
+      const { server, host, code } = await setupStartedRoom()
+      server.handleClose('c2')
+
+      const guestBack = new FakeSocket()
+      server.registerConnection('c2-new', guestBack)
+      await server.handleMessage('c2-new', { type: 'join', code, name: 'Bob' })
+
+      // Assento 0 (host) ainda está na vez dele (a pausa não avança turnos).
+      await server.handleMessage('c1', { type: 'intent', intent: { type: 'draw' } })
+      await server.handleMessage('c1', { type: 'intent', intent: { type: 'discard', cardIndex: 0 } })
+
+      const latest = host.ofType('state').at(-1) as any
+      expect(latest.view.currentSeat).toBe(1)
+      expect(latest.view.paused).toBe(false)
+    })
+  })
 })

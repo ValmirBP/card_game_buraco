@@ -91,9 +91,13 @@ export class RoomManager {
   joinRoom(code: string, connId: string, name: string): JoinOk | ErrorResult {
     const room = this.rooms.get(code)
     if (!room) return { error: 'room not found' }
-    if (room.started) return { error: 'room already started' }
 
-    // Reconnection: a disconnected human seat with the same name resumes it.
+    // Reconnection: a disconnected human seat with the same name resumes it -
+    // runs BEFORE the `room.started` guard below on purpose, so it also works
+    // MID-MATCH, not just in the lobby (pedido do usuário: um jogador que
+    // caiu no meio de uma partida precisa conseguir voltar pro mesmo lugar,
+    // não só antes de começar). protocol.ts's handleJoin pushes a fresh
+    // `state` to the reconnecting seat right after this succeeds.
     const reconnectSeat = room.seats.find(
       (s) => s.kind === 'human' && s.name === name && s.connId === undefined
     )
@@ -102,6 +106,12 @@ export class RoomManager {
       if (reconnectSeat.index === 0) room.hostId = connId
       return { seat: reconnectSeat.index }
     }
+
+    // Só chega aqui se NENHUM assento desconectado bate com esse nome - ou
+    // seja, isto seria um jogador NOVO tentando entrar, o que só é permitido
+    // antes da partida começar (depois disso os 4 assentos já estão
+    // congelados no GameSession, sem lugar pra alguém novo entrar).
+    if (room.started) return { error: 'room already started' }
 
     const freeSeat = room.seats.find((s) => s.kind === 'ai')
     if (!freeSeat) return { error: 'room is full' }

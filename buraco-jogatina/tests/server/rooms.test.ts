@@ -110,6 +110,32 @@ describe('RoomManager', () => {
     expect(room.seats[1].connId).toBe('conn-2-new')
   })
 
+  it('reconnection by matching name works MID-MATCH (room already started), not just in the lobby', () => {
+    const rm = new RoomManager()
+    const { code } = rm.createRoom('conn-host', 'Host', 'medium')
+    rm.joinRoom(code, 'conn-2', 'Bob')
+    rm.startRoom(code, 'conn-host')
+    rm.leaveRoom('conn-2')
+
+    const rejoin = rm.joinRoom(code, 'conn-2-new', 'Bob')
+    expect(rejoin).toEqual({ seat: 1 })
+    const room = rm.getRoom(code)!
+    expect(room.seats[1].connId).toBe('conn-2-new')
+    // A partida em si continua intacta - reconectar não recomeça nada.
+    expect(room.session).toBeDefined()
+    expect(room.started).toBe(true)
+  })
+
+  it('mid-match, a genuinely NEW name (no matching disconnected seat) is still refused', () => {
+    const rm = new RoomManager()
+    const { code } = rm.createRoom('conn-host', 'Host', 'medium')
+    rm.joinRoom(code, 'conn-2', 'Bob')
+    rm.startRoom(code, 'conn-host')
+
+    const attempt = rm.joinRoom(code, 'conn-new', 'Alguém Novo')
+    expect('error' in attempt).toBe(true)
+  })
+
   it('findRoomByConn locates the room for a given connection', () => {
     const rm = new RoomManager()
     const { code } = rm.createRoom('conn-host', 'Host', 'medium')

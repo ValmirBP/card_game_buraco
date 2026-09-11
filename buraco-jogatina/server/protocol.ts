@@ -79,7 +79,18 @@ export class ProtocolServer {
     this.rooms.leaveRoom(connId)
     this.sockets.delete(connId)
     this.connStates.delete(connId)
-    if (state) this.broadcastLobby(state.roomCode)
+    if (!state) return
+    this.broadcastLobby(state.roomCode)
+
+    // Se a partida já tinha começado, quem ficar precisa saber AGORA que
+    // pausou - broadcastLobby só é lido pela tela de LOBBY (ver
+    // OnlineGameplay.tsx, que nunca lê `lobby`), então sem isto o banner de
+    // pausa só apareceria na próxima vez que alguém tentasse jogar e
+    // levasse o erro de handleIntent.
+    const room = this.rooms.getRoom(state.roomCode)
+    if (room?.started && room.session) {
+      this.broadcastState(room)
+    }
   }
 
   private send(connId: string, msg: ServerMessage): void {
@@ -123,11 +134,28 @@ export class ProtocolServer {
     }
   }
 
+  /** true enquanto QUALQUER assento humano estiver desconectado — a partida
+   * fica pausada até todo mundo voltar (pedido do usuário: "pausar o
+   * jogo"). Assentos de IA nunca contam. */
+  private isPaused(room: Room): boolean {
+    return room.seats.some((s) => s.kind === 'human' && s.connId === undefined)
+  }
+
   private broadcastState(room: Room): void {
     if (!room.session) return
+    const paused = this.isPaused(room)
     for (const seat of room.seats) {
       if (!seat.connId || seat.kind !== 'human') continue
-      this.send(seat.connId, { type: 'state', view: room.session.getViewFor(seat.index) })
+      // getViewFor já devolve connected=true/paused=false pra tudo (o
+      // GameSession não sabe de rede) - aqui é onde o protocolo sobrescreve
+      // com o estado real das conexões antes de transmitir.
+      const view = room.session.getViewFor(seat.index)
+      view.paused = paused
+      view.players = view.players.map((p) => ({
+        ...p,
+        connected: room.seats[p.seat]?.kind === 'ai' || room.seats[p.seat]?.connId !== undefined,
+      }))
+      this.send(seat.connId, { type: 'state', view })
     }
   }
 
@@ -145,6 +173,11 @@ export class ProtocolServer {
   private async runAiTurnsPaced(room: Room): Promise<void> {
     if (!room.session) return
     while (room.session.status === 'playing') {
+      // Alguém caiu no meio dessa sequência de turnos de IA (ou já estava
+      // pausado quando isto foi chamado) - para na hora. Retoma sozinho na
+      // próxima vez que handleIntent/handleJoin chamar isto de novo, depois
+      // que a reconexão levantar a pausa.
+      if (this.isPaused(room)) break
       const seat = room.session.currentSeat
       const config = room.seats[seat]
       if (!config || config.kind !== 'ai') break
@@ -231,6 +264,20 @@ export class ProtocolServer {
       serverUrl: this.serverUrl,
     })
     this.broadcastLobby(code)
+
+    // Reconexão NO MEIO de uma partida (rooms.ts joinRoom agora permite isso
+    // pra um assento que já estava desconectado): sem isso, quem voltou só
+    // recebia `joined`+`lobby` e ficava preso na tela de lobby pra sempre,
+    // já que o cliente só troca pra tela de jogo quando um `state` chega
+    // (ver OnlineLobby.tsx). broadcastState manda pra TODO MUNDO - também
+    // limpa o banner de pausa de quem já estava esperando, já que este
+    // assento volta a aparecer `connected: true`. Se a pausa acabou de ser
+    // levantada, retoma turnos de IA que possam ter ficado travados.
+    const room = this.rooms.getRoom(code)
+    if (room?.started && room.session) {
+      this.broadcastState(room)
+      void this.runAiTurnsPaced(room).then(() => this.broadcastState(room))
+    }
   }
 
   private handleStart(connId: string): void {
@@ -259,6 +306,10 @@ export class ProtocolServer {
     const room = this.rooms.getRoom(state.roomCode)
     if (!room || !room.session) {
       this.sendError(connId, 'sala nao encontrada ou partida nao iniciada')
+      return
+    }
+    if (this.isPaused(room)) {
+      this.sendError(connId, 'partida pausada - aguardando alguem reconectar')
       return
     }
     const result = room.session.applyIntent(state.seat, intent)

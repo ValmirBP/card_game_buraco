@@ -33,10 +33,10 @@ describe('GameSession.getViewFor', () => {
     const view = session.getViewFor(0)
 
     expect(view.players).toEqual([
-      { seat: 0, name: 'Alice', kind: 'human', handCount: 11, teamId: 'A' },
-      { seat: 1, name: 'Bot1', kind: 'ai', handCount: 11, teamId: 'B' },
-      { seat: 2, name: 'Bob', kind: 'human', handCount: 11, teamId: 'A' },
-      { seat: 3, name: 'Bot2', kind: 'ai', handCount: 11, teamId: 'B' },
+      { seat: 0, name: 'Alice', kind: 'human', handCount: 11, teamId: 'A', connected: true },
+      { seat: 1, name: 'Bot1', kind: 'ai', handCount: 11, teamId: 'B', connected: true },
+      { seat: 2, name: 'Bob', kind: 'human', handCount: 11, teamId: 'A', connected: true },
+      { seat: 3, name: 'Bot2', kind: 'ai', handCount: 11, teamId: 'B', connected: true },
     ])
   })
 

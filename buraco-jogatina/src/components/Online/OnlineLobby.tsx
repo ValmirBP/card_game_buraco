@@ -40,8 +40,9 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
   const view = useOnlineStore((s) => s.view)
   const errorMsg = useOnlineStore((s) => s.errorMsg)
   const serverUrl = useOnlineStore((s) => s.serverUrl)
-  const serverAddress = useOnlineStore((s) => s.serverAddress)
   const setServerAddress = useOnlineStore((s) => s.setServerAddress)
+  const lastRoom = useOnlineStore((s) => s.lastRoom)
+  const reconnectToLastRoom = useOnlineStore((s) => s.reconnectToLastRoom)
   const createRoom = useOnlineStore((s) => s.create)
   const joinRoom = useOnlineStore((s) => s.join)
   const joinFromScannedLink = useOnlineStore((s) => s.joinFromScannedLink)
@@ -88,19 +89,6 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
   const [mode, setMode] = useState<'choose' | 'create' | 'join'>(inviteCode ? 'join' : 'choose')
   const [showDifficulty, setShowDifficulty] = useState(false)
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
-  // No APK instalado (native), "mesma origem" nunca funciona (a página é
-  // servida de capacitor://localhost/https://localhost, sem nada a ver com
-  // o servidor de verdade) - por isso o campo já abre expandido lá. No
-  // navegador (onde o padrão same-origin já funciona sozinho na maioria dos
-  // casos), fica escondido atrás de "Avançado" a menos que já tenha um
-  // endereço salvo de uma sessão anterior.
-  const [showServerAddress, setShowServerAddress] = useState(
-    () => Capacitor.isNativePlatform() || serverAddressInitiallySet()
-  )
-
-  function serverAddressInitiallySet(): boolean {
-    return useOnlineStore.getState().serverAddress.trim().length > 0
-  }
 
   useEffect(() => {
     if (view) onGameStart()
@@ -169,7 +157,7 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
   const inRoom = code !== null
 
   return (
-    <div className="flex h-full min-h-0 flex-col items-center justify-center gap-6 overflow-y-auto px-4 py-6 text-center landscape:justify-start landscape:gap-1.5 landscape:overflow-y-auto landscape:py-1">
+    <div className="flex h-full min-h-0 flex-col items-center justify-center gap-6 overflow-y-auto px-4 py-6 text-center landscape:justify-center landscape:gap-1.5 landscape:overflow-y-auto landscape:py-1">
       <h1 className="font-display text-3xl text-card-gold drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)] sm:text-4xl landscape:text-xl">
         Jogar Online
       </h1>
@@ -227,43 +215,25 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
               className="min-h-[44px] w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-center text-white placeholder-gray-400 shadow-inner outline-none backdrop-blur-sm transition focus:ring-4 focus:ring-card-gold/70 landscape:min-h-0 landscape:py-1.5 landscape:text-sm"
             />
 
-            <div>
-            <button
-              type="button"
-              onClick={() => setShowServerAddress((v) => !v)}
-              className="w-full text-center text-xs text-gray-400 underline decoration-dotted underline-offset-4 hover:text-card-gold"
-            >
-              {showServerAddress ? 'Ocultar endereço do servidor' : 'Avançado: endereço do servidor'}
-            </button>
-            {showServerAddress && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="mt-2 overflow-hidden"
+            {/* "Reconectar à sala X": aparece só quando há uma sala salva
+                de uma sessão anterior (ver lastRoom em onlineStore.ts) —
+                pedido do usuário: manter o código pra quem caiu conseguir
+                voltar, mesmo depois do app fechar/reabrir. Funciona tanto
+                se a sala ainda está no lobby quanto NO MEIO de uma partida
+                (ver server/rooms.ts joinRoom) — nesse caso a tela troca
+                sozinha pra Gameplay assim que o `state` chega. */}
+            {lastRoom && mode === 'choose' && (
+              <motion.button
+                type="button"
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={reconnectToLastRoom}
+                disabled={connection === 'connecting'}
+                className="min-h-[44px] w-full rounded-xl border-2 border-emerald-400 bg-emerald-500/20 px-4 py-2.5 text-sm font-bold text-emerald-300 shadow-lg shadow-black/30 backdrop-blur-sm transition-colors hover:bg-emerald-500/30 disabled:opacity-50 landscape:min-h-0 landscape:py-1.5 landscape:text-xs"
               >
-                <label htmlFor="server-address" className="sr-only">
-                  Endereço do servidor
-                </label>
-                <input
-                  id="server-address"
-                  type="text"
-                  inputMode="url"
-                  autoCapitalize="off"
-                  autoCorrect="off"
-                  placeholder="ex.: 192.168.2.142:3001 (deixe vazio se abriu isso num navegador)"
-                  value={serverAddress}
-                  onChange={(e) => setServerAddress(e.target.value)}
-                  className="min-h-[40px] w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-center text-sm text-white placeholder-gray-500 shadow-inner outline-none backdrop-blur-sm transition focus:ring-4 focus:ring-card-gold/70"
-                />
-                <p className="mt-1 text-[10px] text-gray-500">
-                  Só necessário pra ENTRAR na sala de outra pessoa (digite o IP e a porta do aparelho que
-                  criou a sala, ex.: 192.168.2.142:3001) — escanear o QR preenche isso sozinho. Pra CRIAR
-                  uma sala no app instalado, não precisa digitar nada: este aparelho vira o servidor.
-                </p>
-              </motion.div>
+                {connection === 'connecting' ? 'Reconectando…' : `🔄 Reconectar à sala ${lastRoom.code}`}
+              </motion.button>
             )}
-            </div>
           </div>
 
           {mode === 'choose' && (

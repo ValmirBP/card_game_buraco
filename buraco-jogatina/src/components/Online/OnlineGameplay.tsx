@@ -80,6 +80,13 @@ export default function OnlineGameplay({ onBackToMenu }: OnlineGameplayProps) {
   const batidaBanner =
     view.status === 'finished' ? (closerName ? `🏆 ${closerName} bateu!` : '🏁 Fim da rodada!') : null
 
+  // Pausa: algum assento humano caiu (ver SeatView.paused/players[].connected
+  // - preenchido pelo servidor em server/protocol.ts broadcastState). O
+  // servidor já recusa qualquer intent enquanto isso, mas sem um aviso
+  // visível um toque na mesa parecia simplesmente "não fazer nada".
+  const disconnectedNames = view.players.filter(p => p.kind === 'human' && !p.connected).map(p => p.name)
+  const isPaused = view.paused && disconnectedNames.length > 0
+
   const lastLog = log[log.length - 1]
   // "Nós"/"Eles" relativo ao próprio time, igual ao GameBoard online.
   const myTeamId: TeamId = view.players[view.seat]?.teamId ?? 'A'
@@ -182,27 +189,55 @@ export default function OnlineGameplay({ onBackToMenu }: OnlineGameplayProps) {
         </p>
       )}
 
-      {/* Mesa — mesmo tratamento do GameBoard offline: ocupa o espaço
-          flexível do meio, sem rolar em paisagem. */}
-      <div className="min-h-0 flex-1 overflow-y-auto landscape:overflow-hidden">
-        <OnlineGameBoard view={view} />
-      </div>
-
-      {/* Registro — escondido em paisagem, igual offline */}
-      <div className="shrink-0 truncate rounded-lg border border-white/10 bg-black/25 px-3 py-1.5 text-center text-xs text-gray-300 landscape:hidden">
-        <span className="text-card-gold">Registro:</span> {lastLog ?? 'Nenhuma ação ainda.'}
-      </div>
-
-      {/* Rodapé: UM painel só com a Mão e o Descarte lado a lado ("em
-          paralelo") — igual ao Gameplay offline. */}
-      <div className="flex shrink-0 items-stretch gap-2 rounded-xl border border-white/10 bg-black/25 px-3 py-1.5 shadow-lg backdrop-blur-sm landscape:gap-1.5 landscape:px-2 landscape:py-0.5">
-        <div className="min-w-0 flex-[3]">
-          <OnlinePlayerHand view={view} />
+      {/* Mesa + rodapé, dentro de um wrapper relativo pra poder cobrir os
+          dois com o overlay de pausa (abaixo) sem tapar o placar/botão de
+          sair no topo, que continuam tocáveis mesmo pausado. */}
+      <div className="relative flex min-h-0 flex-1 flex-col gap-2 landscape:gap-0.5">
+        {/* Mesa — mesmo tratamento do GameBoard offline: ocupa o espaço
+            flexível do meio, sem rolar em paisagem. */}
+        <div className="min-h-0 flex-1 overflow-y-auto landscape:overflow-hidden">
+          <OnlineGameBoard view={view} />
         </div>
-        <div className="w-px shrink-0 self-stretch bg-white/15" />
-        <div className="min-w-0 flex-[2]">
-          <OnlineDiscardRow view={view} />
+
+        {/* Registro — escondido em paisagem, igual offline */}
+        <div className="shrink-0 truncate rounded-lg border border-white/10 bg-black/25 px-3 py-1.5 text-center text-xs text-gray-300 landscape:hidden">
+          <span className="text-card-gold">Registro:</span> {lastLog ?? 'Nenhuma ação ainda.'}
         </div>
+
+        {/* Rodapé: UM painel só com a Mão e o Descarte lado a lado ("em
+            paralelo") — igual ao Gameplay offline. */}
+        <div className="flex shrink-0 items-stretch gap-2 rounded-xl border border-white/10 bg-black/25 px-3 py-1.5 shadow-lg backdrop-blur-sm landscape:gap-1.5 landscape:px-2 landscape:py-0.5">
+          <div className="min-w-0 flex-[3]">
+            <OnlinePlayerHand view={view} />
+          </div>
+          <div className="w-px shrink-0 self-stretch bg-white/15" />
+          <div className="min-w-0 flex-[2]">
+            <OnlineDiscardRow view={view} />
+          </div>
+        </div>
+
+        {/* Overlay de pausa: alguém caiu no meio da partida — pedido do
+            usuário ("identificar quem saiu e mostrar na tela" + "pausar o
+            jogo"). Bloqueia toques na mesa/mão (pointer-events captura tudo
+            embaixo) até a reconexão (ver server/rooms.ts joinRoom, que já
+            aceita o mesmo nome de volta no meio da partida e devolve o
+            estado exato de onde parou). */}
+        <AnimatePresence>
+          {isPaused && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-[110] flex flex-col items-center justify-center gap-2 rounded-xl bg-black/75 px-6 text-center backdrop-blur-sm"
+            >
+              <span className="text-3xl">⏸️</span>
+              <p className="font-display text-lg text-card-gold sm:text-xl landscape:text-sm">Partida pausada</p>
+              <p className="max-w-xs text-sm text-gray-200 landscape:text-xs">
+                Aguardando {disconnectedNames.join(' e ')} voltar…
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   )

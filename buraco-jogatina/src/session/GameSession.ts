@@ -533,6 +533,10 @@ export class GameSession {
       kind: cfg.kind,
       handCount: this.game.state.players[i].hand.getSize(),
       teamId: teamIdOfSeat(i),
+      // GameSession não tem noção de rede - connected/paused sempre "tudo
+      // bem" aqui; o protocolo do servidor sobrescreve com o estado real das
+      // conexões antes de transmitir (ver server/protocol.ts broadcastState).
+      connected: true,
     }))
 
     const teams = this.game.state.teams.map(team => ({
@@ -564,6 +568,7 @@ export class GameSession {
       scoreBreakdowns: this.game.state.scoreBreakdowns,
       closerSeat: this.game.state.closerSeat,
       log: [...this.log],
+      paused: false,
     }
   }
 }
