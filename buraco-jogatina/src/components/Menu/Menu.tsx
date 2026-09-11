@@ -96,11 +96,15 @@ export default function Menu({ onStart, onPlayOnline, canResume, onResume }: Men
             <input
               id="player-name"
               type="text"
+              enterKeyHint="done"
               placeholder="Seu nome"
               value={playerName}
               onChange={e => {
                 setPlayerName(e.target.value)
                 savePlayerName(e.target.value)
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') e.currentTarget.blur()
               }}
               className="min-h-[44px] w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-center text-white placeholder-gray-400 shadow-inner outline-none backdrop-blur-sm transition focus:ring-4 focus:ring-card-gold/70 landscape:min-h-0 landscape:py-1.5 landscape:text-sm"
             />
@@ -128,9 +132,13 @@ export default function Menu({ onStart, onPlayOnline, canResume, onResume }: Men
                   <input
                     id="partner-name"
                     type="text"
+                    enterKeyHint="done"
                     placeholder={DEFAULT_BOT_NAMES.partner}
                     value={botNames.partner}
                     onChange={e => setBotNames(n => ({ ...n, partner: e.target.value }))}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') e.currentTarget.blur()
+                    }}
                     className="min-h-[44px] w-full rounded-xl border border-white/10 bg-black/30 px-4 py-2 text-center text-white placeholder-gray-400 shadow-inner outline-none backdrop-blur-sm transition focus:ring-4 focus:ring-card-gold/70 landscape:min-h-0 landscape:py-1 landscape:text-xs"
                   />
                 </div>
@@ -141,9 +149,13 @@ export default function Menu({ onStart, onPlayOnline, canResume, onResume }: Men
                   <input
                     id="opponent1-name"
                     type="text"
+                    enterKeyHint="done"
                     placeholder={DEFAULT_BOT_NAMES.opponent1}
                     value={botNames.opponent1}
                     onChange={e => setBotNames(n => ({ ...n, opponent1: e.target.value }))}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') e.currentTarget.blur()
+                    }}
                     className="min-h-[44px] w-full rounded-xl border border-white/10 bg-black/30 px-4 py-2 text-center text-white placeholder-gray-400 shadow-inner outline-none backdrop-blur-sm transition focus:ring-4 focus:ring-card-gold/70 landscape:min-h-0 landscape:py-1 landscape:text-xs"
                   />
                 </div>
@@ -154,9 +166,13 @@ export default function Menu({ onStart, onPlayOnline, canResume, onResume }: Men
                   <input
                     id="opponent2-name"
                     type="text"
+                    enterKeyHint="done"
                     placeholder={DEFAULT_BOT_NAMES.opponent2}
                     value={botNames.opponent2}
                     onChange={e => setBotNames(n => ({ ...n, opponent2: e.target.value }))}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') e.currentTarget.blur()
+                    }}
                     className="min-h-[44px] w-full rounded-xl border border-white/10 bg-black/30 px-4 py-2 text-center text-white placeholder-gray-400 shadow-inner outline-none backdrop-blur-sm transition focus:ring-4 focus:ring-card-gold/70 landscape:min-h-0 landscape:py-1 landscape:text-xs"
                   />
                 </div>

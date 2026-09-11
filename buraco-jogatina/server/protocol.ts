@@ -223,8 +223,20 @@ export class ProtocolServer {
       return
     }
     // O assento mudou - connStates precisa acompanhar, senão a próxima
-    // intent/start deste jogador seria avaliada com o assento ANTIGO.
-    this.connStates.set(connId, { roomCode: state.roomCode, seat: result.seat })
+    // intent/start deste jogador seria avaliada com o assento ANTIGO. Não dá
+    // pra só atualizar o CHAMADOR aqui: rooms.chooseSeat agora também troca
+    // de lugar com outro HUMANO (não só um assento de IA vazio), e nesse
+    // caso o connId de QUEM FOI TROCADO também mudou de assento - resincroniza
+    // os dois de uma vez varrendo room.seats (mais simples e robusto do que
+    // rooms.chooseSeat ter que devolver quem mais foi afetado).
+    const room = this.rooms.getRoom(state.roomCode)
+    if (room) {
+      for (const seat of room.seats) {
+        if (seat.kind === 'human' && seat.connId) {
+          this.connStates.set(seat.connId, { roomCode: room.code, seat: seat.index })
+        }
+      }
+    }
     this.broadcastLobby(state.roomCode)
   }
 

@@ -17,6 +17,16 @@
         android:usesCleartextTraffic="true"
         android:theme="@style/AppTheme">
 
+        <!-- windowSoftInputMode="adjustResize": sem isso (o padrão do Android é
+             "adjustPan" quando não especificado) a WebView não redimensiona a
+             viewport quando o teclado abre - o WebView não sabe quanto espaço
+             de verdade sobrou, então o teclado que aparece fica reduzido/
+             diferente do padrão do usuário e sem a tecla de ação certa (ver
+             enterKeyHint nos <input> em Menu.tsx/OnlineLobby.tsx - relato do
+             usuário: "não é um teclado na tela inteira... nem o teclado
+             padrão... nem tem botão de confirmar"). Com adjustResize a
+             viewport encolhe de verdade, e o teclado nativo completo do
+             usuário (Gboard etc.) abre normalmente. -->
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density|fontScale|layoutDirection|colorMode"
             android:name=".MainActivity"
@@ -24,6 +34,7 @@
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
             android:screenOrientation="sensorLandscape"
+            android:windowSoftInputMode="adjustResize"
             android:exported="true">
 
             <intent-filter>

@@ -123,15 +123,24 @@ export class RoomManager {
   }
 
   /**
-   * Move o assento do chamador pra um assento AI livre `targetIndex`, antes
-   * da partida começar — "escolher o lado que quer entrar" (pedido do
-   * usuário): os times são fixos por assento (0/2 = Nós, 1/3 = Eles), então
-   * escolher o assento É escolher o lado.
+   * Move o assento do chamador pra `targetIndex`, antes da partida começar —
+   * "escolher o lado que quer entrar" (pedido do usuário): os times são
+   * fixos por assento (0/2 = Nós, 1/3 = Eles), então escolher o assento É
+   * escolher o lado. Dois casos:
+   *  - assento alvo é IA: MOVE simples (meu lugar vira IA, eu assumo o
+   *    assento vazio) - comportamento original.
+   *  - assento alvo é outro HUMANO: TROCA de verdade, sem confirmação (pedido
+   *    do usuário: "um menu poderá ser aberto e selecionar o nome do
+   *    jogador que quiser trocar de lugar com ele") - os dois trocam de
+   *    lugar na hora. protocol.ts resincroniza os connStates dos DOIS
+   *    conectados depois disso (não só do chamador), senão a próxima jogada
+   *    de quem foi "empurrado" seria avaliada com o assento antigo.
    *
-   * O ANFITRIÃO (assento 0) nunca pode se mover: startRoom só autoriza quem
-   * está em `seats[0]` a iniciar a partida, então deixar o assento 0 vago
-   * (virando AI, sem connId) travaria a sala pra sempre - ninguém mais
-   * conseguiria dar início. Assentos 1/2/3 podem trocar livremente entre si.
+   * O ANFITRIÃO (assento 0) nunca pode se mover NEM ser alvo de troca:
+   * startRoom só autoriza quem está em `seats[0]` a iniciar a partida, então
+   * mexer nesse assento (esvaziar OU trocar o ocupante) arriscaria travar
+   * quem tem o botão "Iniciar Partida" ou confundir quem o vê. Assentos
+   * 1/2/3 podem se mover/trocar livremente entre si.
    */
   chooseSeat(code: string, connId: string, targetIndex: number): JoinOk | ErrorResult {
     const room = this.rooms.get(code)
@@ -145,15 +154,28 @@ export class RoomManager {
     const target = room.seats[targetIndex]
     if (!target) return { error: 'assento invalido' }
     if (target.index === mySeat.index) return { seat: mySeat.index }
-    if (target.kind !== 'ai') return { error: 'assento ocupado' }
+    if (target.index === 0) return { error: 'nao e possivel trocar de lugar com o anfitriao' }
 
+    if (target.kind === 'ai') {
+      const myName = mySeat.name
+      mySeat.kind = 'ai'
+      mySeat.name = defaultAiName(mySeat.index)
+      mySeat.connId = undefined
+      target.kind = 'human'
+      target.name = myName
+      target.connId = connId
+      return { seat: target.index }
+    }
+
+    // target.kind === 'human': troca completa de identidade entre os dois
+    // assentos (nome + connId) - ambos continuam 'human', só de lugar
+    // trocado.
     const myName = mySeat.name
-    mySeat.kind = 'ai'
-    mySeat.name = defaultAiName(mySeat.index)
-    mySeat.connId = undefined
-    target.kind = 'human'
+    const myConnId = mySeat.connId
+    mySeat.name = target.name
+    mySeat.connId = target.connId
     target.name = myName
-    target.connId = connId
+    target.connId = myConnId
     return { seat: target.index }
   }
 

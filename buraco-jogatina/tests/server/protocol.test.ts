@@ -211,6 +211,58 @@ describe('ProtocolServer', () => {
     expect(host.ofType('error')).toHaveLength(1)
   })
 
+  it('chooseSeat recusa trocar de lugar com o anfitrião', async () => {
+    const server = makeServer()
+    const host = new FakeSocket()
+    const guest = new FakeSocket()
+    server.registerConnection('c1', host)
+    server.registerConnection('c2', guest)
+    await server.handleMessage('c1', { type: 'create', name: 'Host', difficulty: 'medium' })
+    await server.handleMessage('c2', { type: 'join', code: (host.ofType('joined')[0] as any).code, name: 'Bob' })
+
+    await server.handleMessage('c2', { type: 'chooseSeat', seatIndex: 0 })
+    expect(guest.ofType('error').length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('chooseSeat com um assento já ocupado por outro humano TROCA os dois, e a intent de cada um passa a valer no NOVO assento', async () => {
+    const server = makeServer()
+    const host = new FakeSocket()
+    const bob = new FakeSocket()
+    const carol = new FakeSocket()
+    server.registerConnection('c1', host)
+    server.registerConnection('c2', bob)
+    server.registerConnection('c3', carol)
+    await server.handleMessage('c1', { type: 'create', name: 'Host', difficulty: 'medium' })
+    const code = (host.ofType('joined')[0] as any).code
+    await server.handleMessage('c2', { type: 'join', code, name: 'Bob' }) // assento 1
+    await server.handleMessage('c3', { type: 'join', code, name: 'Carol' }) // assento 2
+
+    // Bob (assento 1) toca no assento da Carol (2) - os dois trocam.
+    await server.handleMessage('c2', { type: 'chooseSeat', seatIndex: 2 })
+
+    const lastLobby = host.ofType('lobby').at(-1) as any
+    expect(lastLobby.seats[2]).toMatchObject({ name: 'Bob' })
+    expect(lastLobby.seats[1]).toMatchObject({ name: 'Carol' })
+
+    // Regressão do bug que essa troca poderia introduzir: connStates da
+    // CAROL (empurrada pro assento 1 sem ela ter feito nada) precisa
+    // acompanhar - senão a próxima intent dela seria avaliada com o
+    // assento ANTIGO (2, onde não é mais ela).
+    await server.handleMessage('c1', { type: 'start' })
+    // Ordem dos turnos: 0 (host) -> 1 (agora Carol) -> 2 (agora Bob) -> 3.
+    await server.handleMessage('c1', { type: 'intent', intent: { type: 'draw' } })
+    await server.handleMessage('c1', { type: 'intent', intent: { type: 'discard', cardIndex: 0 } })
+
+    const carolState = carol.ofType('state').at(-1) as any
+    expect(carolState.view.currentSeat).toBe(1)
+    expect(carolState.view.seat).toBe(1) // a própria view da Carol confirma o assento novo
+
+    // A intent da Carol (assento 1 de verdade agora) precisa ser aceita sem
+    // erro "não é a vez deste assento".
+    await server.handleMessage('c3', { type: 'intent', intent: { type: 'draw' } })
+    expect(carol.ofType('error')).toHaveLength(0)
+  })
+
   it('rename atualiza o nome e rebroadcasta lobby', async () => {
     const server = makeServer()
     const host = new FakeSocket()

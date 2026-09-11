@@ -166,12 +166,20 @@ describe('RoomManager', () => {
       expect(rm.getRoom(code)!.seats[1]).toMatchObject({ kind: 'human', name: 'Bob' })
     })
 
-    it('recusa mover para um assento já ocupado por outro humano', () => {
+    it('tocar num assento já ocupado por outro humano TROCA os dois de lugar (pedido do usuário)', () => {
       const rm = new RoomManager()
       const { code } = rm.createRoom('conn-host', 'Host', 'medium')
-      rm.joinRoom(code, 'conn-2', 'Bob')
-      rm.joinRoom(code, 'conn-3', 'Carol')
-      expect(rm.chooseSeat(code, 'conn-2', 2)).toEqual({ error: expect.any(String) })
+      rm.joinRoom(code, 'conn-2', 'Bob') // assento 1
+      rm.joinRoom(code, 'conn-3', 'Carol') // assento 2
+
+      const result = rm.chooseSeat(code, 'conn-2', 2)
+      expect(result).toEqual({ seat: 2 })
+
+      const room = rm.getRoom(code)!
+      // Bob (era assento 1, conn-2) agora está no 2; Carol (era 2) foi
+      // "empurrada" pro 1 - os DOIS continuam humanos, só trocaram de lugar.
+      expect(room.seats[2]).toMatchObject({ kind: 'human', name: 'Bob', connId: 'conn-2' })
+      expect(room.seats[1]).toMatchObject({ kind: 'human', name: 'Carol', connId: 'conn-3' })
     })
 
     it('o anfitrião (assento 0) nunca pode trocar de assento', () => {
@@ -179,6 +187,17 @@ describe('RoomManager', () => {
       const { code } = rm.createRoom('conn-host', 'Host', 'medium')
       expect(rm.chooseSeat(code, 'conn-host', 1)).toEqual({ error: expect.any(String) })
       expect(rm.getRoom(code)!.seats[0]).toMatchObject({ kind: 'human', connId: 'conn-host' })
+    })
+
+    it('ninguém pode trocar de lugar COM o anfitrião (nem como alvo)', () => {
+      const rm = new RoomManager()
+      const { code } = rm.createRoom('conn-host', 'Host', 'medium')
+      rm.joinRoom(code, 'conn-2', 'Bob')
+
+      expect(rm.chooseSeat(code, 'conn-2', 0)).toEqual({ error: expect.any(String) })
+      const room = rm.getRoom(code)!
+      expect(room.seats[0]).toMatchObject({ kind: 'human', name: 'Host', connId: 'conn-host' })
+      expect(room.seats[1]).toMatchObject({ kind: 'human', name: 'Bob', connId: 'conn-2' })
     })
 
     it('recusa depois que a partida começou', () => {

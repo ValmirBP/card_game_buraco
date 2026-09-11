@@ -206,11 +206,15 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
             <input
               id="online-name"
               type="text"
+              enterKeyHint="done"
               placeholder="Seu nome"
               value={name}
               onChange={(e) => {
                 setName(e.target.value)
                 savePlayerName(e.target.value)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur()
               }}
               className="min-h-[44px] w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-center text-white placeholder-gray-400 shadow-inner outline-none backdrop-blur-sm transition focus:ring-4 focus:ring-card-gold/70 landscape:min-h-0 landscape:py-1.5 landscape:text-sm"
             />
@@ -277,9 +281,15 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
             <div className="flex flex-col gap-3 landscape:gap-1.5">
               <input
                 type="text"
+                enterKeyHint="go"
+                autoCapitalize="characters"
+                autoCorrect="off"
                 placeholder="Código da sala"
                 value={joinCode}
                 onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleJoin()
+                }}
                 maxLength={5}
                 className="min-h-[44px] w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-center font-display text-2xl tracking-[0.3em] text-card-gold placeholder-gray-500 shadow-inner outline-none backdrop-blur-sm transition focus:ring-4 focus:ring-card-gold/70 landscape:min-h-0 landscape:py-1 landscape:text-lg"
               />
@@ -360,9 +370,12 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
               const isMyTeam = seat === null ? i === 0 : i % 2 === seat % 2
               // "Escolher o lado que quer entrar": qualquer convidado (não
               // o anfitrião, que trava a sala pra sempre se sair do
-              // assento 0 - ver rooms.ts) pode tocar num assento AI livre
-              // pra se mudar pra lá, antes da partida começar.
-              const canMoveHere = !isYou && !isHost && seatInfo?.kind === 'ai'
+              // assento 0 - ver rooms.ts) pode tocar em QUALQUER outro
+              // assento - vazio (assume o lugar) OU ocupado por outra
+              // pessoa (TROCAM de lugar na hora, sem confirmação) - antes
+              // da partida começar. O assento 0 (anfitrião) nunca é alvo,
+              // nem de quem toca nem de ninguém.
+              const canMoveHere = !isYou && !isHost && i !== 0
               const teamBorder = isMyTeam ? 'border-card-gold/60' : 'border-fuchsia-400/40'
 
               if (isYou) {
@@ -394,7 +407,9 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
                   </span>
                   <span className="flex items-center gap-1.5 text-xs text-gray-400 landscape:text-[10px]">
                     {canMoveHere && (
-                      <span className="text-card-gold landscape:hidden">Toque para entrar aqui</span>
+                      <span className="text-card-gold landscape:hidden">
+                        {seatInfo?.kind === 'human' ? 'Toque para trocar' : 'Toque para entrar aqui'}
+                      </span>
                     )}
                     {seatInfo?.kind === 'human'
                       ? seatInfo.connected
@@ -472,6 +487,7 @@ function YourSeatRow({ name, onRename }: YourSeatRowProps) {
         <input
           autoFocus
           type="text"
+          enterKeyHint="done"
           value={draft}
           maxLength={24}
           onChange={(e) => setDraft(e.target.value)}
