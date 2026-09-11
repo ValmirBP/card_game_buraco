@@ -97,14 +97,17 @@ describe('onlineStore: lastRoom (persistência pra "Reconectar à sala")', () =>
     expect(FakeWebSocket.instances.length).toBe(countBefore)
   })
 
-  test('leave() (saída intencional) limpa lastRoom do store E do localStorage', () => {
+  test('leave() (botão "Sair") NÃO limpa lastRoom - é o único jeito de sair da tela quando a SUA conexão já caiu, e apagar o código bem aí travaria a reconexão (bug relatado pelo usuário)', () => {
     simulateSuccessfulJoin('ABCDE', 'Alice')
     expect(useOnlineStore.getState().lastRoom).not.toBeNull()
 
     useOnlineStore.getState().leave()
 
-    expect(useOnlineStore.getState().lastRoom).toBeNull()
-    expect(window.localStorage.getItem(LAST_ROOM_KEY)).toBeNull()
+    expect(useOnlineStore.getState().lastRoom).toEqual({ code: 'ABCDE', name: 'Alice' })
+    expect(JSON.parse(window.localStorage.getItem(LAST_ROOM_KEY)!)).toEqual({ code: 'ABCDE', name: 'Alice' })
+    // O resto do estado da conexão continua sendo limpo normalmente.
+    expect(useOnlineStore.getState().code).toBeNull()
+    expect(useOnlineStore.getState().connection).toBe('idle')
   })
 
   test('roomClosed (anfitrião saiu) limpa lastRoom — nada pra reconectar numa sala que não existe mais', () => {
@@ -115,6 +118,25 @@ describe('onlineStore: lastRoom (persistência pra "Reconectar à sala")', () =>
 
     expect(useOnlineStore.getState().lastRoom).toBeNull()
     expect(window.localStorage.getItem(LAST_ROOM_KEY)).toBeNull()
+  })
+
+  test('uma tentativa de reconectar que volta "room not found" limpa o lastRoom (o botão não fica oferecendo pra sempre uma sala que já não existe)', () => {
+    const ws = simulateSuccessfulJoin('ABCDE', 'Alice')
+    expect(useOnlineStore.getState().lastRoom).not.toBeNull()
+
+    ws.simulateMessage({ type: 'error', message: 'room not found' })
+
+    expect(useOnlineStore.getState().lastRoom).toBeNull()
+    expect(window.localStorage.getItem(LAST_ROOM_KEY)).toBeNull()
+  })
+
+  test('um erro qualquer OUTRO (ex.: jogada inválida) não afeta o lastRoom', () => {
+    const ws = simulateSuccessfulJoin('ABCDE', 'Alice')
+    expect(useOnlineStore.getState().lastRoom).not.toBeNull()
+
+    ws.simulateMessage({ type: 'error', message: 'jogada invalida' })
+
+    expect(useOnlineStore.getState().lastRoom).toEqual({ code: 'ABCDE', name: 'Alice' })
   })
 
   test('um novo join sobrescreve o lastRoom anterior (sempre reflete o mais recente)', () => {

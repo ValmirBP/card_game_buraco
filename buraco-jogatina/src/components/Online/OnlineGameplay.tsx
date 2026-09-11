@@ -24,6 +24,7 @@ interface OnlineGameplayProps {
 export default function OnlineGameplay({ onBackToMenu }: OnlineGameplayProps) {
   const view = useOnlineStore(s => s.view)
   const log = useOnlineStore(s => s.log)
+  const connection = useOnlineStore(s => s.connection)
   const errorMsg = useOnlineStore(s => s.errorMsg)
   const clearError = useOnlineStore(s => s.clearError)
   const drawAnim = useOnlineStore(s => s.drawAnim)
@@ -179,6 +180,22 @@ export default function OnlineGameplay({ onBackToMenu }: OnlineGameplayProps) {
         </div>
         </div>
       </div>
+
+      {/* Diferente do banner de pausa (que avisa que OUTRO jogador caiu):
+          isto é pra quando a SUA PRÓPRIA conexão caiu - o app tenta
+          reconectar sozinho por alguns segundos (ver onlineStore.ts), mas
+          se demorar (ou o app tiver ficado em segundo plano), a mesa fica
+          congelada sem nenhum aviso do motivo. Sem isso, o único jeito de
+          sair era o botão "Sair" - que funciona, mas apagava o código da
+          sala (bug corrigido: "Sair" não limpa mais lastRoom, então o
+          botão "Reconectar à sala X" no menu volta a funcionar depois). */}
+      {connection !== 'open' && (
+        <p className="shrink-0 rounded-xl bg-amber-500/15 px-4 py-2 text-center text-sm text-amber-200 landscape:py-1 landscape:text-xs">
+          {connection === 'connecting'
+            ? '🔄 Reconectando…'
+            : '⚠️ Você perdeu a conexão. Toque em "Sair" e depois em "Reconectar à sala" no menu.'}
+        </p>
+      )}
 
       {errorMsg && (
         <p className="shrink-0 rounded-xl bg-red-500/15 px-4 py-2 text-center text-sm text-red-200 landscape:py-1 landscape:text-xs">

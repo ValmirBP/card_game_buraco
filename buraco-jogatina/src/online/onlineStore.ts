@@ -327,7 +327,17 @@ function handleServerMessage(msg: ServerMessage): void {
       useOnlineStore.setState((s) => ({ log: [...s.log, ...msg.lines] }))
       break
     case 'error':
-      useOnlineStore.setState({ errorMsg: msg.message })
+      // 'room not found' é a resposta exata de rooms.ts quando o código
+      // simplesmente não existe mais no servidor (o processo/app do
+      // anfitrião reiniciou, ou a sala expirou de outro jeito) - sem isso,
+      // "Reconectar à sala X" ficava oferecendo pra sempre uma sala que já
+      // não existe, e todo clique repetia o mesmo erro.
+      if (msg.message === 'room not found') {
+        clearLastRoom()
+        useOnlineStore.setState({ errorMsg: msg.message, lastRoom: null })
+      } else {
+        useOnlineStore.setState({ errorMsg: msg.message })
+      }
       break
     case 'roomClosed':
       // A sala JÁ NÃO EXISTE MAIS no servidor (o anfitrião saiu) - mesma
@@ -422,11 +432,16 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
 
   leave: () => {
     teardownConnection()
-    // Saída INTENCIONAL (botão "Sair"/"Voltar ao Menu") - mesmo espírito do
-    // resetGame() offline: abandonar de propósito não deixa nada pra
-    // "Reconectar" depois (diferente de uma queda/wifi, que preserva
-    // lastRoom pro botão de reconexão no OnlineLobby).
-    clearLastRoom()
+    // NÃO limpa lastRoom aqui (correção de bug relatado pelo usuário: "a
+    // pessoa que saiu não consegue voltar pq o código da sala não está
+    // salvo"). A ideia original era "saída intencional = nada pra
+    // reconectar depois", mas na prática o único jeito de sair da tela de
+    // Gameplay quando a SUA PRÓPRIA conexão já caiu (ex.: o app ficou
+    // tentando reconectar sozinho e desistiu, ou você só quer voltar pro
+    // menu pra tentar de novo) é este mesmo botão "Sair" - e ele apagava o
+    // código bem na hora em que a pessoa mais precisava dele pra voltar.
+    // lastRoom só é limpo mesmo quando a sala DE VERDADE deixou de existir
+    // (ver o caso 'roomClosed' abaixo, quando o anfitrião sai).
     set({
       connection: 'idle',
       code: null,
@@ -443,7 +458,6 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
       discardAnim: null,
       tableAnim: null,
       roomClosedReason: null,
-      lastRoom: null,
     })
   },
 
