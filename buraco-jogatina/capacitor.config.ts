@@ -25,6 +25,19 @@ const config: CapacitorConfig = {
     androidScheme: 'http',
   },
   plugins: {
+    // O windowSoftInputMode="adjustResize" do AndroidManifest.xml SOZINHO não
+    // é confiável em todo aparelho/versão de Android - em alguns o WebView
+    // ignora ou aplica de forma inconsistente, e o teclado que abre fica
+    // reduzido (nem o teclado padrão do usuário, nem tela cheia, sem tecla de
+    // confirmar - relato do usuário). O plugin Keyboard controla isso pelo
+    // lado do Capacitor/JS em vez de depender só do WebView nativo -
+    // 'body' redimensiona o <body> da página quando o teclado abre (mesmo
+    // efeito do adjustResize, só que reforçado/mais consistente entre
+    // aparelhos).
+    Keyboard: {
+      resize: 'body',
+      resizeOnFullScreen: true,
+    },
     SystemBars: {
       // Em Android 15+ (API 35) o plugin SystemBars do Capacitor aplica
       // padding no PAI da WebView igual aos insets de systemBars +

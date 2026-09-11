@@ -23,6 +23,7 @@
     "@capacitor/android": "^8.5.0",
     "@capacitor/app": "^8.1.1",
     "@capacitor/core": "^8.5.0",
+    "@capacitor/keyboard": "^8.0.5",
     "@fontsource/righteous": "^5.3.0",
     "framer-motion": "^12.43.0",
     "jsqr": "^1.4.0",
