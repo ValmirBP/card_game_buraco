@@ -10,8 +10,9 @@ import Seat from '../Gameplay/Seat'
 import MeldCardColumn from '../Gameplay/MeldCardColumn'
 import MeldRow from '../Gameplay/MeldRow'
 
-/** Footprint do MONTE — idêntico ao PILE_CARD_SIZE offline. */
-const PILE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-8 landscape:h-[2.9rem]'
+/** Footprint do MONTE — idêntico ao PILE_CARD_SIZE offline (pedido do
+ * usuário: mesa bem maior em paisagem, com rolagem em vez de compressão). */
+const PILE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-16 landscape:h-24'
 /** Footprints dos fantasmas de animação — idênticos aos GHOST_*_SIZE de
  * Gameplay.tsx (offline). Repetidos aqui de propósito (não importados), pra
  * não acoplar este arquivo à estrutura interna de PlayerHand/MeldCardColumn
@@ -200,7 +201,7 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
           <CardBack variant="red" sizeClassName={PILE_CARD_SIZE} compactOnLandscape />
         </div>
         <CardBack variant="blue" sizeClassName={PILE_CARD_SIZE} compactOnLandscape />
-        <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-card-gold px-1 text-[10px] font-bold text-black shadow landscape:-right-1.5 landscape:-top-1.5 landscape:h-4 landscape:min-w-4 landscape:text-[9px]">
+        <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-card-gold px-1 text-[10px] font-bold text-black shadow landscape:-right-2 landscape:-top-2 landscape:h-6 landscape:min-w-6 landscape:text-xs">
           {deckCount}
         </span>
       </motion.div>
@@ -208,7 +209,7 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
       <div
         id="deck-pile"
         onClick={handleDeckClick}
-        className={`flex h-24 w-16 items-center justify-center rounded-xl border border-dashed border-white/20 text-[10px] text-gray-400 sm:h-28 sm:w-20 landscape:h-[2.9rem] landscape:w-8 landscape:text-[6px] ${
+        className={`flex h-24 w-16 items-center justify-center rounded-xl border border-dashed border-white/20 text-[10px] text-gray-400 sm:h-28 sm:w-20 landscape:h-24 landscape:w-16 landscape:text-xs ${
           canClickDeck ? 'cursor-pointer ring-2 ring-card-gold' : ''
         }`}
       >
@@ -218,11 +219,11 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
 
   const mortoBlock = (
     <div className="flex flex-col items-center gap-0.5">
-      <span className="text-[8px] font-semibold uppercase tracking-wide text-gray-400 landscape:text-[7px]">
+      <span className="text-[8px] font-semibold uppercase tracking-wide text-gray-400 landscape:text-xs">
         Morto{mortos.length !== 1 ? 's' : ''}
       </span>
       {mortos.length > 0 ? (
-        <div className="relative flex h-12 w-12 items-center justify-center landscape:h-10 landscape:w-10">
+        <div className="relative flex h-12 w-12 items-center justify-center landscape:h-20 landscape:w-20">
           <AnimatePresence>
             {mortos.map((morto, i) => {
               const isCrossed = mortos.length === 2
@@ -240,7 +241,7 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
                   <div className="relative">
                     <CardBack variant={i === 0 ? 'blue' : 'red'} sizeClassName={PILE_CARD_SIZE} compactOnLandscape />
                     <span
-                      className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-card-gold px-1 text-[9px] font-bold text-black shadow"
+                      className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-card-gold px-1 text-[9px] font-bold text-black shadow landscape:h-6 landscape:min-w-6 landscape:text-xs"
                       style={{ transform: rotate ? `rotate(-${rotate}deg)` : undefined }}
                     >
                       {morto.count}
@@ -261,8 +262,11 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
   // embutido no painel da mão (lado a lado) — ver OnlineGameplay.tsx.
 
   return (
-    <div className="relative h-full min-h-0 rounded-2xl border border-white/10 bg-black/25 p-2 shadow-lg backdrop-blur-sm sm:p-4 landscape:rounded-xl landscape:border-0 landscape:p-1 landscape:overflow-hidden">
-      <div className="flex flex-col gap-3 sm:gap-4 landscape:grid landscape:h-full landscape:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_auto] landscape:grid-rows-[auto_minmax(0,1fr)] landscape:items-stretch landscape:gap-x-1 landscape:gap-y-0.5">
+    <div className="relative h-full min-h-0 rounded-2xl border border-white/10 bg-black/25 p-2 shadow-lg backdrop-blur-sm sm:p-4 landscape:rounded-xl landscape:border-0 landscape:p-4">
+      {/* Pedido do usuário: mesa bem maior, com rolagem vertical E
+          horizontal (ver overflow-auto no wrapper em OnlineGameplay.tsx) -
+          ver o mesmo comentário em GameBoard.tsx (offline). */}
+      <div className="flex flex-col gap-3 sm:gap-4 landscape:grid landscape:h-full landscape:grid-cols-[auto_minmax(360px,1fr)_minmax(360px,1fr)_auto] landscape:grid-rows-[auto_minmax(420px,1fr)] landscape:items-stretch landscape:gap-x-6 landscape:gap-y-4">
         {/* Monte — canto superior-esquerdo */}
         <div className="order-1 flex items-center justify-center landscape:col-start-1 landscape:row-start-1 landscape:justify-self-start">
           {deckPile}
@@ -323,14 +327,14 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
               key={team.id}
               id={team.id === myTeamId ? 'meld-drop-zone' : undefined}
               onClick={team.id === myTeamId ? handleDropZoneClick : undefined}
-              className={`space-y-2 overflow-hidden rounded-xl border p-3 transition-all landscape:flex landscape:h-full landscape:min-h-0 landscape:flex-col landscape:space-y-0.5 landscape:p-1 ${
+              className={`space-y-2 overflow-hidden rounded-xl border p-3 transition-all landscape:flex landscape:h-full landscape:min-h-0 landscape:flex-col landscape:space-y-2 landscape:p-3 ${
                 TEAM_GRID_CLASS[team.id]
               } ${TEAM_PANEL_CLASS[team.id]} ${
                 isDropTarget ? 'cursor-pointer border-card-gold shadow-[0_0_16px_rgba(212,175,55,0.5)]' : ''
               }`}
             >
               <div className="flex items-center justify-between gap-2 landscape:shrink-0">
-                <h4 className={`flex items-center font-display text-sm landscape:text-xs ${TEAM_TEXT_CLASS[team.id]}`}>
+                <h4 className={`flex items-center font-display text-sm landscape:text-base ${TEAM_TEXT_CLASS[team.id]}`}>
                   {TEAM_LABEL[team.id]}
                   {/* Botão sempre visível no cabeçalho - mesa cheia não deixa
                       área vazia clicável no painel (ver GameBoard offline). */}
@@ -341,19 +345,19 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
                         event.stopPropagation()
                         handleDropZoneClick()
                       }}
-                      className="ml-2 animate-pulse rounded-full bg-card-gold px-2.5 py-0.5 font-sans text-[11px] font-bold text-black shadow-[0_0_10px_rgba(212,175,55,0.6)] landscape:px-2 landscape:text-[10px]"
+                      className="ml-2 animate-pulse rounded-full bg-card-gold px-2.5 py-0.5 font-sans text-[11px] font-bold text-black shadow-[0_0_10px_rgba(212,175,55,0.6)] landscape:px-3 landscape:py-1 landscape:text-sm"
                     >
                       ⬇ Baixar jogo
                     </button>
                   )}
                 </h4>
-                <span className="text-xs text-gray-200 landscape:text-[9px] landscape:leading-tight">
+                <span className="text-xs text-gray-200 landscape:text-sm landscape:leading-tight">
                   {team.score} pts · {team.melds.filter(m => m.isCanastra).length} can.
                   {team.hasTakenMorto ? ' · morto' : ''}
                 </span>
               </div>
               {team.melds.length === 0 ? (
-                <span className="text-sm text-gray-400 landscape:text-[10px]">
+                <span className="text-sm text-gray-400 landscape:text-sm">
                   {isDropTarget ? 'Clique aqui para baixar as cartas selecionadas' : 'Nenhum jogo baixado ainda'}
                 </span>
               ) : (
@@ -374,7 +378,7 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
                           initial={{ opacity: 0, scale: 0.85 }}
                           animate={{ opacity: 1, scale: 1 }}
                           onClick={event => handleMeldClick(event, team.id, ci, meldCards)}
-                          className={`shrink-0 space-y-1 rounded-lg p-1 transition-shadow landscape:space-y-0.5 landscape:p-0.5 ${
+                          className={`shrink-0 space-y-1 rounded-lg p-1 transition-shadow landscape:space-y-1.5 landscape:p-1.5 ${
                             canClickToExtend
                               ? compatible
                                 ? 'cursor-pointer ring-2 ring-card-gold shadow-[0_0_14px_rgba(212,175,55,0.5)]'
@@ -386,7 +390,7 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
                               última carta inteira) — ver MeldCardColumn. */}
                           <MeldCardColumn cards={canasta.layout.map(e => asCard(e.card))} isClosed={isClosed} />
                           <div
-                            className={`text-center text-xs font-semibold landscape:shrink-0 landscape:text-[9px] landscape:leading-tight ${
+                            className={`text-center text-xs font-semibold landscape:shrink-0 landscape:text-sm landscape:leading-tight ${
                               canasta.kind === 'real'
                                 ? 'text-card-gold'
                                 : canasta.kind === 'quinhentos'
@@ -426,13 +430,13 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
                         event.stopPropagation()
                         handleDropZoneClick()
                       }}
-                      className={`flex h-24 w-20 shrink-0 flex-col items-center justify-center gap-1 self-start rounded-lg border-2 border-dashed text-xs transition-colors landscape:h-20 landscape:w-12 landscape:text-[9px] ${
+                      className={`flex h-24 w-20 shrink-0 flex-col items-center justify-center gap-1 self-start rounded-lg border-2 border-dashed text-xs transition-colors landscape:h-28 landscape:w-20 landscape:text-sm ${
                         isDropTarget
                           ? 'border-card-gold bg-card-gold/10 text-card-gold shadow-[0_0_12px_rgba(212,175,55,0.45)]'
                           : 'border-white/20 text-gray-400'
                       }`}
                     >
-                      <span className="text-lg leading-none landscape:text-sm">⬇</span>
+                      <span className="text-lg leading-none landscape:text-xl">⬇</span>
                       <span>Baixar</span>
                     </button>
                   )}
@@ -455,7 +459,7 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
       </div>
 
       {/* Morto — escondido num canto discreto */}
-      <div className="pointer-events-none absolute right-1 top-6 z-20 origin-top-right scale-[0.62] landscape:scale-[0.5]">
+      <div className="pointer-events-none absolute right-1 top-6 z-20 origin-top-right scale-[0.62] landscape:scale-[0.85]">
         {mortoBlock}
       </div>
 
@@ -467,7 +471,7 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-gray-200 landscape:text-[9px]"
+              className="flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-gray-200 landscape:px-3 landscape:py-1 landscape:text-sm"
             >
               <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.2, repeat: Infinity }}>
                 ⏳
@@ -480,7 +484,7 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="flex items-center gap-1 rounded-full bg-card-gold px-2 py-0.5 text-[10px] font-bold text-black landscape:text-[9px]"
+              className="flex items-center gap-1 rounded-full bg-card-gold px-2 py-0.5 text-[10px] font-bold text-black landscape:px-3 landscape:py-1 landscape:text-sm"
             >
               Sua vez
             </motion.span>
@@ -496,7 +500,7 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
               initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="pointer-events-none rounded-lg bg-red-500/90 px-3 py-2 text-center text-xs text-red-50 shadow-lg landscape:px-2 landscape:py-1 landscape:text-[10px]"
+              className="pointer-events-none rounded-lg bg-red-500/90 px-3 py-2 text-center text-xs text-red-50 shadow-lg landscape:px-3 landscape:py-1.5 landscape:text-sm"
             >
               {hint}
             </motion.p>

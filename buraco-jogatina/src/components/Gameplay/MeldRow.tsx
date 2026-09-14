@@ -18,7 +18,7 @@ import type { ReactNode } from 'react'
  * Classe literal pro Tailwind conseguir gerá-la.
  */
 export function meldRowSpacing(_n: number): string {
-  return 'landscape:space-x-1.5'
+  return 'landscape:space-x-3'
 }
 
 interface MeldRowProps {

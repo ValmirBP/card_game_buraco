@@ -356,7 +356,7 @@ export default function Gameplay({ onGameEnd, onExit }: GameplayProps) {
           menores, painéis "Nós"/"Eles" nas laterais) pra caber inteiro na
           altura disponível. Manipulação direta: clicar no monte, no
           descarte ou na mesa substitui os antigos botões de ação. */}
-      <div className="min-h-0 flex-1 overflow-y-auto landscape:overflow-hidden">
+      <div className="min-h-0 flex-1 overflow-y-auto landscape:overflow-auto">
         <GameBoard
           phase={phase}
           onDraw={handleDraw}

@@ -1,16 +1,20 @@
 import { meldRowSpacing } from '../../src/components/Gameplay/MeldRow'
 
-/** Larguras medidas no aparelho, em paisagem: cada coluna de jogo baixado
- * ocupa 52px (48px de carta + 2px de padding de cada lado) e o painel de uma
- * dupla tem 383px. A fileira mostra os N jogos MAIS o slot fixo "Baixar". */
-const COLUNA = 52
-const PAINEL = 383
+/** Larguras em paisagem depois do pedido do usuário "deixa a mesa ainda
+ * maior": cada coluna de jogo baixado tem 80px de carta (landscape:w-20,
+ * ver MeldCardColumn.FULL_CARD_SIZE — igual ao retrato agora, sem
+ * compressão especial pra paisagem) e o painel de uma dupla tem uma
+ * largura MÍNIMA garantida de 360px (landscape:grid-cols-[...
+ * minmax(360px,1fr)...] em GameBoard.tsx - pode crescer além disso, mas
+ * nunca menos). A fileira mostra os N jogos MAIS o slot fixo "Baixar". */
+const COLUNA = 80
+const PAINEL = 360
 
 /** Deslocamento horizontal (px) que cada classe aplica — `space-x-N` é um
  * respiro POSITIVO de N*4px entre colunas; `-space-x-N` seria sobreposição
  * (negativo). Depois do relato de "amontoado", não usamos mais negativos. */
 const ESPACO: Record<string, number> = {
-  'landscape:space-x-1.5': 6,
+  'landscape:space-x-3': 12,
 }
 
 function visivelPorColuna(jogos: number): number {
@@ -48,9 +52,12 @@ describe('meldRowSpacing', () => {
     }
   })
 
-  /** Poucos jogos continuam cabendo sem precisar rolar. */
-  it('cabe sem rolagem com até 5 jogos', () => {
-    for (let n = 0; n <= 5; n++) {
+  /** Poucos jogos continuam cabendo sem precisar rolar. Com a mesa maior
+   * (cartas de 80px em vez de 48px), o limite sem rolagem caiu de 5 pra 3
+   * jogos - troca deliberada do pedido do usuário: cartas maiores e mais
+   * legíveis, rolando pra ver o resto em vez de espremer tudo na tela. */
+  it('cabe sem rolagem com até 3 jogos', () => {
+    for (let n = 0; n <= 3; n++) {
       expect(larguraNecessaria(n)).toBeLessThanOrEqual(PAINEL)
     }
   })

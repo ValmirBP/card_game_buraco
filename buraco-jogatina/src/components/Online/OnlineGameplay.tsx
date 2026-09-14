@@ -212,7 +212,7 @@ export default function OnlineGameplay({ onBackToMenu }: OnlineGameplayProps) {
       <div className="relative flex min-h-0 flex-1 flex-col gap-2 landscape:gap-0.5">
         {/* Mesa — mesmo tratamento do GameBoard offline: ocupa o espaço
             flexível do meio, sem rolar em paisagem. */}
-        <div className="min-h-0 flex-1 overflow-y-auto landscape:overflow-hidden">
+        <div className="min-h-0 flex-1 overflow-y-auto landscape:overflow-auto">
           <OnlineGameBoard view={view} />
         </div>
 
