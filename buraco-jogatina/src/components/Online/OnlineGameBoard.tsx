@@ -262,11 +262,12 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
   // embutido no painel da mão (lado a lado) — ver OnlineGameplay.tsx.
 
   return (
-    <div className="relative h-full min-h-0 rounded-2xl border border-white/10 bg-black/25 p-2 shadow-lg backdrop-blur-sm sm:p-4 landscape:rounded-xl landscape:border-0 landscape:p-4">
-      {/* Pedido do usuário: mesa bem maior, com rolagem vertical E
-          horizontal (ver overflow-auto no wrapper em OnlineGameplay.tsx) -
-          ver o mesmo comentário em GameBoard.tsx (offline). */}
-      <div className="flex flex-col gap-3 sm:gap-4 landscape:grid landscape:h-full landscape:grid-cols-[auto_minmax(360px,1fr)_minmax(360px,1fr)_auto] landscape:grid-rows-[auto_minmax(420px,1fr)] landscape:items-stretch landscape:gap-x-6 landscape:gap-y-4">
+    <div className="relative h-full min-h-0 rounded-2xl border border-white/10 bg-black/25 p-2 shadow-lg backdrop-blur-sm sm:p-4 landscape:rounded-xl landscape:border-0 landscape:p-2 landscape:overflow-hidden">
+      {/* Pedido do usuário: cartas/textos maiores, mas SEM rolar a mesa/tela
+          inteira - ver o mesmo comentário em GameBoard.tsx (offline). A
+          rolagem fica só dentro do "quadro de baixar carta" de cada dupla
+          (ver MeldRow.tsx). */}
+      <div className="flex flex-col gap-3 sm:gap-4 landscape:grid landscape:h-full landscape:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_auto] landscape:grid-rows-[auto_minmax(0,1fr)] landscape:items-stretch landscape:gap-x-2 landscape:gap-y-1">
         {/* Monte — canto superior-esquerdo */}
         <div className="order-1 flex items-center justify-center landscape:col-start-1 landscape:row-start-1 landscape:justify-self-start">
           {deckPile}

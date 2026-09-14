@@ -28,10 +28,14 @@ interface MeldRowProps {
 }
 
 /**
- * A fileira de jogos baixados de uma dupla. Em paisagem rola na horizontal
- * quando a mesa enche, com um esmaecido na borda direita indicando que há
- * mais jogos além da dobra (sem isso a rolagem passa despercebida: a barra
- * do WebView só aparece durante o gesto).
+ * A fileira de jogos baixados de uma dupla — o "quadro de baixar carta".
+ * Pedido do usuário: a MESA/TELA inteira não rola mais (GameBoard.tsx volta
+ * a encolher pra caber, minmax(0,1fr)); a rolagem fica só AQUI DENTRO, tanto
+ * na horizontal (muitos jogos lado a lado) quanto na vertical (uma canastra
+ * fechada alta demais pro espaço que sobrou) — o painel em si nunca vaza
+ * pra fora do seu próprio quadro. Um esmaecido na borda direita indica que
+ * há mais jogos além da dobra horizontal (sem isso a rolagem passa
+ * despercebida: a barra do WebView só aparece durante o gesto).
  */
 export default function MeldRow({ count, children }: MeldRowProps) {
   const ref = useRef<HTMLDivElement>(null)
@@ -66,7 +70,7 @@ export default function MeldRow({ count, children }: MeldRowProps) {
     <div className="relative landscape:min-h-0 landscape:flex-1">
       <div
         ref={ref}
-        className={`flex flex-wrap items-start gap-3 landscape:h-full landscape:flex-nowrap landscape:gap-0 landscape:overflow-x-auto landscape:overflow-y-hidden landscape:overscroll-x-contain no-scrollbar ${meldRowSpacing(
+        className={`flex flex-wrap items-start gap-3 landscape:h-full landscape:flex-nowrap landscape:gap-0 landscape:overflow-auto landscape:overscroll-contain no-scrollbar ${meldRowSpacing(
           count
         )}`}
       >

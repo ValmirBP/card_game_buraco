@@ -3,10 +3,14 @@ import { meldRowSpacing } from '../../src/components/Gameplay/MeldRow'
 /** Larguras em paisagem depois do pedido do usuário "deixa a mesa ainda
  * maior": cada coluna de jogo baixado tem 80px de carta (landscape:w-20,
  * ver MeldCardColumn.FULL_CARD_SIZE — igual ao retrato agora, sem
- * compressão especial pra paisagem) e o painel de uma dupla tem uma
- * largura MÍNIMA garantida de 360px (landscape:grid-cols-[...
- * minmax(360px,1fr)...] em GameBoard.tsx - pode crescer além disso, mas
- * nunca menos). A fileira mostra os N jogos MAIS o slot fixo "Baixar". */
+ * compressão especial pra paisagem). O painel de uma dupla NÃO tem mais
+ * uma largura mínima garantida por CSS (GameBoard.tsx voltou a
+ * minmax(0,1fr) - a mesa toda encolhe pra caber, sem rolar - ver pedido
+ * seguinte do usuário: "rolagem só no quadro de baixar carta"); 360px aqui
+ * é só uma largura TÍPICA observada num celular comum em paisagem, usada
+ * pra verificar que o quadro (que agora rola por dentro, ver MeldRow.tsx)
+ * de fato precisa rolar quando enche. A fileira mostra os N jogos MAIS o
+ * slot fixo "Baixar". */
 const COLUNA = 80
 const PAINEL = 360
 

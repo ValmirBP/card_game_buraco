@@ -217,18 +217,18 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
   // no painel da mão (lado a lado) — ver Gameplay.tsx.
 
   return (
-    <div className="relative h-full min-h-0 rounded-2xl border border-white/10 bg-black/25 p-2 shadow-lg backdrop-blur-sm sm:p-4 landscape:rounded-xl landscape:border-0 landscape:p-4">
+    <div className="relative h-full min-h-0 rounded-2xl border border-white/10 bg-black/25 p-2 shadow-lg backdrop-blur-sm sm:p-4 landscape:rounded-xl landscape:border-0 landscape:p-2 landscape:overflow-hidden">
       {/* Retrato: empilha (fallback decente). Paisagem ("estilo Jogatina"):
           grade com os JOGADORES nas colunas-borda (fora do feltro de jogo),
           o MONTE no canto sup-esquerdo, o DESCARTE embaixo (logo acima da
           mão) e os painéis "Nós"/"Eles" ocupando as duas colunas centrais —
-          a MAIOR parte da mesa. Pedido do usuário: mesa bem maior, com
-          rolagem vertical E horizontal (ver overflow-auto no wrapper em
-          Gameplay.tsx) - os painéis centrais têm uma largura MÍNIMA de
-          verdade (minmax(360px,1fr)) e a grade uma altura mínima
-          (minmax(420px,1fr)), então em vez de espremer tudo pra caber numa
-          tela de celular, a mesa cresce além da tela e rola. */}
-      <div className="flex flex-col gap-3 sm:gap-4 landscape:grid landscape:h-full landscape:grid-cols-[auto_minmax(360px,1fr)_minmax(360px,1fr)_auto] landscape:grid-rows-[auto_minmax(420px,1fr)] landscape:items-stretch landscape:gap-x-6 landscape:gap-y-4">
+          a MAIOR parte da mesa. Pedido do usuário: cartas/textos maiores,
+          mas SEM rolar a mesa/tela inteira — a grade volta a encolher pra
+          caber (minmax(0,1fr), como antes) e nada aqui rola. A rolagem fica
+          só DENTRO do "quadro de baixar carta" de cada dupla, quando os
+          jogos baixados não cabem no espaço que sobrou (ver MeldRow.tsx:
+          overflow-x-auto E overflow-y-auto ali dentro). */}
+      <div className="flex flex-col gap-3 sm:gap-4 landscape:grid landscape:h-full landscape:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_auto] landscape:grid-rows-[auto_minmax(0,1fr)] landscape:items-stretch landscape:gap-x-2 landscape:gap-y-1">
         {/* Monte — canto superior-esquerdo (row1/col1), visível e clicável.
             (O morto fica escondido num canto discreto, ver overlay abaixo.)
             landscape:ml-[env(...)]: protege só o monte se o recorte cair do
