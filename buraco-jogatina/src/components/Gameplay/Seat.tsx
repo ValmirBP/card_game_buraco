@@ -32,20 +32,20 @@ export default function Seat({ name, cardCount, isCurrentTurn, teamId, compact, 
     <motion.div
       animate={{ scale: isCurrentTurn ? 1.05 : 1 }}
       transition={{ duration: 0.25 }}
-      className={`flex flex-col items-center gap-1.5 rounded-xl border-2 p-2 sm:p-3 landscape:gap-1.5 landscape:p-2 ${
+      className={`flex flex-col items-center gap-1.5 rounded-xl border-2 p-2 sm:p-3 landscape:gap-1 landscape:p-1.5 ${
         isCurrentTurn ? TEAM_RING[teamId] : 'border-transparent bg-white/5'
       }`}
     >
-      <div className="flex items-center gap-2 landscape:gap-2">
+      <div className="flex items-center gap-2 landscape:gap-1.5">
         <div
-          className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full font-display text-xs sm:h-10 sm:w-10 sm:text-sm landscape:h-9 landscape:w-9 landscape:text-sm ${TEAM_AVATAR[teamId]}`}
+          className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full font-display text-xs sm:h-10 sm:w-10 sm:text-sm landscape:h-7 landscape:w-7 landscape:text-xs ${TEAM_AVATAR[teamId]}`}
         >
           {name.charAt(0).toUpperCase()}
         </div>
         <div className="min-w-0 text-left">
-          <div className="truncate text-xs font-bold sm:text-sm landscape:text-sm landscape:leading-tight">{name}</div>
+          <div className="truncate text-xs font-bold sm:text-sm landscape:text-xs landscape:leading-tight">{name}</div>
           {isCurrentTurn && (
-            <span className="inline-block rounded-full bg-card-gold px-1.5 py-0.5 text-[9px] font-bold text-black sm:text-[10px] landscape:px-2 landscape:py-0.5 landscape:text-[10px]">
+            <span className="inline-block rounded-full bg-card-gold px-1.5 py-0.5 text-[9px] font-bold text-black sm:text-[10px] landscape:px-1.5 landscape:py-0 landscape:text-[9px]">
               {isThinking ? '🤖 jogando…' : 'Sua vez'}
             </span>
           )}
@@ -69,7 +69,7 @@ export default function Seat({ name, cardCount, isCurrentTurn, teamId, compact, 
         </div>
       )}
       {!compact && (
-        <span className="text-[10px] text-gray-300 sm:text-xs landscape:text-xs">
+        <span className="text-[10px] text-gray-300 sm:text-xs landscape:text-[10px]">
           {cardCount} carta{cardCount === 1 ? '' : 's'}
         </span>
       )}

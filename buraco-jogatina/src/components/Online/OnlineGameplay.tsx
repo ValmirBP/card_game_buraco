@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useOnlineStore } from '../../online/onlineStore'
 import OnlineGameBoard from './OnlineGameBoard'
@@ -8,6 +8,7 @@ import OnlineResult from './OnlineResult'
 import DrawAnimation from '../Gameplay/DrawAnimation'
 import CardFlyAnimation from '../Gameplay/CardFlyAnimation'
 import ExitButton from '../ExitButton'
+import { otherSeatsInOrder } from '../../online/seatLayout'
 import type { TeamId } from '../../engine/gameState'
 
 const TEAM_LABEL: Record<'A' | 'B', string> = { A: 'Nós', B: 'Eles' }
@@ -92,6 +93,12 @@ export default function OnlineGameplay({ onBackToMenu }: OnlineGameplayProps) {
   // "Nós"/"Eles" relativo ao próprio time, igual ao GameBoard online.
   const myTeamId: TeamId = view.players[view.seat]?.teamId ?? 'A'
   const sortedTeams = [...view.teams].sort((a, b) => (a.id === myTeamId ? -1 : 1) - (b.id === myTeamId ? -1 : 1))
+  // Parceiro (assento oposto, mesmo time) — mostrado no placar, entre os
+  // dois placares, só em paisagem (pedido do usuário, ver OnlineGameBoard.tsx
+  // que esconde o assento dele no tabuleiro nessa orientação).
+  const partnerSeat = otherSeatsInOrder(view.seat)[1]
+  const partner = view.players[partnerSeat]
+  const partnerIsTurn = view.status === 'playing' && view.currentSeat === partnerSeat
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2 landscape:gap-0.5">
@@ -148,33 +155,52 @@ export default function OnlineGameplay({ onBackToMenu }: OnlineGameplayProps) {
         <ExitButton onClick={handleExit} />
         <div className="z-40 min-w-0 flex-1 rounded-xl border border-card-gold/30 bg-black/40 px-2 py-1 shadow-[0_4px_16px_rgba(0,0,0,0.35)] backdrop-blur-md landscape:rounded-md landscape:px-1.5 landscape:py-0">
         <div className="mx-auto flex max-w-7xl flex-nowrap items-center justify-center gap-2 landscape:gap-1.5">
-          {sortedTeams.map(team => {
+          {sortedTeams.map((team, i) => {
             const isMine = team.id === myTeamId
             const matchTotal = view.matchScores[team.id] + team.score
             const canastraCount = team.melds.filter(m => m.isCanastra).length
             return (
-              <div
-                key={team.id}
-                className={`flex min-w-0 items-center gap-1.5 rounded-lg px-2 py-0.5 ${
-                  isMine ? 'border border-card-gold/50 bg-card-gold/10' : 'border border-fuchsia-400/40 bg-fuchsia-500/10'
-                }`}
-              >
-                <span className={`font-display text-xs ${isMine ? 'text-card-gold' : 'text-fuchsia-300'}`}>
-                  {TEAM_LABEL[isMine ? 'A' : 'B']}
-                </span>
-                <span className="text-base font-bold text-white" title="Pontos da partida atual">
-                  {matchTotal}
-                </span>
-                <span className="whitespace-nowrap text-[10px] text-gray-300" title="Canastras (jogos de 7+ cartas)">
-                  {canastraCount} can.
-                </span>
-                <span
-                  className={`text-[10px] ${team.hasTakenMorto ? 'text-green-300' : 'text-gray-500'}`}
-                  title="Morto pego?"
+              <Fragment key={team.id}>
+                <div
+                  className={`flex min-w-0 items-center gap-1.5 rounded-lg px-2 py-0.5 ${
+                    isMine ? 'border border-card-gold/50 bg-card-gold/10' : 'border border-fuchsia-400/40 bg-fuchsia-500/10'
+                  }`}
                 >
-                  {team.hasTakenMorto ? '✓morto' : '✗morto'}
-                </span>
-              </div>
+                  <span className={`font-display text-xs ${isMine ? 'text-card-gold' : 'text-fuchsia-300'}`}>
+                    {TEAM_LABEL[isMine ? 'A' : 'B']}
+                  </span>
+                  <span className="text-base font-bold text-white" title="Pontos da partida atual">
+                    {matchTotal}
+                  </span>
+                  <span className="whitespace-nowrap text-[10px] text-gray-300" title="Canastras (jogos de 7+ cartas)">
+                    {canastraCount} can.
+                  </span>
+                  <span
+                    className={`text-[10px] ${team.hasTakenMorto ? 'text-green-300' : 'text-gray-500'}`}
+                    title="Morto pego?"
+                  >
+                    {team.hasTakenMorto ? '✓morto' : '✗morto'}
+                  </span>
+                </div>
+                {/* Parceiro entre os dois placares, só em paisagem - pedido
+                    do usuário: "separa os scores no topo da tela, coloca o
+                    jogador entre eles" (ver o `landscape:hidden` no assento
+                    dele em OnlineGameBoard.tsx). */}
+                {i === 0 && partner && (
+                  <div
+                    data-seat-index={partnerSeat}
+                    className={`hidden shrink-0 items-center gap-1 rounded-lg border px-1.5 py-0.5 landscape:flex ${
+                      partnerIsTurn ? 'border-card-gold bg-card-gold/15' : 'border-white/10 bg-white/5'
+                    }`}
+                  >
+                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-card-gold/80 text-[8px] font-bold text-black">
+                      {partner.name.charAt(0).toUpperCase()}
+                    </span>
+                    <span className="max-w-[5rem] truncate text-[10px] text-white">{partner.name}</span>
+                    <span className="text-[9px] text-gray-400">{partner.handCount}</span>
+                  </div>
+                )}
+              </Fragment>
             )
           })}
         </div>

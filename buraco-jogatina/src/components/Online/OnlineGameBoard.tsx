@@ -10,9 +10,11 @@ import Seat from '../Gameplay/Seat'
 import MeldCardColumn from '../Gameplay/MeldCardColumn'
 import MeldRow from '../Gameplay/MeldRow'
 
-/** Footprint do MONTE — idêntico ao PILE_CARD_SIZE offline (pedido do
- * usuário: mesa bem maior em paisagem, com rolagem em vez de compressão). */
+/** Footprint do MONTE — idêntico ao PILE_CARD_SIZE offline. */
 const PILE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-16 landscape:h-24'
+/** Footprint do MORTO — idêntico ao MORTO_CARD_SIZE offline: menor que o
+ * monte de propósito (pedido do usuário: "o morto pode ficar menor"). */
+const MORTO_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-10 landscape:h-14'
 /** Footprints dos fantasmas de animação — idênticos aos GHOST_*_SIZE de
  * Gameplay.tsx (offline). Repetidos aqui de propósito (não importados), pra
  * não acoplar este arquivo à estrutura interna de PlayerHand/MeldCardColumn
@@ -219,11 +221,11 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
 
   const mortoBlock = (
     <div className="flex flex-col items-center gap-0.5">
-      <span className="text-[8px] font-semibold uppercase tracking-wide text-gray-400 landscape:text-xs">
+      <span className="text-[8px] font-semibold uppercase tracking-wide text-gray-400 landscape:text-[8px]">
         Morto{mortos.length !== 1 ? 's' : ''}
       </span>
       {mortos.length > 0 ? (
-        <div className="relative flex h-12 w-12 items-center justify-center landscape:h-20 landscape:w-20">
+        <div className="relative flex h-12 w-12 items-center justify-center landscape:h-12 landscape:w-12">
           <AnimatePresence>
             {mortos.map((morto, i) => {
               const isCrossed = mortos.length === 2
@@ -239,9 +241,9 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
                   className="absolute"
                 >
                   <div className="relative">
-                    <CardBack variant={i === 0 ? 'blue' : 'red'} sizeClassName={PILE_CARD_SIZE} compactOnLandscape />
+                    <CardBack variant={i === 0 ? 'blue' : 'red'} sizeClassName={MORTO_CARD_SIZE} compactOnLandscape />
                     <span
-                      className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-card-gold px-1 text-[9px] font-bold text-black shadow landscape:h-6 landscape:min-w-6 landscape:text-xs"
+                      className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-card-gold px-1 text-[9px] font-bold text-black shadow landscape:h-3.5 landscape:min-w-3.5 landscape:text-[8px]"
                       style={{ transform: rotate ? `rotate(-${rotate}deg)` : undefined }}
                     >
                       {morto.count}
@@ -273,12 +275,12 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
           {deckPile}
         </div>
 
-        {/* Parceiro — topo-centro, FORA dos painéis */}
+        {/* Parceiro: em paisagem mora no placar (ver o header em
+            OnlineGameplay.tsx), entre os dois placares - pedido do usuário,
+            libera essa linha inteira do tabuleiro pro quadro de baixar
+            carta. Em retrato continua aqui, como sempre. */}
         {partnerSeat !== undefined && players[partnerSeat] && (
-          <div
-            data-seat-index={partnerSeat}
-            className="order-2 flex justify-center landscape:col-start-2 landscape:col-span-2 landscape:row-start-1 landscape:justify-self-center landscape:self-center"
-          >
+          <div data-seat-index={partnerSeat} className="order-2 flex justify-center landscape:hidden">
             <Seat
               name={players[partnerSeat].name}
               cardCount={players[partnerSeat].handCount}
@@ -460,7 +462,7 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
       </div>
 
       {/* Morto — escondido num canto discreto */}
-      <div className="pointer-events-none absolute right-1 top-6 z-20 origin-top-right scale-[0.62] landscape:scale-[0.85]">
+      <div className="pointer-events-none absolute right-1 top-6 z-20 origin-top-right scale-[0.62] landscape:scale-[0.6]">
         {mortoBlock}
       </div>
 

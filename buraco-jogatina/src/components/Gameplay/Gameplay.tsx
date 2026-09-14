@@ -123,8 +123,15 @@ export default function Gameplay({ onGameEnd, onExit }: GameplayProps) {
       if (!g) return
       const discardBefore = [...g.state.discardPile]
       const logBefore = store.gameLog.length
-      const seatEl = document.querySelector(`[data-seat-index="${seat}"]`)
-      const toRect = seatEl?.getBoundingClientRect()
+      // O assento 2 (parceiro) agora tem DOIS elementos com esse
+      // data-seat-index: um no tabuleiro (visível só em retrato) e outro no
+      // placar (visível só em paisagem, ver Scoreboard.tsx) — só um dos
+      // dois está de fato na tela a cada vez, o outro é `display:none`
+      // (rect zerado). Pega o PRIMEIRO com tamanho de verdade, não
+      // simplesmente o primeiro do DOM.
+      const toRect = Array.from(document.querySelectorAll(`[data-seat-index="${seat}"]`))
+        .map(el => el.getBoundingClientRect())
+        .find(r => r.width > 0 || r.height > 0)
       // Origem do lixo capturada AGORA (antes do turno), com a pilha ainda
       // cheia — depois do aiTurn o descarte fica "Vazio" (elemento menor).
       // #discard-top é a carta do topo (tamanho de carta); cai para

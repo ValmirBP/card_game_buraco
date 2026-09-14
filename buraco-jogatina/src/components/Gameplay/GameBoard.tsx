@@ -34,10 +34,13 @@ const TEAM_GRID_CLASS: Record<TeamId, string> = {
   B: 'order-4 landscape:col-start-3 landscape:row-start-2',
 }
 
-/** Footprint do MONTE — pedido do usuário: mesa bem maior em paisagem
- * (antes comprimida pra caber sem rolar; agora a mesa rola e pode ser
- * grande de verdade). */
+/** Footprint do MONTE — cartas maiores/legíveis (pedido do usuário). */
 const PILE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-16 landscape:h-24'
+/** Footprint do MORTO — menor que o monte de propósito (pedido do usuário:
+ * "o morto pode ficar menor"). Ele é só um indicador discreto no canto
+ * (ver o overlay com scale abaixo), não precisa do mesmo destaque do
+ * monte, que é clicável e onde a ação de fato acontece. */
+const MORTO_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-10 landscape:h-14'
 /** Footprint das cartas do DESCARTE — MESMO tamanho das cartas da mão, pra a
  * fileira do descarte ficar paralela à mão e visualmente consistente. Deve
  * acompanhar HAND_CARD_SIZE em PlayerHand.tsx. */
@@ -172,11 +175,11 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
 
   const mortoBlock = (
     <div className="flex flex-col items-center gap-0.5">
-      <span className="text-[8px] font-semibold uppercase tracking-wide text-gray-400 landscape:text-xs">
+      <span className="text-[8px] font-semibold uppercase tracking-wide text-gray-400 landscape:text-[8px]">
         Morto{mortos.length !== 1 ? 's' : ''}
       </span>
       {mortos.length > 0 ? (
-        <div className="relative flex h-12 w-12 items-center justify-center landscape:h-20 landscape:w-20">
+        <div className="relative flex h-12 w-12 items-center justify-center landscape:h-12 landscape:w-12">
           <AnimatePresence>
             {mortos.map((morto, i) => {
               // i === 0 -> morto 1 deitado por cima; i === 1 -> morto 2 em pé
@@ -194,9 +197,9 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
                   className="absolute"
                 >
                   <div className="relative">
-                    <CardBack variant={i === 0 ? 'blue' : 'red'} sizeClassName={PILE_CARD_SIZE} compactOnLandscape />
+                    <CardBack variant={i === 0 ? 'blue' : 'red'} sizeClassName={MORTO_CARD_SIZE} compactOnLandscape />
                     <span
-                      className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-card-gold px-1 text-[9px] font-bold text-black shadow landscape:h-6 landscape:min-w-6 landscape:text-xs"
+                      className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-card-gold px-1 text-[9px] font-bold text-black shadow landscape:h-3.5 landscape:min-w-3.5 landscape:text-[8px]"
                       style={{ transform: rotate ? `rotate(-${rotate}deg)` : undefined }}
                     >
                       {morto.length}
@@ -237,8 +240,11 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
           {deckPile}
         </div>
 
-        {/* Parceiro (topo-centro), FORA dos painéis (row1/col2-3) */}
-        <div data-seat-index={2} className="order-2 flex justify-center landscape:col-start-2 landscape:col-span-2 landscape:row-start-1 landscape:justify-self-center landscape:self-center">
+        {/* Parceiro: em paisagem mora no placar (Scoreboard.tsx), entre os
+            dois placares - pedido do usuário, libera essa linha inteira do
+            tabuleiro pro quadro de baixar carta. Em retrato continua aqui,
+            como sempre. */}
+        <div data-seat-index={2} className="order-2 flex justify-center landscape:hidden">
           <Seat
             name={players[2].name}
             cardCount={players[2].hand.getCards().length}
@@ -431,7 +437,7 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
           que sobrou aqui (ver comentário em Layout.tsx) — se o recorte cair
           do lado direito nessa rotação, empurra só este badge, não o
           tabuleiro inteiro. */}
-      <div className="pointer-events-none absolute right-1 top-6 z-20 origin-top-right scale-[0.62] landscape:scale-[0.85] landscape:mr-[env(safe-area-inset-right)]">
+      <div className="pointer-events-none absolute right-1 top-6 z-20 origin-top-right scale-[0.62] landscape:scale-[0.6] landscape:mr-[env(safe-area-inset-right)]">
         {mortoBlock}
       </div>
 
