@@ -34,8 +34,11 @@ const TEAM_GRID_CLASS: Record<TeamId, string> = {
   B: 'order-4 landscape:col-start-3 landscape:row-start-2',
 }
 
-/** Footprint do MONTE — cartas maiores/legíveis (pedido do usuário). */
-const PILE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-16 landscape:h-24'
+/** Footprint do MONTE — grande em retrato (legibilidade), mas compacto em
+ * paisagem: o monte é só um botão de comprar, não precisa do mesmo tamanho
+ * das cartas da mão — pedido do usuário pra sobrar mais espaço horizontal
+ * pros quadros de baixar carta. */
+const PILE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-12 landscape:h-16'
 /** Footprint do MORTO — menor que o monte de propósito (pedido do usuário:
  * "o morto pode ficar menor"). Ele é só um indicador discreto no canto
  * (ver o overlay com scale abaixo), não precisa do mesmo destaque do
@@ -165,7 +168,7 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
       <div
         id="deck-pile"
         onClick={handleDeckClick}
-        className={`flex h-24 w-16 items-center justify-center rounded-xl border border-dashed border-white/20 text-[10px] text-gray-400 sm:h-28 sm:w-20 landscape:h-24 landscape:w-16 landscape:text-xs ${
+        className={`flex h-24 w-16 items-center justify-center rounded-xl border border-dashed border-white/20 text-[10px] text-gray-400 sm:h-28 sm:w-20 landscape:h-16 landscape:w-12 landscape:text-xs ${
           canClickDeck ? 'cursor-pointer ring-2 ring-card-gold' : ''
         }`}
       >

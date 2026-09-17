@@ -11,7 +11,7 @@ import MeldCardColumn from '../Gameplay/MeldCardColumn'
 import MeldRow from '../Gameplay/MeldRow'
 
 /** Footprint do MONTE — idêntico ao PILE_CARD_SIZE offline. */
-const PILE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-16 landscape:h-24'
+const PILE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-12 landscape:h-16'
 /** Footprint do MORTO — idêntico ao MORTO_CARD_SIZE offline: menor que o
  * monte de propósito (pedido do usuário: "o morto pode ficar menor"). */
 const MORTO_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-10 landscape:h-14'
@@ -211,7 +211,7 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
       <div
         id="deck-pile"
         onClick={handleDeckClick}
-        className={`flex h-24 w-16 items-center justify-center rounded-xl border border-dashed border-white/20 text-[10px] text-gray-400 sm:h-28 sm:w-20 landscape:h-24 landscape:w-16 landscape:text-xs ${
+        className={`flex h-24 w-16 items-center justify-center rounded-xl border border-dashed border-white/20 text-[10px] text-gray-400 sm:h-28 sm:w-20 landscape:h-16 landscape:w-12 landscape:text-xs ${
           canClickDeck ? 'cursor-pointer ring-2 ring-card-gold' : ''
         }`}
       >
