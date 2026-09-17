@@ -80,8 +80,8 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
   // "Nós" sempre na coluna central esquerda (col-start-2), "Eles" na direita
   // (col-start-3) — igual offline, mas relativo ao próprio time.
   const TEAM_GRID_CLASS: Record<'A' | 'B', string> = {
-    [myTeamId]: 'order-4 landscape:col-start-2 landscape:row-start-2',
-    [otherTeamId]: 'order-4 landscape:col-start-3 landscape:row-start-2',
+    [myTeamId]: 'order-4 landscape:col-start-2 landscape:row-start-1',
+    [otherTeamId]: 'order-4 landscape:col-start-3 landscape:row-start-1',
   } as Record<'A' | 'B', string>
 
   // [esquerda, topo(parceiro), direita] — sempre nessa ordem relativa ao
@@ -114,7 +114,13 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
     pendingDrawRef.current = false
     if (yourHand.length <= prevLen) return // intent recusada (chegou um error, não um novo state)
 
-    const fromRect = document.getElementById('deck-pile')?.getBoundingClientRect()
+    // O MONTE tem DOIS elementos possíveis com `data-deck-pile`: um no
+    // tabuleiro (visível só em retrato) e outro flutuando sobre o quadro
+    // "Nós" (visível só em paisagem) — mesmo cuidado do assento do parceiro
+    // (ver Scoreboard.tsx): pega o PRIMEIRO com tamanho de verdade.
+    const fromRect = Array.from(document.querySelectorAll('[data-deck-pile]'))
+      .map(el => el.getBoundingClientRect())
+      .find(r => r.width > 0 || r.height > 0)
     const toRect = document.getElementById('player-hand-anchor')?.getBoundingClientRect()
     const drawnCard = yourHand[yourHand.length - 1]
     if (fromRect && toRect && drawnCard) {
@@ -191,7 +197,7 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
   const deckPile =
     deckCount > 0 ? (
       <motion.div
-        id="deck-pile"
+        data-deck-pile="true"
         onClick={handleDeckClick}
         animate={canClickDeck ? { scale: [1, 1.05, 1] } : { scale: 1 }}
         transition={canClickDeck ? { duration: 1.4, repeat: Infinity, ease: 'easeInOut' } : undefined}
@@ -209,7 +215,7 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
       </motion.div>
     ) : (
       <div
-        id="deck-pile"
+        data-deck-pile="true"
         onClick={handleDeckClick}
         className={`flex h-24 w-16 items-center justify-center rounded-xl border border-dashed border-white/20 text-[10px] text-gray-400 sm:h-28 sm:w-20 landscape:h-16 landscape:w-12 landscape:text-xs ${
           canClickDeck ? 'cursor-pointer ring-2 ring-card-gold' : ''
@@ -269,9 +275,14 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
           inteira - ver o mesmo comentário em GameBoard.tsx (offline). A
           rolagem fica só dentro do "quadro de baixar carta" de cada dupla
           (ver MeldRow.tsx). */}
-      <div className="flex flex-col gap-3 sm:gap-4 landscape:grid landscape:h-full landscape:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_auto] landscape:grid-rows-[auto_minmax(0,1fr)] landscape:items-stretch landscape:gap-x-2 landscape:gap-y-1">
-        {/* Monte — canto superior-esquerdo */}
-        <div className="order-1 flex items-center justify-center landscape:col-start-1 landscape:row-start-1 landscape:justify-self-start">
+      <div className="flex flex-col gap-3 sm:gap-4 landscape:grid landscape:h-full landscape:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_auto] landscape:grid-rows-1 landscape:items-stretch landscape:gap-x-2 landscape:gap-y-1">
+        {/* Monte — em retrato ocupa seu próprio lugar no topo, como sempre.
+            Em paisagem vira um selo flutuante SOBRE o quadro do time do
+            jogador (ver bloco landscape:col-start-2 logo abaixo, dentro da
+            MESMA célula da grade que o painel) — pedido do usuário: sem
+            linha própria reservada no topo, o quadro de baixar carta cresce
+            até o topo da tela. */}
+        <div className="order-1 flex items-center justify-center landscape:hidden">
           {deckPile}
         </div>
 
@@ -290,11 +301,12 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
           </div>
         )}
 
-        {/* Adversário à esquerda */}
+        {/* Adversário à esquerda — ocupa a única linha da grade (row1/col1),
+            centralizado verticalmente nela. */}
         {leftSeat !== undefined && players[leftSeat] && (
           <div
             data-seat-index={leftSeat}
-            className="order-3 flex justify-start landscape:col-start-1 landscape:row-start-2 landscape:self-center landscape:justify-self-center"
+            className="order-3 flex justify-start landscape:col-start-1 landscape:row-start-1 landscape:self-center landscape:justify-self-center"
           >
             <Seat
               name={players[leftSeat].name}
@@ -305,11 +317,11 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
           </div>
         )}
 
-        {/* Adversário à direita */}
+        {/* Adversário à direita (row1/col4) */}
         {rightSeat !== undefined && players[rightSeat] && (
           <div
             data-seat-index={rightSeat}
-            className="order-5 flex justify-end landscape:col-start-4 landscape:row-start-2 landscape:self-center landscape:justify-self-center"
+            className="order-5 flex justify-end landscape:col-start-4 landscape:row-start-1 landscape:self-center landscape:justify-self-center"
           >
             <Seat
               name={players[rightSeat].name}
@@ -319,6 +331,17 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
             />
           </div>
         )}
+
+        {/* Monte, versão paisagem: fica no canto sup-esquerdo, mesma coluna
+            do adversário à esquerda (col1/row1) — como ele agora fica
+            centralizado na altura toda da linha, sobra espaço vazio acima
+            dele, onde o monte flutua sem empurrar nenhum painel nem cobrir o
+            rótulo/placar (pedido do usuário: "deixa o monte no canto
+            mesmo"). Só um dos dois `data-deck-pile` (este ou o de retrato
+            acima) tem tamanho de verdade a cada vez. */}
+        <div className="hidden landscape:block landscape:col-start-1 landscape:row-start-1 landscape:z-20 landscape:self-start landscape:justify-self-center">
+          {deckPile}
+        </div>
 
         {/* ---- Jogos baixados por dupla — colunas centrais ---- */}
         {teams.map(team => {

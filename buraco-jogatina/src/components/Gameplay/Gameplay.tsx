@@ -58,6 +58,17 @@ function leftmostHandCardRect(cardIndices: number[]): DOMRect | undefined {
   return rects.reduce((leftmost, r) => (r.left < leftmost.left ? r : leftmost))
 }
 
+/** O MONTE agora tem DOIS elementos possíveis com `data-deck-pile`: um no
+ * tabuleiro (visível só em retrato) e outro flutuando sobre o quadro "Nós"
+ * (visível só em paisagem, ver GameBoard.tsx) — só um dos dois está de fato
+ * na tela a cada vez, o outro é `display:none` (rect zerado). Mesmo cuidado
+ * do assento do parceiro, ver comentário abaixo. */
+function visibleDeckPileRect(): DOMRect | undefined {
+  return Array.from(document.querySelectorAll('[data-deck-pile]'))
+    .map(el => el.getBoundingClientRect())
+    .find(r => r.width > 0 || r.height > 0)
+}
+
 export default function Gameplay({ onGameEnd, onExit }: GameplayProps) {
   // `version` MUST be selected alongside `game`: `game` is a mutable engine
   // instance whose object reference never changes across actions, so
@@ -163,7 +174,7 @@ export default function Gameplay({ onGameEnd, onExit }: GameplayProps) {
           window.setTimeout(() => setAiTakeAnim(current => (current?.id === id ? null : current)), AI_TAKE_ANIM_MS)
         }
       } else {
-        const fromRect = document.getElementById('deck-pile')?.getBoundingClientRect()
+        const fromRect = visibleDeckPileRect()
         if (fromRect) {
           setAiDrawAnim({ id, fromRect, toRect })
           window.setTimeout(() => setAiDrawAnim(current => (current?.id === id ? null : current)), AI_DRAW_ANIM_MS)
@@ -235,9 +246,8 @@ export default function Gameplay({ onGameEnd, onExit }: GameplayProps) {
   if (!game) return null
 
   const handleDraw = () => {
-    const deckEl = document.getElementById('deck-pile')
     const handEl = document.getElementById('player-hand-anchor')
-    const fromRect = deckEl?.getBoundingClientRect()
+    const fromRect = visibleDeckPileRect()
 
     useGameStore.getState().drawFromDeck()
     setPhase('play')

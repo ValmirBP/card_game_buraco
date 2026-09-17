@@ -30,8 +30,8 @@ const TEAM_TEXT_CLASS: Record<TeamId, string> = {
 // colunas centrais (1fr cada) que ocupam a MAIOR parte do feltro; os
 // jogadores ficam nas colunas-borda (1 e 4), FORA da área dos jogos.
 const TEAM_GRID_CLASS: Record<TeamId, string> = {
-  A: 'order-4 landscape:col-start-2 landscape:row-start-2',
-  B: 'order-4 landscape:col-start-3 landscape:row-start-2',
+  A: 'order-4 landscape:col-start-2 landscape:row-start-1',
+  B: 'order-4 landscape:col-start-3 landscape:row-start-1',
 }
 
 /** Footprint do MONTE — grande em retrato (legibilidade), mas compacto em
@@ -148,7 +148,7 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
   const deckPile =
     deck.length > 0 ? (
       <motion.div
-        id="deck-pile"
+        data-deck-pile="true"
         onClick={handleDeckClick}
         animate={canClickDeck ? { scale: [1, 1.05, 1] } : { scale: 1 }}
         transition={canClickDeck ? { duration: 1.4, repeat: Infinity, ease: 'easeInOut' } : undefined}
@@ -166,7 +166,7 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
       </motion.div>
     ) : (
       <div
-        id="deck-pile"
+        data-deck-pile="true"
         onClick={handleDeckClick}
         className={`flex h-24 w-16 items-center justify-center rounded-xl border border-dashed border-white/20 text-[10px] text-gray-400 sm:h-28 sm:w-20 landscape:h-16 landscape:w-12 landscape:text-xs ${
           canClickDeck ? 'cursor-pointer ring-2 ring-card-gold' : ''
@@ -234,12 +234,14 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
           só DENTRO do "quadro de baixar carta" de cada dupla, quando os
           jogos baixados não cabem no espaço que sobrou (ver MeldRow.tsx:
           overflow-x-auto E overflow-y-auto ali dentro). */}
-      <div className="flex flex-col gap-3 sm:gap-4 landscape:grid landscape:h-full landscape:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_auto] landscape:grid-rows-[auto_minmax(0,1fr)] landscape:items-stretch landscape:gap-x-2 landscape:gap-y-1">
-        {/* Monte — canto superior-esquerdo (row1/col1), visível e clicável.
-            (O morto fica escondido num canto discreto, ver overlay abaixo.)
-            landscape:ml-[env(...)]: protege só o monte se o recorte cair do
-            lado esquerdo nessa rotação (ver comentário em Layout.tsx). */}
-        <div className="order-1 flex items-center justify-center landscape:col-start-1 landscape:row-start-1 landscape:justify-self-start landscape:ml-[env(safe-area-inset-left)]">
+      <div className="flex flex-col gap-3 sm:gap-4 landscape:grid landscape:h-full landscape:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_auto] landscape:grid-rows-1 landscape:items-stretch landscape:gap-x-2 landscape:gap-y-1">
+        {/* Monte — em retrato ocupa seu próprio lugar no topo, como sempre.
+            Em paisagem vira um selo flutuante SOBRE o quadro "Nós" (ver bloco
+            landscape:col-start-2 logo abaixo, dentro da MESMA célula da
+            grade que o painel) — pedido do usuário: sem linha própria
+            reservada no topo, o quadro de baixar carta cresce até o topo da
+            tela. */}
+        <div className="order-1 flex items-center justify-center landscape:hidden">
           {deckPile}
         </div>
 
@@ -256,8 +258,9 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
           />
         </div>
 
-        {/* Adversário 1 (Ana) — borda esquerda (row2/col1) */}
-        <div data-seat-index={1} className="order-3 flex justify-start landscape:col-start-1 landscape:row-start-2 landscape:self-center landscape:justify-self-center">
+        {/* Adversário 1 (Ana) — borda esquerda, ocupa a única linha da grade
+            (row1/col1), centralizado verticalmente nela. */}
+        <div data-seat-index={1} className="order-3 flex justify-start landscape:col-start-1 landscape:row-start-1 landscape:self-center landscape:justify-self-center">
           <Seat
             name={players[1].name}
             cardCount={players[1].hand.getCards().length}
@@ -266,14 +269,27 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
           />
         </div>
 
-        {/* Adversário 2 (Carlos) — borda direita (row2/col4) */}
-        <div data-seat-index={3} className="order-5 flex justify-end landscape:col-start-4 landscape:row-start-2 landscape:self-center landscape:justify-self-center">
+        {/* Adversário 2 (Carlos) — borda direita (row1/col4) */}
+        <div data-seat-index={3} className="order-5 flex justify-end landscape:col-start-4 landscape:row-start-1 landscape:self-center landscape:justify-self-center">
           <Seat
             name={players[3].name}
             cardCount={players[3].hand.getCards().length}
             isCurrentTurn={status === 'playing' && currentPlayerIndex === 3}
             teamId={teamIdOfSeat(3)}
           />
+        </div>
+
+        {/* Monte, versão paisagem: fica no canto sup-esquerdo, mesma coluna
+            de Ana (col1/row1) — como ela agora fica centralizada na altura
+            toda da linha, sobra espaço vazio acima dela, onde o monte
+            flutua sem empurrar nenhum painel nem cobrir o rótulo/placar
+            "Nós"/"Eles" (pedido do usuário: "deixa o monte no canto mesmo").
+            Só um dos dois `data-deck-pile` (este ou o de retrato acima) tem
+            tamanho de verdade a cada vez — mesmo cuidado do
+            parceiro/Scoreboard: ver o querySelectorAll + filtro de
+            visibilidade em Gameplay.tsx. */}
+        <div className="hidden landscape:block landscape:col-start-1 landscape:row-start-1 landscape:z-20 landscape:self-start landscape:justify-self-center landscape:ml-[env(safe-area-inset-left)]">
+          {deckPile}
         </div>
 
         {/* ---- Jogos baixados por dupla (Nós/Eles) — colunas centrais,

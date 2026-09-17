@@ -9,25 +9,26 @@ const SUIT_COLOR_CLASS: Record<CardType['suit'], string> = {
 }
 
 /** Tamanho da carta INTEIRA no fim da coluna (a "carta de baixo" do leque,
- * como na foto de referência do usuário). Pedido do usuário: mesa bem
- * maior em paisagem — agora do MESMO tamanho do retrato, sem compressão
- * especial pra paisagem (a mesa rola em vez de espremer, ver GameBoard). */
-const FULL_CARD_SIZE = 'w-20 h-28 landscape:w-20 landscape:h-28'
-const FULL_CARD_CORNER = 'text-sm font-normal sm:text-base landscape:text-base landscape:leading-none'
+ * como na foto de referência do usuário). Em retrato, grande e legível. Em
+ * paisagem, compacta — pedido do usuário ("as cartas baixadas estão muito
+ * grandes"): o tamanho do retrato tomava espaço demais quando várias
+ * canastras/jogos precisam caber lado a lado no quadro de baixar carta. */
+const FULL_CARD_SIZE = 'w-20 h-28 landscape:w-14 landscape:h-20'
+const FULL_CARD_CORNER = 'text-sm font-normal sm:text-base landscape:text-sm landscape:leading-none'
 
 /** Uma carta "espiada": só a faixa do topo com rank+naipe, altura FIXA —
  * sempre legível, não importa quantas cartas o jogo tenha. */
 function CardStrip({ card }: { card: CardType }) {
   if (card.isWild) {
     return (
-      <div className="flex h-6 w-20 shrink-0 items-center justify-center rounded-sm border border-purple-300/50 bg-gradient-to-r from-fuchsia-600 to-indigo-700 text-xs font-bold leading-none text-white landscape:h-8 landscape:w-20 landscape:text-base">
+      <div className="flex h-6 w-20 shrink-0 items-center justify-center rounded-sm border border-purple-300/50 bg-gradient-to-r from-fuchsia-600 to-indigo-700 text-xs font-bold leading-none text-white landscape:h-6 landscape:w-14 landscape:text-sm">
         ★
       </div>
     )
   }
   return (
     <div
-      className={`flex h-6 w-20 shrink-0 items-center gap-1 rounded-sm border border-black/15 bg-card-face px-1.5 text-base font-bold leading-none landscape:h-8 landscape:w-20 landscape:gap-1 landscape:px-1.5 landscape:text-base ${SUIT_COLOR_CLASS[card.suit]}`}
+      className={`flex h-6 w-20 shrink-0 items-center gap-1 rounded-sm border border-black/15 bg-card-face px-1.5 text-base font-bold leading-none landscape:h-6 landscape:w-14 landscape:gap-1 landscape:px-1 landscape:text-sm ${SUIT_COLOR_CLASS[card.suit]}`}
     >
       <span>{card.rank}</span>
       <SuitIcon suit={card.suit} />

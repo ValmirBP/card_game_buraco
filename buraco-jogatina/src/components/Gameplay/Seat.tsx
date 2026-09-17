@@ -43,7 +43,10 @@ export default function Seat({ name, cardCount, isCurrentTurn, teamId, compact, 
           {name.charAt(0).toUpperCase()}
         </div>
         <div className="min-w-0 text-left">
-          <div className="truncate text-xs font-bold sm:text-sm landscape:text-xs landscape:leading-tight">{name}</div>
+          {/* landscape:text-[10px]: mesmo tamanho do nome do parceiro no
+              placar (ver Scoreboard.tsx TeamPill/badge do parceiro), pedido
+              do usuário. */}
+          <div className="truncate text-xs font-bold sm:text-sm landscape:text-[10px] landscape:leading-tight">{name}</div>
           {isCurrentTurn && (
             <span className="inline-block rounded-full bg-card-gold px-1.5 py-0.5 text-[9px] font-bold text-black sm:text-[10px] landscape:px-1.5 landscape:py-0 landscape:text-[9px]">
               {isThinking ? '🤖 jogando…' : 'Sua vez'}
