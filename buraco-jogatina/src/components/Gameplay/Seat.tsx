@@ -32,13 +32,16 @@ export default function Seat({ name, cardCount, isCurrentTurn, teamId, compact, 
     <motion.div
       animate={{ scale: isCurrentTurn ? 1.05 : 1 }}
       transition={{ duration: 0.25 }}
-      className={`flex flex-col items-center gap-1.5 rounded-xl border-2 p-2 sm:p-3 landscape:gap-1 landscape:p-1.5 ${
+      className={`flex flex-col items-center gap-1.5 rounded-xl border-2 p-2 sm:p-3 landscape:gap-0.5 landscape:p-1 ${
         isCurrentTurn ? TEAM_RING[teamId] : 'border-transparent bg-white/5'
       }`}
     >
-      <div className="flex items-center gap-2 landscape:gap-1.5">
+      <div className="flex items-center gap-2 landscape:gap-1">
+        {/* landscape:h-4 landscape:w-4 landscape:text-[8px]: mesmo tamanho
+            do avatar do parceiro no placar (ver Scoreboard.tsx), pedido do
+            usuário ("deixo Ana e Carlos com o mesmo tamanho do Bruno"). */}
         <div
-          className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full font-display text-xs sm:h-10 sm:w-10 sm:text-sm landscape:h-7 landscape:w-7 landscape:text-xs ${TEAM_AVATAR[teamId]}`}
+          className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full font-display text-xs sm:h-10 sm:w-10 sm:text-sm landscape:h-4 landscape:w-4 landscape:text-[8px] ${TEAM_AVATAR[teamId]}`}
         >
           {name.charAt(0).toUpperCase()}
         </div>
@@ -72,7 +75,7 @@ export default function Seat({ name, cardCount, isCurrentTurn, teamId, compact, 
         </div>
       )}
       {!compact && (
-        <span className="text-[10px] text-gray-300 sm:text-xs landscape:text-[10px]">
+        <span className="text-[10px] text-gray-300 sm:text-xs landscape:text-[9px]">
           {cardCount} carta{cardCount === 1 ? '' : 's'}
         </span>
       )}

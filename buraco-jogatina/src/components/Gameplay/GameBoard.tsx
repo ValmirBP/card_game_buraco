@@ -39,11 +39,10 @@ const TEAM_GRID_CLASS: Record<TeamId, string> = {
  * das cartas da mão — pedido do usuário pra sobrar mais espaço horizontal
  * pros quadros de baixar carta. */
 const PILE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-12 landscape:h-16'
-/** Footprint do MORTO — menor que o monte de propósito (pedido do usuário:
- * "o morto pode ficar menor"). Ele é só um indicador discreto no canto
- * (ver o overlay com scale abaixo), não precisa do mesmo destaque do
- * monte, que é clicável e onde a ação de fato acontece. */
-const MORTO_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-10 landscape:h-14'
+/** Footprint do MORTO — mesmo tamanho do monte (pedido do usuário: "deixe
+ * o morto no mesmo tamanho do monte"). Alias direto pra nunca dessincronizar
+ * dos dois — se o monte mudar de tamanho de novo, o morto acompanha. */
+const MORTO_CARD_SIZE = PILE_CARD_SIZE
 /** Footprint das cartas do DESCARTE — MESMO tamanho das cartas da mão, pra a
  * fileira do descarte ficar paralela à mão e visualmente consistente. Deve
  * acompanhar HAND_CARD_SIZE em PlayerHand.tsx. */
@@ -456,7 +455,11 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
           que sobrou aqui (ver comentário em Layout.tsx) — se o recorte cair
           do lado direito nessa rotação, empurra só este badge, não o
           tabuleiro inteiro. */}
-      <div className="pointer-events-none absolute right-1 top-6 z-20 origin-top-right scale-[0.62] landscape:scale-[0.6] landscape:mr-[env(safe-area-inset-right)]">
+      {/* landscape:scale-100: sem encolher o morto por transform — agora
+          que MORTO_CARD_SIZE já é igual a PILE_CARD_SIZE, um scale menor
+          que 1 voltaria a deixar o morto visualmente menor que o monte
+          (pedido do usuário: "deixe o morto no mesmo tamanho do monte"). */}
+      <div className="pointer-events-none absolute right-1 top-6 z-20 origin-top-right scale-[0.62] landscape:scale-100 landscape:mr-[env(safe-area-inset-right)]">
         {mortoBlock}
       </div>
 

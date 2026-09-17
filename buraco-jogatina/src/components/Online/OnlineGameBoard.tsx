@@ -12,9 +12,10 @@ import MeldRow from '../Gameplay/MeldRow'
 
 /** Footprint do MONTE — idêntico ao PILE_CARD_SIZE offline. */
 const PILE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-12 landscape:h-16'
-/** Footprint do MORTO — idêntico ao MORTO_CARD_SIZE offline: menor que o
- * monte de propósito (pedido do usuário: "o morto pode ficar menor"). */
-const MORTO_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-10 landscape:h-14'
+/** Footprint do MORTO — mesmo tamanho do monte (pedido do usuário: "deixe
+ * o morto no mesmo tamanho do monte"). Alias direto pra nunca dessincronizar
+ * dos dois — se o monte mudar de tamanho de novo, o morto acompanha. */
+const MORTO_CARD_SIZE = PILE_CARD_SIZE
 /** Footprints dos fantasmas de animação — idênticos aos GHOST_*_SIZE de
  * Gameplay.tsx (offline). Repetidos aqui de propósito (não importados), pra
  * não acoplar este arquivo à estrutura interna de PlayerHand/MeldCardColumn
@@ -485,7 +486,11 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
       </div>
 
       {/* Morto — escondido num canto discreto */}
-      <div className="pointer-events-none absolute right-1 top-6 z-20 origin-top-right scale-[0.62] landscape:scale-[0.6]">
+      {/* landscape:scale-100: sem encolher o morto por transform — agora
+          que MORTO_CARD_SIZE já é igual a PILE_CARD_SIZE, um scale menor
+          que 1 voltaria a deixar o morto visualmente menor que o monte
+          (pedido do usuário: "deixe o morto no mesmo tamanho do monte"). */}
+      <div className="pointer-events-none absolute right-1 top-6 z-20 origin-top-right scale-[0.62] landscape:scale-100">
         {mortoBlock}
       </div>
 
