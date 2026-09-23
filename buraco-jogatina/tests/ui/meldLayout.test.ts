@@ -68,7 +68,7 @@ function randomTable(rand: () => number, maxCards: number): number[] {
 describe('computeMeldLayout — cabe sempre, sem rolagem', () => {
   it.each(Object.entries(PAINEIS))('a mesa cheia de teste cabe no quadro %s', (_nome, painel) => {
     for (const dockSlot of [true, false]) {
-      const layout = computeMeldLayout({ ...painel, lengths: MESA_CHEIA, dockSlot })
+      const layout = computeMeldLayout({ ...painel, lengths: MESA_CHEIA, closed: MESA_CHEIA.map(l => l >= 7), dockSlot })
       assertFits(layout, painel.width, painel.height, MESA_CHEIA.length + (dockSlot ? 1 : 0))
     }
   })
@@ -78,7 +78,7 @@ describe('computeMeldLayout — cabe sempre, sem rolagem', () => {
     for (let t = 0; t < 200; t++) {
       const lengths = randomTable(rand, 108)
       for (const painel of Object.values(PAINEIS)) {
-        const layout = computeMeldLayout({ ...painel, lengths, dockSlot: t % 2 === 0 })
+        const layout = computeMeldLayout({ ...painel, lengths, closed: lengths.map(l => l >= 7), dockSlot: t % 2 === 0 })
         assertFits(layout, painel.width, painel.height, lengths.length + (t % 2 === 0 ? 1 : 0))
       }
     }
@@ -184,5 +184,34 @@ describe('computeMeldLayout — rodapé de pontos vs. divisão em sub-colunas', 
     const a = computeMeldLayout({ width: 458, height: 172, lengths, dockSlot: true })
     const b = computeMeldLayout({ width: 459, height: 172, lengths, dockSlot: true })
     expect(b.metrics.fontPx).toBeGreaterThanOrEqual(a.metrics.fontPx - 1)
+  })
+})
+
+describe('computeMeldLayout — canastra fechada reserva moldura grossa e faixa de tipo', () => {
+  it('caixa fechada é maior que a aberta, exatamente pela faixa e pela moldura extra', () => {
+    const m = meldMetrics(12, true)
+    const aberta = meldBox(7, 7, m, false)
+    const fechada = meldBox(7, 7, m, true)
+    expect(fechada.headerH).toBe(m.headerH)
+    expect(aberta.headerH).toBe(0)
+    expect(fechada.frame).toBeGreaterThan(aberta.frame)
+    expect(fechada.height).toBe(aberta.height + m.headerH + 2 * (fechada.frame - aberta.frame))
+    expect(fechada.width).toBe(aberta.width + 2 * (fechada.frame - aberta.frame))
+  })
+
+  it('mesa cheia só de canastras fechadas (6) cabe em todos os quadros; no menor a fonte cai a ~7px', () => {
+    const lengths = [14, 13, 8, 7, 7, 7]
+    for (const painel of Object.values(PAINEIS)) {
+      const layout = computeMeldLayout({ ...painel, lengths, closed: lengths.map(() => true), dockSlot: true })
+      assertFits(layout, painel.width, painel.height, lengths.length + 1)
+      expect(layout.metrics.fontPx).toBeGreaterThanOrEqual(7)
+    }
+  })
+
+  it('jogo avançado realista (2 canastras + 4 abertos): >= 14px no celular típico e >= 11px no pequeno', () => {
+    const lengths = [7, 8, 4, 3, 5, 4]
+    const closed = lengths.map(l => l >= 7)
+    expect(computeMeldLayout({ ...TIPICO, lengths, closed, dockSlot: true }).metrics.fontPx).toBeGreaterThanOrEqual(14)
+    expect(computeMeldLayout({ ...PEQUENO, lengths, closed, dockSlot: true }).metrics.fontPx).toBeGreaterThanOrEqual(11)
   })
 })

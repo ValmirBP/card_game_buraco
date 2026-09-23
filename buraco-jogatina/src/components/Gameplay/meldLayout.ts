@@ -38,6 +38,10 @@ const RELAX_SUBCOLS_BELOW_FONT = 9
  * quando a canastra está fechada ou o jogo aceita as cartas selecionadas),
  * pra todos os jogos ficarem alinhados. */
 export const MELD_FRAME = 2
+/** Canastra FECHADA: moldura grossa + faixa com o tipo escrito no topo
+ * (REAL / 500 / LIMPA / SUJA) — pedido do cliente: "não identifico se é
+ * canastra ou não" com só uma moldura fina. */
+export const MELD_FRAME_CLOSED = 4
 /** Espaço (px) entre as sub-colunas de um mesmo jogo quebrado. */
 export const MELD_SUBCOL_GAP = 1
 /** Quantas cartas de altura tem o slot tracejado "Baixar". */
@@ -51,6 +55,8 @@ export interface MeldMetrics {
   stripH: number
   /** Altura do rodapé com os pontos do jogo (0 = sem rodapé). */
   footerH: number
+  /** Altura da faixa de tipo das canastras fechadas. */
+  headerH: number
   gapX: number
   gapY: number
 }
@@ -63,12 +69,16 @@ export function meldMetrics(fontPx: number, withFooter: boolean): MeldMetrics {
     // Uma linha de texto (leading-none) + a borda que separa as tiras.
     stripH: Math.ceil(fontPx * 1.2 + 1),
     footerH: withFooter ? Math.ceil(fontPx * 1.1) : 0,
+    headerH: Math.ceil(fontPx * 1.1),
     gapX: Math.max(3, Math.round(fontPx * 0.35)),
     gapY: Math.max(3, Math.round(fontPx * 0.35)),
   }
 }
 
 export interface MeldBox {
+  /** Espessura da moldura e altura da faixa de tipo (0 se aberto). */
+  frame: number
+  headerH: number
   /** Cartas por sub-coluna (a altura do jogo em tiras). */
   rows: number
   subCols: number
@@ -79,21 +89,27 @@ export interface MeldBox {
 /** Caixa de um jogo de `length` cartas quebrado em sub-colunas de até
  * `maxRows` cartas cada — divididas por igual (13 com limite 11 vira 7 + 6,
  * não 11 + 2). */
-export function meldBox(length: number, maxRows: number, m: MeldMetrics): MeldBox {
+export function meldBox(length: number, maxRows: number, m: MeldMetrics, closed = false): MeldBox {
   const safeLen = Math.max(1, length)
   const subCols = Math.ceil(safeLen / Math.max(1, maxRows))
   const rows = Math.ceil(safeLen / subCols)
+  const frame = closed ? MELD_FRAME_CLOSED : MELD_FRAME
+  const headerH = closed ? m.headerH : 0
   return {
+    frame,
+    headerH,
     rows,
     subCols,
-    width: subCols * m.stripW + (subCols - 1) * MELD_SUBCOL_GAP + 2 * MELD_FRAME,
-    height: rows * m.stripH + 2 * MELD_FRAME + m.footerH,
+    width: subCols * m.stripW + (subCols - 1) * MELD_SUBCOL_GAP + 2 * frame,
+    height: rows * m.stripH + 2 * frame + headerH + m.footerH,
   }
 }
 
 function dockBox(maxRows: number, m: MeldMetrics): MeldBox {
   const rows = Math.min(DOCK_ROWS, maxRows)
   return {
+    frame: MELD_FRAME,
+    headerH: 0,
     rows,
     subCols: 1,
     width: m.stripW + 2 * MELD_FRAME,
@@ -115,6 +131,9 @@ export interface MeldLayoutInput {
   height: number
   /** Quantidade de cartas de cada jogo, na ordem em que foram baixados. */
   lengths: number[]
+  /** Quais jogos são canastra fechada (mesma ordem de `lengths`); ausente =
+   * todos abertos. */
+  closed?: boolean[]
   /** Reserva o slot tracejado "Baixar" no fim (só no quadro do jogador). */
   dockSlot: boolean
 }
@@ -185,8 +204,14 @@ function pack(boxes: MeldBox[], W: number, H: number, m: MeldMetrics): Packing |
   return { placements, totalWidth, totalHeight: n > 0 ? y - m.gapY : 0 }
 }
 
-function boxesFor(lengths: number[], dockSlot: boolean, maxRows: number, m: MeldMetrics): MeldBox[] {
-  const boxes = lengths.map(len => meldBox(len, maxRows, m))
+function boxesFor(
+  lengths: number[],
+  closed: boolean[],
+  dockSlot: boolean,
+  maxRows: number,
+  m: MeldMetrics
+): MeldBox[] {
+  const boxes = lengths.map((len, i) => meldBox(len, maxRows, m, closed[i] ?? false))
   if (dockSlot) boxes.push(dockBox(maxRows, m))
   return boxes
 }
@@ -203,6 +228,7 @@ function bestRowsFor(
   fontPx: number,
   withFooter: boolean,
   lengths: number[],
+  closed: boolean[],
   dockSlot: boolean,
   W: number,
   H: number,
@@ -212,7 +238,7 @@ function bestRowsFor(
   const longest = Math.max(DOCK_ROWS, ...lengths)
   const minRows = Math.min(longest, Math.max(MIN_ROWS_WHEN_SPLIT, Math.ceil(longest / maxSubCols)))
   for (let rows = longest; rows >= minRows; rows--) {
-    const packing = pack(boxesFor(lengths, dockSlot, rows, m), W, H, m)
+    const packing = pack(boxesFor(lengths, closed, dockSlot, rows, m), W, H, m)
     if (packing) return { metrics: m, maxRows: rows, packing }
   }
   return null
@@ -221,20 +247,21 @@ function bestRowsFor(
 function largestFittingWith(
   withFooter: boolean,
   lengths: number[],
+  closed: boolean[],
   dockSlot: boolean,
   W: number,
   H: number,
   maxSubCols: number
 ): Candidate | null {
   for (let f = MELD_FONT_MAX; f >= MELD_FONT_MIN; f -= FONT_STEP) {
-    const found = bestRowsFor(f, withFooter, lengths, dockSlot, W, H, maxSubCols)
+    const found = bestRowsFor(f, withFooter, lengths, closed, dockSlot, W, H, maxSubCols)
     if (!found) continue
     // Quebrar jogos em sub-colunas só compensa se ganhar tamanho de
     // verdade: se até 1px menor já dá pra quebrar menos, fica com isso.
     let chosen = found
     for (const smaller of [f - FONT_STEP, f - 2 * FONT_STEP]) {
       if (smaller < MELD_FONT_MIN) break
-      const alt = bestRowsFor(smaller, withFooter, lengths, dockSlot, W, H, maxSubCols)
+      const alt = bestRowsFor(smaller, withFooter, lengths, closed, dockSlot, W, H, maxSubCols)
       if (alt && alt.maxRows > chosen.maxRows) chosen = alt
     }
     return chosen
@@ -245,13 +272,14 @@ function largestFittingWith(
 function largestFitting(
   withFooter: boolean,
   lengths: number[],
+  closed: boolean[],
   dockSlot: boolean,
   W: number,
   H: number
 ): Candidate | null {
-  const preferred = largestFittingWith(withFooter, lengths, dockSlot, W, H, PREFERRED_MAX_SUBCOLS)
+  const preferred = largestFittingWith(withFooter, lengths, closed, dockSlot, W, H, PREFERRED_MAX_SUBCOLS)
   if (preferred && preferred.metrics.fontPx >= RELAX_SUBCOLS_BELOW_FONT) return preferred
-  const relaxed = largestFittingWith(withFooter, lengths, dockSlot, W, H, Infinity)
+  const relaxed = largestFittingWith(withFooter, lengths, closed, dockSlot, W, H, Infinity)
   if (!preferred) return relaxed
   return relaxed && relaxed.metrics.fontPx > preferred.metrics.fontPx ? relaxed : preferred
 }
@@ -260,19 +288,19 @@ function maxSubColsOf(c: Candidate): number {
   return Math.max(1, ...c.packing.placements.map(p => p.subCols))
 }
 
-export function computeMeldLayout({ width, height, lengths, dockSlot }: MeldLayoutInput): MeldLayout {
+export function computeMeldLayout({ width, height, lengths, closed = [], dockSlot }: MeldLayoutInput): MeldLayout {
   const W = Math.max(0, Math.floor(width))
   const H = height === Infinity ? Infinity : Math.max(0, Math.floor(height))
 
-  const withFooter = largestFitting(true, lengths, dockSlot, W, H)
+  const withFooter = largestFitting(true, lengths, closed, dockSlot, W, H)
   let chosen = withFooter
   if (!withFooter || withFooter.metrics.fontPx < FOOTER_KEEP_FONT) {
-    let without = largestFitting(false, lengths, dockSlot, W, H)
+    let without = largestFitting(false, lengths, closed, dockSlot, W, H)
     // Se o layout COM rodapé já precisou de mais de 2 sub-colunas, o SEM
     // rodapé recebe a mesma liberdade — senão a comparação é desigual e o
     // layout com rodapé pode ganhar mesmo sendo pior em tudo.
     if (withFooter && maxSubColsOf(withFooter) > PREFERRED_MAX_SUBCOLS) {
-      const relaxed = largestFittingWith(false, lengths, dockSlot, W, H, Infinity)
+      const relaxed = largestFittingWith(false, lengths, closed, dockSlot, W, H, Infinity)
       if (relaxed && (!without || relaxed.metrics.fontPx > without.metrics.fontPx)) without = relaxed
     }
     if (
@@ -303,7 +331,7 @@ export function computeMeldLayout({ width, height, lengths, dockSlot }: MeldLayo
   // tamanho, uma caixa por linha, só pra renderizar algo coerente.
   const m = meldMetrics(MELD_FONT_MIN, false)
   const maxRows = Math.max(DOCK_ROWS, ...lengths)
-  const boxes = boxesFor(lengths, dockSlot, maxRows, m)
+  const boxes = boxesFor(lengths, closed, dockSlot, maxRows, m)
   const placements: MeldPlacement[] = []
   let y = 0
   boxes.forEach((box, index) => {

@@ -29,7 +29,7 @@ describe('frameClass / footerClass — o realce "compatível" nunca muda a leitu
     const base = meld(m)
     const realcado = meld({ ...m, highlight: 'compatible' })
     const semContorno = (c: string) => c.split(' ').filter(x => !/outline|shadow/.test(x)).join(' ')
-    expect(semContorno(frameClass(realcado))).toBe(frameClass(base))
+    expect(semContorno(frameClass(realcado))).toBe(semContorno(frameClass(base)))
     expect(footerClass(realcado)).toBe(footerClass(base))
     expect(frameClass(realcado)).toContain('outline-sky-300')
   })
@@ -39,6 +39,7 @@ describe('frameClass / footerClass — o realce "compatível" nunca muda a leitu
     const limpa = frameClass(meld({ closed: true, clean: true }))
     const suja = frameClass(meld({ closed: true, clean: false }))
     expect(new Set([aberto, limpa, suja]).size).toBe(3)
+    expect(aberto).not.toMatch(/gold|orange/)
   })
 
   it('um jogo aberto compatível NÃO ganha o dourado da canastra fechada', () => {
@@ -86,5 +87,35 @@ describe('MeldArea — renderiza todos os jogos, identificáveis', () => {
     expect(grupos[1].getAttribute('aria-label')).toMatch(/Canastra limpa, 245 pontos: 3 de espadas/)
     expect(grupos[0].getAttribute('data-meld-closed')).toBeNull()
     expect(grupos[1].getAttribute('data-meld-closed')).toBe('true')
+  })
+})
+
+describe('canastra fechada é inconfundível', () => {
+  it('ganha faixa com o tipo escrito; jogo aberto não tem faixa', () => {
+    render(
+      <MeldArea
+        melds={[
+          meld(),
+          meld({ strips: cards('spades', ['3', '4', '5', '6', '7', '8', '9']).map(card => ({ card, wild: false })), closed: true, kind: 'limpa' }),
+          meld({ strips: cards('hearts', ['3', '4', '5', '6', '7', '8', '9']).map(card => ({ card, wild: false })), closed: true, clean: false, kind: 'suja' }),
+        ]}
+      />
+    )
+    expect(screen.getByText('LIMPA')).toBeTruthy()
+    expect(screen.getByText('SUJA')).toBeTruthy()
+    expect(screen.queryAllByText(/^(LIMPA|SUJA|REAL|500)$/)).toHaveLength(2)
+  })
+
+  it('canastras real e de quinhentos têm o próprio texto', () => {
+    render(
+      <MeldArea
+        melds={[
+          meld({ closed: true, kind: 'real' }),
+          meld({ closed: true, kind: 'quinhentos' }),
+        ]}
+      />
+    )
+    expect(screen.getByText('REAL')).toBeTruthy()
+    expect(screen.getByText('500')).toBeTruthy()
   })
 })

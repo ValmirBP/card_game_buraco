@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent 
 import { motion } from 'framer-motion'
 import { SuitIcon } from '../Card'
 import type { Card as CardType } from '../../engine/card'
-import { computeMeldLayout, MELD_FRAME, MELD_SUBCOL_GAP, type MeldMetrics, type MeldPlacement } from './meldLayout'
+import { computeMeldLayout, MELD_SUBCOL_GAP, type MeldMetrics, type MeldPlacement } from './meldLayout'
 
 export interface MeldAreaStrip {
   card: CardType
@@ -60,6 +60,14 @@ const SUIT_NAME: Record<CardType['suit'], string> = {
   diamonds: 'ouros',
   clubs: 'paus',
   spades: 'espadas',
+}
+
+/** Texto curto da faixa no topo de uma canastra fechada. */
+export const KIND_BADGE: Record<string, string> = {
+  real: 'REAL',
+  quinhentos: '500',
+  limpa: 'LIMPA',
+  suja: 'SUJA',
 }
 
 const KIND_LABEL: Record<string, string> = {
@@ -123,9 +131,13 @@ function Strip({ strip, m }: { strip: MeldAreaStrip; m: MeldMetrics }) {
  * na hora em que o jogador escolhe onde baixar. */
 export function frameClass(meld: MeldAreaMeld): string {
   const fill = !meld.closed ? 'bg-white/10' : meld.clean ? 'bg-card-gold' : 'bg-orange-400'
-  return meld.highlight === 'compatible'
-    ? `${fill} outline outline-2 outline-sky-300 shadow-[0_0_10px_rgba(125,211,252,0.8)]`
-    : fill
+  if (meld.highlight === 'compatible') {
+    return `${fill} outline outline-2 outline-sky-300 shadow-[0_0_10px_rgba(125,211,252,0.8)]`
+  }
+  if (meld.closed) {
+    return `${fill} ${meld.clean ? 'shadow-[0_0_8px_rgba(212,175,55,0.55)]' : 'shadow-[0_0_8px_rgba(251,146,60,0.55)]'}`
+  }
+  return fill
 }
 
 export function footerClass(meld: MeldAreaMeld): string {
@@ -149,8 +161,18 @@ function MeldColumn({ meld, place, m }: { meld: MeldAreaMeld; place: MeldPlaceme
       className={`absolute flex flex-col rounded-[4px] transition-colors ${frameClass(meld)} ${
         meld.highlight ? 'cursor-pointer' : ''
       }`}
-      style={{ left: place.x, top: place.y, width: place.width, height: place.height, padding: MELD_FRAME }}
+      style={{ left: place.x, top: place.y, width: place.width, height: place.height, padding: place.frame }}
     >
+      {/* Canastra FECHADA: faixa com o tipo escrito (a cor da moldura já
+          diz limpa/suja, o texto tira qualquer dúvida). */}
+      {place.headerH > 0 && (
+        <div
+          className="flex shrink-0 items-center justify-center font-black uppercase leading-none tracking-wide text-black"
+          style={{ height: place.headerH, fontSize: m.fontPx * 0.72 }}
+        >
+          {KIND_BADGE[meld.kind] ?? 'CANASTRA'}
+        </div>
+      )}
       <div className="flex items-start" style={{ columnGap: MELD_SUBCOL_GAP }}>
         {chunks.map((chunk, ci) => (
           <div key={ci} className="flex flex-col overflow-hidden rounded-[3px]" style={{ width: m.stripW }}>
@@ -200,6 +222,7 @@ export default function MeldArea({ melds, dock }: MeldAreaProps) {
   }, [])
 
   const lengthsKey = melds.map(m => m.strips.length).join(',')
+  const closedKey = melds.map(m => (m.closed ? '1' : '0')).join(',')
   const hasDock = Boolean(dock)
   const layout = useMemo(
     () =>
@@ -207,9 +230,10 @@ export default function MeldArea({ melds, dock }: MeldAreaProps) {
         width: size.w,
         height: landscape ? size.h : Infinity,
         lengths: lengthsKey ? lengthsKey.split(',').map(Number) : [],
+        closed: closedKey ? closedKey.split(',').map(v => v === '1') : [],
         dockSlot: hasDock,
       }),
-    [size.w, size.h, landscape, lengthsKey, hasDock]
+    [size.w, size.h, landscape, lengthsKey, closedKey, hasDock]
   )
   const m = layout.metrics
 
