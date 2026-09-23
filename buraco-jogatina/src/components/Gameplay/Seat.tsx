@@ -32,7 +32,7 @@ export default function Seat({ name, cardCount, isCurrentTurn, teamId, compact, 
     <motion.div
       animate={{ scale: isCurrentTurn ? 1.05 : 1 }}
       transition={{ duration: 0.25 }}
-      className={`flex flex-col items-center gap-1.5 rounded-xl border-2 p-2 sm:p-3 landscape:gap-0.5 landscape:p-1 ${
+      className={`relative flex flex-col items-center gap-1.5 rounded-xl border-2 p-2 sm:p-3 landscape:gap-0.5 landscape:p-1 ${
         isCurrentTurn ? TEAM_RING[teamId] : 'border-transparent bg-white/5'
       }`}
     >
@@ -50,8 +50,11 @@ export default function Seat({ name, cardCount, isCurrentTurn, teamId, compact, 
               placar (ver Scoreboard.tsx TeamPill/badge do parceiro), pedido
               do usuário. */}
           <div className="truncate text-xs font-bold sm:text-sm landscape:text-[10px] landscape:leading-tight">{name}</div>
+          {/* Em paisagem o "Sua vez" fica FORA do fluxo (absolute, logo abaixo
+              do assento): dentro do fluxo ele alargava a coluna da Ana/Carlos
+              a cada turno deles, e os jogos dos DOIS quadros reescalavam. */}
           {isCurrentTurn && (
-            <span className="inline-block rounded-full bg-card-gold px-1.5 py-0.5 text-[9px] font-bold text-black sm:text-[10px] landscape:px-1.5 landscape:py-0 landscape:text-[9px]">
+            <span className="inline-block rounded-full bg-card-gold px-1.5 py-0.5 text-[9px] font-bold text-black sm:text-[10px] landscape:absolute landscape:left-1/2 landscape:top-full landscape:z-10 landscape:mt-0.5 landscape:-translate-x-1/2 landscape:whitespace-nowrap landscape:px-1.5 landscape:py-0 landscape:text-[9px]">
               {isThinking ? '🤖 jogando…' : 'Sua vez'}
             </span>
           )}

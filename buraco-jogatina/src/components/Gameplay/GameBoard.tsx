@@ -5,8 +5,7 @@ import { CardComponent, CardBack } from '../Card'
 import { teamIdOfSeat, type TeamId } from '../../engine/gameState'
 import { canExtendMeld, isValidCanasta } from '../../engine/utils'
 import Seat from './Seat'
-import MeldCardColumn from './MeldCardColumn'
-import MeldRow from './MeldRow'
+import MeldArea, { isWildStrip, meldSuitOf } from './MeldArea'
 import type { TurnPhase } from './Gameplay'
 
 interface GameBoardProps {
@@ -227,12 +226,9 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
           grade com os JOGADORES nas colunas-borda (fora do feltro de jogo),
           o MONTE no canto sup-esquerdo, o DESCARTE embaixo (logo acima da
           mão) e os painéis "Nós"/"Eles" ocupando as duas colunas centrais —
-          a MAIOR parte da mesa. Pedido do usuário: cartas/textos maiores,
-          mas SEM rolar a mesa/tela inteira — a grade volta a encolher pra
-          caber (minmax(0,1fr), como antes) e nada aqui rola. A rolagem fica
-          só DENTRO do "quadro de baixar carta" de cada dupla, quando os
-          jogos baixados não cabem no espaço que sobrou (ver MeldRow.tsx:
-          overflow-x-auto E overflow-y-auto ali dentro). */}
+          a MAIOR parte da mesa. Nada aqui rola: a grade encolhe pra caber
+          (minmax(0,1fr)) e o "quadro de baixar carta" de cada dupla ajusta
+          o tamanho das cartas pra TODOS os jogos caberem nele (MeldArea). */}
       <div className="flex flex-col gap-3 sm:gap-4 landscape:grid landscape:h-full landscape:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_auto] landscape:grid-rows-1 landscape:items-stretch landscape:gap-x-2 landscape:gap-y-1">
         {/* Monte — em retrato ocupa seu próprio lugar no topo, como sempre.
             Em paisagem vira um selo flutuante SOBRE o quadro "Nós" (ver bloco
@@ -292,29 +288,35 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
         </div>
 
         {/* ---- Jogos baixados por dupla (Nós/Eles) — colunas centrais,
-            ocupam a maior parte do feltro. Cada jogo é uma COLUNA VERTICAL
-            de cartas sobrepostas (rank+naipe de cada uma visível no topo). O
-            painel "Nós" (Time A) é a zona de baixar: com 3+ cartas
-            selecionadas, clicar nele forma uma canastra nova; clicar num
-            jogo já baixado estende aquele jogo. ---- */}
+            ocupam a maior parte do feltro. Cada jogo é uma coluna de TIRAS
+            (rank+naipe de cada carta), dimensionada por MeldArea pra que
+            TODOS os jogos caibam no quadro sem rolagem. O painel "Nós" (Time
+            A) é a zona de baixar: com 3+ cartas selecionadas, clicar nele
+            forma uma canastra nova; clicar num jogo já baixado estende
+            aquele jogo. Em paisagem o cabeçalho tem altura FIXA (h-6), pra o
+            quadro não mudar de tamanho — e as cartas de escala — quando o
+            botão "Baixar jogo" aparece. ---- */}
         {teams.map(team => {
           const canClickToExtend =
             team.id === 'A' && isHumanTurn && phase === 'play' && selectedCardIndices.length > 0
           const isDropTarget = team.id === 'A' && canClickDropZone
+          const selectedCards = canClickToExtend
+            ? selectedCardIndices.map(i => players[0].hand.getCards()[i]).filter(Boolean)
+            : []
 
           return (
             <div
               key={team.id}
               id={team.id === 'A' ? 'meld-drop-zone' : undefined}
               onClick={team.id === 'A' ? handleDropZoneClick : undefined}
-              className={`space-y-2 overflow-hidden rounded-xl border p-3 transition-all landscape:flex landscape:h-full landscape:min-h-0 landscape:flex-col landscape:space-y-2 landscape:p-3 ${
+              className={`space-y-2 overflow-hidden rounded-xl border p-3 transition-all landscape:flex landscape:h-full landscape:min-h-0 landscape:flex-col landscape:space-y-1 landscape:p-1.5 ${
                 TEAM_GRID_CLASS[team.id]
               } ${TEAM_PANEL_CLASS[team.id]} ${
                 isDropTarget ? 'cursor-pointer border-card-gold shadow-[0_0_16px_rgba(212,175,55,0.5)]' : ''
               }`}
             >
-              <div className="flex items-center justify-between gap-2 landscape:shrink-0">
-                <h4 className={`flex items-center font-display text-sm landscape:text-base ${TEAM_TEXT_CLASS[team.id]}`}>
+              <div className="flex items-center justify-between gap-2 landscape:h-6 landscape:shrink-0 landscape:px-1">
+                <h4 className={`flex shrink-0 items-center font-display text-sm landscape:text-sm landscape:leading-none ${TEAM_TEXT_CLASS[team.id]}`}>
                   {TEAM_LABEL[team.id]}
                   {/* Botão SEMPRE visível no cabeçalho (que nunca é coberto
                       pelas colunas de cartas): com a mesa cheia, o fundo do
@@ -329,110 +331,43 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
                         event.stopPropagation()
                         handleDropZoneClick()
                       }}
-                      className="ml-2 animate-pulse rounded-full bg-card-gold px-2.5 py-0.5 font-sans text-[11px] font-bold text-black shadow-[0_0_10px_rgba(212,175,55,0.6)] landscape:px-3 landscape:py-1 landscape:text-sm"
+                      className="ml-2 shrink-0 animate-pulse whitespace-nowrap rounded-full bg-card-gold px-2.5 py-0.5 font-sans text-[11px] font-bold text-black shadow-[0_0_10px_rgba(212,175,55,0.6)] landscape:px-2 landscape:py-0.5 landscape:text-xs landscape:leading-none"
                     >
                       ⬇ Baixar jogo
                     </button>
                   )}
                 </h4>
-                <span className="text-xs text-gray-200 landscape:text-sm landscape:leading-tight">
+                <span className="min-w-0 truncate whitespace-nowrap text-xs text-gray-200 landscape:text-xs landscape:leading-none">
                   {team.score} pts · {team.melds.filter(m => m.isCanastra).length} can.
                   {team.hasTakenMorto ? ' · morto' : ''}
                 </span>
               </div>
               {team.melds.length === 0 ? (
-                <span className="text-sm text-gray-400 landscape:text-sm">
+                <span className="text-sm text-gray-400 landscape:px-1 landscape:text-sm">
                   {isDropTarget ? 'Clique aqui para baixar as cartas selecionadas' : 'Nenhum jogo baixado ainda'}
                 </span>
               ) : (
-                <MeldRow count={team.melds.length}>
-                  <AnimatePresence>
-                    {team.melds.map((canasta, ci) => {
-                      const compatible =
-                        canClickToExtend &&
-                        canExtendMeld(
-                          canasta.cards,
-                          selectedCardIndices.map(i => players[0].hand.getCards()[i]).filter(Boolean)
-                        )
-                      return (
-                        <motion.div
-                          key={ci}
-                          initial={{ opacity: 0, scale: 0.85 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          onClick={event => handleMeldClick(event, team.id, ci, canasta.cards)}
-                          className={`shrink-0 space-y-1 rounded-lg p-1 transition-shadow landscape:space-y-1.5 landscape:p-1.5 ${
-                            canClickToExtend
-                              ? compatible
-                                ? 'cursor-pointer ring-2 ring-card-gold shadow-[0_0_14px_rgba(212,175,55,0.5)]'
-                                : 'cursor-pointer opacity-70'
-                              : ''
-                          }`}
-                        >
-                          {/* Coluna estilo foto de referência: cada carta é
-                              uma TIRA fixa (rank+naipe, sempre legível) e a
-                              última aparece INTEIRA — ver MeldCardColumn. */}
-                          {(() => {
-                            const slots = canasta.layout ?? canasta.cards.map(card => ({ card }))
-                            const isClosed =
-                              (canasta as { isCanastra?: boolean }).isCanastra ?? canasta.cards.length >= 7
-                            return <MeldCardColumn cards={slots.map(s => s.card)} isClosed={isClosed} />
-                          })()}
-                          <div
-                            className={`text-center text-xs font-semibold landscape:shrink-0 landscape:text-sm landscape:leading-tight ${
-                              canasta.kind === 'real'
-                                ? 'text-card-gold'
-                                : canasta.kind === 'quinhentos'
-                                  ? 'text-yellow-200'
-                                  : canasta.isClean
-                                    ? 'text-green-300'
-                                    : 'text-orange-300'
-                            }`}
-                          >
-                            <span className="landscape:hidden">
-                              {canasta.kind === 'real'
-                                ? '👑 Canastra Real'
-                                : canasta.kind === 'quinhentos'
-                                  ? '⭐ Canastra de Quinhentos'
-                                  : canasta.kind === 'limpa'
-                                    ? 'Canastra Limpa'
-                                    : canasta.kind === 'suja'
-                                      ? 'Canastra Suja'
-                                      : canasta.isClean
-                                        ? 'Jogo limpo'
-                                        : 'Jogo sujo'}
-                              {canasta.type === 'aces' ? ' · Trinca de Áses' : ''} (+{canasta.points})
-                            </span>
-                            <span className="hidden landscape:inline">+{canasta.points}</span>
-                          </div>
-                        </motion.div>
-                      )
-                    })}
-                  </AnimatePresence>
-
-                  {/* Slot de DOCK: espaço fixo tracejado no fim da fileira
-                      pra baixar um jogo NOVO — sempre presente no painel do
-                      time do jogador, mesmo com a mesa cheia (pedido do
-                      usuário). Acende dourado quando há 3+ cartas
-                      selecionadas. stopPropagation pra não disparar o clique
-                      do painel em dobro. */}
-                  {team.id === 'A' && (
-                    <button
-                      type="button"
-                      onClick={event => {
-                        event.stopPropagation()
-                        handleDropZoneClick()
-                      }}
-                      className={`flex h-24 w-20 shrink-0 flex-col items-center justify-center gap-1 self-start rounded-lg border-2 border-dashed text-xs transition-colors landscape:h-28 landscape:w-20 landscape:text-sm ${
-                        isDropTarget
-                          ? 'border-card-gold bg-card-gold/10 text-card-gold shadow-[0_0_12px_rgba(212,175,55,0.45)]'
-                          : 'border-white/20 text-gray-400'
-                      }`}
-                    >
-                      <span className="text-lg leading-none landscape:text-xl">⬇</span>
-                      <span>Baixar</span>
-                    </button>
-                  )}
-                </MeldRow>
+                <MeldArea
+                  melds={team.melds.map((canasta, ci) => {
+                    const slots: { card: typeof canasta.cards[number]; representsValue?: number }[] =
+                      canasta.layout ?? canasta.cards.map(card => ({ card }))
+                    const compatible = canClickToExtend && canExtendMeld(canasta.cards, selectedCards)
+                    const meldSuit = meldSuitOf(slots.map(s => s.card))
+                    return {
+                      strips: slots.map(s => ({ card: s.card, wild: isWildStrip(s.card, s.representsValue, meldSuit) })),
+                      closed: canasta.isCanastra ?? canasta.cards.length >= 7,
+                      clean: canasta.isClean,
+                      kind: canasta.kind,
+                      points: canasta.points,
+                      highlight: canClickToExtend ? (compatible ? 'compatible' : 'dim') : null,
+                      onClick: event => handleMeldClick(event, team.id, ci, canasta.cards),
+                    }
+                  })}
+                  // Slot tracejado "Baixar" no fim — sempre presente no
+                  // quadro do jogador, mesmo com a mesa cheia (pedido do
+                  // usuário); acende dourado com 3+ cartas selecionadas.
+                  dock={team.id === 'A' ? { active: isDropTarget, onClick: handleDropZoneClick } : undefined}
+                />
               )}
             </div>
           )

@@ -7,8 +7,7 @@ import type { SeatView, PlainCard } from '../../session/types'
 import { otherSeatsInOrder } from '../../online/seatLayout'
 import { asCard, asCards } from '../../online/cardAdapter'
 import Seat from '../Gameplay/Seat'
-import MeldCardColumn from '../Gameplay/MeldCardColumn'
-import MeldRow from '../Gameplay/MeldRow'
+import MeldArea, { isWildStrip, meldSuitOf } from '../Gameplay/MeldArea'
 
 /** Footprint do MONTE — idêntico ao PILE_CARD_SIZE offline. */
 const PILE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-12 landscape:h-16'
@@ -18,8 +17,8 @@ const PILE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-12 landscape:h-16'
 const MORTO_CARD_SIZE = PILE_CARD_SIZE
 /** Footprints dos fantasmas de animação — idênticos aos GHOST_*_SIZE de
  * Gameplay.tsx (offline). Repetidos aqui de propósito (não importados), pra
- * não acoplar este arquivo à estrutura interna de PlayerHand/MeldCardColumn
- * — só os valores literais precisam bater. */
+ * não acoplar este arquivo à estrutura interna de PlayerHand — só os
+ * valores literais precisam bater. */
 const GHOST_HAND_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-14 landscape:h-[4.25rem]'
 const GHOST_TABLE_SIZE = 'w-20 h-28 landscape:w-12 landscape:h-16'
 
@@ -272,10 +271,9 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
 
   return (
     <div className="relative h-full min-h-0 rounded-2xl border border-white/10 bg-black/25 p-2 shadow-lg backdrop-blur-sm sm:p-4 landscape:rounded-xl landscape:border-0 landscape:p-2 landscape:overflow-hidden">
-      {/* Pedido do usuário: cartas/textos maiores, mas SEM rolar a mesa/tela
-          inteira - ver o mesmo comentário em GameBoard.tsx (offline). A
-          rolagem fica só dentro do "quadro de baixar carta" de cada dupla
-          (ver MeldRow.tsx). */}
+      {/* Nada rola - ver o mesmo comentário em GameBoard.tsx (offline): o
+          "quadro de baixar carta" de cada dupla ajusta o tamanho das cartas
+          pra todos os jogos caberem (MeldArea). */}
       <div className="flex flex-col gap-3 sm:gap-4 landscape:grid landscape:h-full landscape:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_auto] landscape:grid-rows-1 landscape:items-stretch landscape:gap-x-2 landscape:gap-y-1">
         {/* Monte — em retrato ocupa seu próprio lugar no topo, como sempre.
             Em paisagem vira um selo flutuante SOBRE o quadro do time do
@@ -348,20 +346,26 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
         {teams.map(team => {
           const canClickToExtend = team.id === myTeamId && isMyTurn && phase === 'play' && selectedCardIndices.length > 0
           const isDropTarget = team.id === myTeamId && canClickDropZone
+          const selectedCards = canClickToExtend
+            ? asCards(selectedCardIndices.map(i => yourHand[i]).filter(Boolean))
+            : []
 
           return (
             <div
               key={team.id}
               id={team.id === myTeamId ? 'meld-drop-zone' : undefined}
               onClick={team.id === myTeamId ? handleDropZoneClick : undefined}
-              className={`space-y-2 overflow-hidden rounded-xl border p-3 transition-all landscape:flex landscape:h-full landscape:min-h-0 landscape:flex-col landscape:space-y-2 landscape:p-3 ${
+              className={`space-y-2 overflow-hidden rounded-xl border p-3 transition-all landscape:flex landscape:h-full landscape:min-h-0 landscape:flex-col landscape:space-y-1 landscape:p-1.5 ${
                 TEAM_GRID_CLASS[team.id]
               } ${TEAM_PANEL_CLASS[team.id]} ${
                 isDropTarget ? 'cursor-pointer border-card-gold shadow-[0_0_16px_rgba(212,175,55,0.5)]' : ''
               }`}
             >
-              <div className="flex items-center justify-between gap-2 landscape:shrink-0">
-                <h4 className={`flex items-center font-display text-sm landscape:text-base ${TEAM_TEXT_CLASS[team.id]}`}>
+              {/* Cabeçalho com altura FIXA em paisagem (h-6) — ver GameBoard
+                  offline: o quadro não muda de tamanho quando o botão
+                  "Baixar jogo" aparece. */}
+              <div className="flex items-center justify-between gap-2 landscape:h-6 landscape:shrink-0 landscape:px-1">
+                <h4 className={`flex shrink-0 items-center font-display text-sm landscape:text-sm landscape:leading-none ${TEAM_TEXT_CLASS[team.id]}`}>
                   {TEAM_LABEL[team.id]}
                   {/* Botão sempre visível no cabeçalho - mesa cheia não deixa
                       área vazia clicável no painel (ver GameBoard offline). */}
@@ -372,102 +376,44 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
                         event.stopPropagation()
                         handleDropZoneClick()
                       }}
-                      className="ml-2 animate-pulse rounded-full bg-card-gold px-2.5 py-0.5 font-sans text-[11px] font-bold text-black shadow-[0_0_10px_rgba(212,175,55,0.6)] landscape:px-3 landscape:py-1 landscape:text-sm"
+                      className="ml-2 shrink-0 animate-pulse whitespace-nowrap rounded-full bg-card-gold px-2.5 py-0.5 font-sans text-[11px] font-bold text-black shadow-[0_0_10px_rgba(212,175,55,0.6)] landscape:px-2 landscape:py-0.5 landscape:text-xs landscape:leading-none"
                     >
                       ⬇ Baixar jogo
                     </button>
                   )}
                 </h4>
-                <span className="text-xs text-gray-200 landscape:text-sm landscape:leading-tight">
+                <span className="min-w-0 truncate whitespace-nowrap text-xs text-gray-200 landscape:text-xs landscape:leading-none">
                   {team.score} pts · {team.melds.filter(m => m.isCanastra).length} can.
                   {team.hasTakenMorto ? ' · morto' : ''}
                 </span>
               </div>
               {team.melds.length === 0 ? (
-                <span className="text-sm text-gray-400 landscape:text-sm">
+                <span className="text-sm text-gray-400 landscape:px-1 landscape:text-sm">
                   {isDropTarget ? 'Clique aqui para baixar as cartas selecionadas' : 'Nenhum jogo baixado ainda'}
                 </span>
               ) : (
-                <MeldRow count={team.melds.length}>
-                  <AnimatePresence>
-                    {team.melds.map((canasta, ci) => {
-                      const meldCards = canasta.layout.map(entry => entry.card)
-                      const compatible =
-                        canClickToExtend &&
-                        canExtendMeld(
-                          asCards(meldCards),
-                          asCards(selectedCardIndices.map(i => yourHand[i]).filter(Boolean))
-                        )
-                      const isClosed = canasta.isCanastra
-                      return (
-                        <motion.div
-                          key={ci}
-                          initial={{ opacity: 0, scale: 0.85 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          onClick={event => handleMeldClick(event, team.id, ci, meldCards)}
-                          className={`shrink-0 space-y-1 rounded-lg p-1 transition-shadow landscape:space-y-1.5 landscape:p-1.5 ${
-                            canClickToExtend
-                              ? compatible
-                                ? 'cursor-pointer ring-2 ring-card-gold shadow-[0_0_14px_rgba(212,175,55,0.5)]'
-                                : 'cursor-pointer opacity-70'
-                              : ''
-                          }`}
-                        >
-                          {/* Coluna estilo foto de referência (tiras fixas +
-                              última carta inteira) — ver MeldCardColumn. */}
-                          <MeldCardColumn cards={canasta.layout.map(e => asCard(e.card))} isClosed={isClosed} />
-                          <div
-                            className={`text-center text-xs font-semibold landscape:shrink-0 landscape:text-sm landscape:leading-tight ${
-                              canasta.kind === 'real'
-                                ? 'text-card-gold'
-                                : canasta.kind === 'quinhentos'
-                                  ? 'text-yellow-200'
-                                  : canasta.isClean
-                                    ? 'text-green-300'
-                                    : 'text-orange-300'
-                            }`}
-                          >
-                            <span className="landscape:hidden">
-                              {canasta.kind === 'real'
-                                ? '👑 Canastra Real'
-                                : canasta.kind === 'quinhentos'
-                                  ? '⭐ Canastra de Quinhentos'
-                                  : canasta.kind === 'limpa'
-                                    ? 'Canastra Limpa'
-                                    : canasta.kind === 'suja'
-                                      ? 'Canastra Suja'
-                                      : canasta.isClean
-                                        ? 'Jogo limpo'
-                                        : 'Jogo sujo'}
-                              {canasta.type === 'aces' ? ' · Trinca de Áses' : ''} (+{canasta.points})
-                            </span>
-                            <span className="hidden landscape:inline">+{canasta.points}</span>
-                          </div>
-                        </motion.div>
-                      )
-                    })}
-                  </AnimatePresence>
-
-                  {/* Slot de DOCK fixo pra baixar jogo novo com a mesa cheia
-                      — ver GameBoard offline. */}
-                  {team.id === myTeamId && (
-                    <button
-                      type="button"
-                      onClick={event => {
-                        event.stopPropagation()
-                        handleDropZoneClick()
-                      }}
-                      className={`flex h-24 w-20 shrink-0 flex-col items-center justify-center gap-1 self-start rounded-lg border-2 border-dashed text-xs transition-colors landscape:h-28 landscape:w-20 landscape:text-sm ${
-                        isDropTarget
-                          ? 'border-card-gold bg-card-gold/10 text-card-gold shadow-[0_0_12px_rgba(212,175,55,0.45)]'
-                          : 'border-white/20 text-gray-400'
-                      }`}
-                    >
-                      <span className="text-lg leading-none landscape:text-xl">⬇</span>
-                      <span>Baixar</span>
-                    </button>
-                  )}
-                </MeldRow>
+                <MeldArea
+                  melds={team.melds.map((canasta, ci) => {
+                    const meldCards = canasta.layout.map(entry => entry.card)
+                    const compatible = canClickToExtend && canExtendMeld(asCards(meldCards), selectedCards)
+                    const layoutCards = canasta.layout.map(entry => asCard(entry.card))
+                    const meldSuit = meldSuitOf(layoutCards)
+                    return {
+                      strips: canasta.layout.map((entry, i) => ({
+                        card: layoutCards[i],
+                        wild: isWildStrip(layoutCards[i], entry.representsValue, meldSuit),
+                      })),
+                      closed: canasta.isCanastra,
+                      clean: canasta.isClean,
+                      kind: canasta.kind,
+                      points: canasta.points,
+                      highlight: canClickToExtend ? (compatible ? 'compatible' : 'dim') : null,
+                      onClick: event => handleMeldClick(event, team.id, ci, meldCards),
+                    }
+                  })}
+                  // Slot tracejado "Baixar" fixo — ver GameBoard offline.
+                  dock={team.id === myTeamId ? { active: isDropTarget, onClick: handleDropZoneClick } : undefined}
+                />
               )}
             </div>
           )
