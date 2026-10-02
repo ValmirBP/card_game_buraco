@@ -7,9 +7,12 @@ import { isValidCanasta, canExtendMeld, scoreCardValue } from './utils'
 export const HAND_SIZE = 11
 export const MORTO_SIZE = 11
 const MORTO_COUNT = 2
+export const STALEMATE_RECYCLES = 12
 
 export class Game {
   state: GameState
+  private lastMeldCardTotal = 0
+  private recyclesAtLastMeldChange = 0
 
   constructor(players: Player[]) {
     if (players.length !== 4) {
@@ -311,7 +314,16 @@ export class Game {
       return this.canClose(teamOfSeat(this.state, seat))
     })
 
-    return someoneClosed || nothingLeftAnywhere
+    return someoneClosed || nothingLeftAnywhere || this.isStalemate()
+  }
+
+  private isStalemate(): boolean {
+    const meldCards = this.state.teams.reduce((sum, t) => sum + t.melds.reduce((n, m) => n + m.cards.length, 0), 0)
+    if (meldCards !== this.lastMeldCardTotal) {
+      this.lastMeldCardTotal = meldCards
+      this.recyclesAtLastMeldChange = this.state.discardRecycles
+    }
+    return this.state.discardRecycles - this.recyclesAtLastMeldChange >= STALEMATE_RECYCLES
   }
 
   finish(): void {
@@ -363,6 +375,8 @@ export class Game {
   clone(): Game {
     const clonedPlayers = this.state.players.map(p => (p as unknown as { clone(): Player }).clone())
     const game = new Game(clonedPlayers)
+    game.lastMeldCardTotal = this.lastMeldCardTotal
+    game.recyclesAtLastMeldChange = this.recyclesAtLastMeldChange
     game.state = {
       ...this.state,
       players: clonedPlayers,

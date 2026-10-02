@@ -5,12 +5,13 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { WebSocketServer, WebSocket } from 'ws'
-import { ProtocolServer, ClientMessage } from './protocol'
+import { ProtocolServer } from './protocol'
 import { lanAddresses as computeLanAddresses, lanBaseUrl as computeLanBaseUrl } from './lanAddress'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DIST_DIR = path.resolve(__dirname, '..', 'dist')
 const PORT = Number(process.env.PORT) || 3001
+const MAX_MESSAGE_BYTES = 4096
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -27,9 +28,17 @@ const MIME_TYPES: Record<string, string> = {
 
 async function serveStatic(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const url = new URL(req.url ?? '/', 'http://localhost')
-  let filePath = path.join(DIST_DIR, decodeURIComponent(url.pathname))
+  let decoded: string
+  try {
+    decoded = decodeURIComponent(url.pathname)
+  } catch {
+    res.writeHead(400)
+    res.end('Bad request')
+    return
+  }
+  let filePath = path.join(DIST_DIR, decoded)
 
-  if (!filePath.startsWith(DIST_DIR)) {
+  if (filePath !== DIST_DIR && !filePath.startsWith(DIST_DIR + path.sep)) {
     res.writeHead(403)
     res.end('Forbidden')
     return
@@ -67,10 +76,13 @@ function lanBaseUrl(): string {
 }
 
 const httpServer = createServer((req, res) => {
-  void serveStatic(req, res)
+  serveStatic(req, res).catch(() => {
+    if (!res.headersSent) res.writeHead(500)
+    res.end('Internal error')
+  })
 })
 
-const wss = new WebSocketServer({ server: httpServer })
+const wss = new WebSocketServer({ server: httpServer, maxPayload: MAX_MESSAGE_BYTES })
 const protocol = new ProtocolServer({ serverUrl: lanBaseUrl() })
 
 let nextConnId = 1
@@ -84,13 +96,13 @@ wss.on('connection', (socket: WebSocket) => {
   })
 
   socket.on('message', (raw) => {
-    let msg: ClientMessage
+    let msg: unknown
     try {
       msg = JSON.parse(raw.toString())
     } catch {
       return
     }
-    void protocol.handleMessage(connId, msg)
+    protocol.handleMessage(connId, msg).catch((err) => console.error('Erro nao tratado na mensagem:', err))
   })
 
   socket.on('close', () => {
@@ -104,4 +116,8 @@ httpServer.listen(PORT, () => {
   for (const ip of lanAddresses()) {
     console.log(`  Na rede: http://${ip}:${PORT}`)
   }
+})
+
+process.on('unhandledRejection', (reason) => {
+  console.error('unhandledRejection:', reason)
 })

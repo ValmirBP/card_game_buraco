@@ -107,3 +107,39 @@ describe('onlineStore reconnect loop (B7)', () => {
     expect(useOnlineStore.getState().errorMsg).toMatch(/não foi possível conectar/i)
   })
 })
+
+describe('onlineStore: uma nova conexão substitui a anterior', () => {
+  const OriginalWebSocket = global.WebSocket
+
+  beforeEach(() => {
+    FakeWebSocket.instances = []
+    ;(global as unknown as { WebSocket: unknown }).WebSocket = FakeWebSocket
+    jest.useFakeTimers()
+    useOnlineStore.getState().leave()
+  })
+
+  afterEach(() => {
+    useOnlineStore.getState().leave()
+    jest.useRealTimers()
+    ;(global as unknown as { WebSocket: unknown }).WebSocket = OriginalWebSocket
+  })
+
+  test('entrar duas vezes fecha o socket antigo, e o fechamento dele não derruba a conexão nova', () => {
+    useOnlineStore.getState().join('ABCDE', 'Você')
+    const first = FakeWebSocket.instances[0]
+    first.simulateOpen()
+
+    useOnlineStore.getState().join('FGHIJ', 'Você')
+    expect(FakeWebSocket.instances).toHaveLength(2)
+    const second = FakeWebSocket.instances[1]
+    expect(first.readyState).toBe(FakeWebSocket.CLOSED)
+    expect(first.onclose).toBeNull()
+
+    second.simulateOpen()
+    first.simulateClose()
+    expect(useOnlineStore.getState().connection).toBe('open')
+
+    jest.advanceTimersByTime(10_000)
+    expect(FakeWebSocket.instances).toHaveLength(2)
+  })
+})

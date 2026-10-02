@@ -313,7 +313,7 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-gray-200 landscape:px-3 landscape:py-1 landscape:text-sm"
+              className="flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-gray-200 landscape:px-1.5 landscape:py-0 landscape:text-[10px]"
             >
               <motion.span animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.2, repeat: Infinity }}>
                 🤖
@@ -326,7 +326,7 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="flex items-center gap-1 rounded-full bg-card-gold px-2 py-0.5 text-[10px] font-bold text-black landscape:px-3 landscape:py-1 landscape:text-sm"
+              className="flex items-center gap-1 rounded-full bg-card-gold px-2 py-0.5 text-[10px] font-bold text-black landscape:px-1.5 landscape:py-0 landscape:text-[10px]"
             >
               Sua vez
             </motion.span>

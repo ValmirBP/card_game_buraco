@@ -301,7 +301,8 @@ describe('ProtocolServer', () => {
 
       expect(host.ofType('roomClosed')).toHaveLength(0)
       const lastLobby = host.ofType('lobby').at(-1) as any
-      expect(lastLobby.seats[1]).toMatchObject({ kind: 'human', name: 'Bob', connected: false })
+      expect(lastLobby.seats[1]).toMatchObject({ kind: 'ai' })
+      expect(lastLobby.seats[1].name).not.toBe('Bob')
     })
   })
 

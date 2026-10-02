@@ -2,56 +2,18 @@ import type { CapacitorConfig } from '@capacitor/cli'
 
 const config: CapacitorConfig = {
   appId: 'com.buraco.jogatina',
-  appName: 'Buraco Jogatina v34',
-  // Vite builds the web app into dist/ — Capacitor bundles it into the APK,
-  // so the game runs fully offline (single-player) inside a native WebView.
+  appName: 'Buraco Jogatina',
   webDir: 'dist',
   backgroundColor: '#0f5132',
   server: {
-    // Default é 'https' (a página carrega em https://localhost). O modo
-    // Online conecta num servidor LAN comum (server/index.ts), que só fala
-    // ws:// simples, sem TLS - uma página https:// bloqueia QUALQUER
-    // conexão ws:// não criptografada por política de "mixed content" (o
-    // WebView lança SecurityError síncrono ao tentar `new WebSocket(...)`,
-    // antes mesmo de tentar conectar). 'http' faz a página carregar em
-    // http://localhost, onde ws:// é permitido normalmente.
-    //
-    // NÃO defina `hostname` junto: a página PRECISA continuar em
-    // http://localhost. `localhost` é a única origem http que conta como
-    // CONTEXTO SEGURO - com qualquer outro hostname o WebView remove
-    // `navigator.mediaDevices`, e o leitor de QR da tela Online
-    // (src/components/Online/QrScanner.tsx) para de funcionar em silêncio,
-    // sem erro visível.
     androidScheme: 'http',
   },
   plugins: {
-    // O windowSoftInputMode="adjustResize" do AndroidManifest.xml SOZINHO não
-    // é confiável em todo aparelho/versão de Android - em alguns o WebView
-    // ignora ou aplica de forma inconsistente, e o teclado que abre fica
-    // reduzido (nem o teclado padrão do usuário, nem tela cheia, sem tecla de
-    // confirmar - relato do usuário). O plugin Keyboard controla isso pelo
-    // lado do Capacitor/JS em vez de depender só do WebView nativo -
-    // 'body' redimensiona o <body> da página quando o teclado abre (mesmo
-    // efeito do adjustResize, só que reforçado/mais consistente entre
-    // aparelhos).
     Keyboard: {
       resize: 'body',
       resizeOnFullScreen: true,
     },
     SystemBars: {
-      // Em Android 15+ (API 35) o plugin SystemBars do Capacitor aplica
-      // padding no PAI da WebView igual aos insets de systemBars +
-      // displayCutout (ver SystemBars.initWindowInsetsListener). Num jogo
-      // travado em paisagem isso empurrava a WebView 128px pra dentro na
-      // borda do furo da câmera, e sobrava uma faixa onde a moldura de
-      // madeira da mesa não chegava - dava pra ver o fundo liso da janela
-      // ali. 'disable' desliga esse tratamento; a WebView cobre a tela
-      // inteira e a moldura acompanha a borda real do aparelho.
-      //
-      // Só desativa a injeção das variáveis --safe-area-inset-* do
-      // Capacitor, que este projeto NÃO usa: o CSS usa o env(safe-area-
-      // inset-*) nativo (viewport-fit=cover no index.html), que continua
-      // protegendo os elementos de canto (ver GameBoard.tsx).
       insetsHandling: 'disable',
     },
   },

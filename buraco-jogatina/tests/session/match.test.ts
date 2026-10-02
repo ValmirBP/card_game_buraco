@@ -111,7 +111,6 @@ describe('GameSession match layer', () => {
 
   it('crossing matchTarget sets matchWinner, and nextRound becomes a no-op', () => {
     const session = new GameSession(allHumans(), 3000)
-    // Force the match to be right at the edge before this round ends.
     ;(session as any).matchScores = { A: 2950, B: 100 }
 
     forceRoundEnd(session, 'A')

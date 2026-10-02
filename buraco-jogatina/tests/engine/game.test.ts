@@ -94,7 +94,6 @@ describe('Game', () => {
     const game = new Game(makeFourPlayers())
     game.setup()
     while (game.drawFromDeck() !== null) {
-      // drain
     }
     expect(game.drawFromDeck()).toBeNull()
   })
@@ -139,7 +138,6 @@ describe('Game', () => {
       ]
 
       while (game.drawFromDeck() !== null) {
-        // drain
       }
 
       expect(game.state.deck.length).toBe(0)
@@ -797,7 +795,6 @@ describe('Game', () => {
       const game = new Game(makeFourPlayers())
       game.setup()
       while (game.drawFromDeck() !== null) {
-        // drain
       }
       expect(game.isGameOver()).toBe(true)
     })

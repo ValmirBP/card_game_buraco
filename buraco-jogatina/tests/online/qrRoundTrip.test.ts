@@ -1,10 +1,4 @@
-/**
- * @jest-environment node
- *
- * Ambiente node (não jsdom): o encoder do `qrcode` usa TextEncoder, que o
- * jsdom não expõe. Este teste monta o RGBA na mão, então não precisa de
- * DOM nem de canvas.
- */
+/** @jest-environment node */
 import QRCode from 'qrcode'
 import jsQR from 'jsqr'
 import { joinUrlFor } from '../../src/online/onlineStore'

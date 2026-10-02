@@ -142,8 +142,6 @@ export default function Gameplay({ onGameEnd, onExit }: GameplayProps) {
     if (!game) return false
     if (game.state.status !== 'playing' || game.state.currentPlayerIndex !== 0) return false
     return canTakeDiscardPile(game)
-    // Re-derive whenever the game mutates (version) — hand/discard/melds can
-    // all change what's takeable.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game, version])
 

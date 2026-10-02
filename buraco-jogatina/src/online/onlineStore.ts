@@ -9,10 +9,6 @@ import type { FlyAnimState } from '../components/Gameplay/CardFlyAnimation'
 const SERVER_ADDRESS_STORAGE_KEY = 'buraco-server-address'
 const LAST_ROOM_STORAGE_KEY = 'buraco-last-online-room'
 
-/** Lido uma vez no boot: lembra o último endereço de servidor digitado, pra
- * o usuário não ter que retitar o IP do PC toda vez que abrir o app. Vazio
- * (default) = mesma origem da página, que é o único caso que funciona
- * quando o jogo é aberto num navegador servido pelo próprio servidor. */
 function loadStoredServerAddress(): string {
   try {
     return window.localStorage.getItem(SERVER_ADDRESS_STORAGE_KEY) ?? ''
@@ -21,15 +17,6 @@ function loadStoredServerAddress(): string {
   }
 }
 
-/** Código + nome da ÚLTIMA sala em que este aparelho esteve — pedido do
- * usuário: "manter o código da última sala para o jogador que saiu
- * reconectar". `lastJoin` (módulo, em memória) já guarda isso ENQUANTO o
- * app continua aberto, mas se o app for fechado/morto (comum no Android em
- * segundo plano) esse estado some — persistir em localStorage é o que
- * sobrevive a isso, pra oferecer "Reconectar à sala X" ao reabrir. Servidor
- * já aceita reconexão por nome igual no MEIO de uma partida (ver
- * server/rooms.ts joinRoom), então isso também cobre "continuar de onde
- * parou", não só voltar pro lobby. */
 export interface LastRoomInfo {
   code: string
   name: string
@@ -53,7 +40,6 @@ function saveLastRoom(info: LastRoomInfo): void {
   try {
     window.localStorage.setItem(LAST_ROOM_STORAGE_KEY, JSON.stringify(info))
   } catch {
-    // localStorage indisponível - só não persiste, não quebra o app.
   }
 }
 
@@ -61,7 +47,6 @@ function clearLastRoom(): void {
   try {
     window.localStorage.removeItem(LAST_ROOM_STORAGE_KEY)
   } catch {
-    // idem acima.
   }
 }
 
@@ -100,40 +85,12 @@ interface OnlineState {
   view: SeatView | null
   log: string[]
   errorMsg: string | null
-  /** Motivo pelo qual a sala foi fechada à força (hoje só "o anfitrião
-   * saiu") - diferente de errorMsg (uma jogada recusada, a sala continua
-   * de pé): aqui a sala JÁ NÃO EXISTE MAIS, então quem vê isso precisa
-   * sair da tela online, não só dispensar um aviso. App.tsx observa este
-   * campo pra voltar ao menu sozinho quando ele aparece. */
   roomClosedReason: string | null
-  /** LAN base URL reported by the server (e.g. `http://192.168.2.169:3001`),
-   * used to build a join link/QR that works from another device. Falls back
-   * to window.location.origin when the server didn't find a LAN IP. */
   serverUrl: string | null
-  /** Endereço explícito do servidor (ex.: "192.168.2.142:3001"), digitado
-   * pelo usuário. OBRIGATÓRIO dentro do APK — lá a página é servida de
-   * capacitor://localhost/https://localhost, então "mesma origem" (o
-   * default vazio) tentaria conectar no próprio aparelho e nunca
-   * funcionaria. Persistido em localStorage (ver resolveWsUrl em wsUrl.ts). */
   serverAddress: string
-  /** Código+nome da última sala (ver loadLastRoom acima) — sobrevive ao app
-   * fechar/reabrir. null quando nunca entrou numa sala, ou depois de sair
-   * de propósito / a sala ter sido fechada (ver leave()/roomClosed). */
   lastRoom: LastRoomInfo | null
-  /** Local UI-only selection state, mirrors the single-player store's
-   * selectedCardIndices — indices into `view.yourHand`. */
   selectedCardIndices: number[]
 
-  /** Fantasmas de animação — mesma ideia do modo offline (Gameplay.tsx),
-   * só que vivendo no store em vez de useState local: OnlineGameBoard.tsx e
-   * OnlineDiscardRow.tsx disparam essas ações no momento do clique (onde
-   * ainda sabem QUAIS cartas/retângulos estão envolvidos), e
-   * OnlineGameplay.tsx só lê e renderiza os componentes de fantasma
-   * (DrawAnimation/CardFlyAnimation), compartilhados com o offline.
-   * `drawAnim` é a exceção: como a carta comprada só é conhecida depois da
-   * resposta do servidor (ao contrário do offline, que muta local e
-   * síncrono), quem dispara é um efeito em OnlineGameBoard.tsx reagindo ao
-   * tamanho da mão crescer, não o clique em si. */
   drawAnim: DrawAnimState | null
   pickupAnim: FlyAnimState | null
   discardAnim: FlyAnimState | null
@@ -145,14 +102,7 @@ interface OnlineState {
 
   create: (name: string, difficulty: AIDifficulty) => void
   join: (code: string, name: string) => void
-  /** Entra numa sala a partir do texto CRU de um QR lido (ver joinLink.ts):
-   * configura o endereço do servidor embutido no link e já entra. Retorna
-   * false se o texto não for um convite válido — aí o leitor segue lendo em
-   * vez de fechar. */
   joinFromScannedLink: (raw: string, name: string) => boolean
-  /** Tenta reentrar na última sala (ver `lastRoom`) — no-op se não houver
-   * nenhuma. Usado pelo botão "Reconectar à sala X" no OnlineLobby quando o
-   * app reabre com uma partida em andamento em outro lugar. */
   reconnectToLastRoom: () => void
   start: () => void
   sendIntent: (intent: Intent) => void
@@ -163,41 +113,22 @@ interface OnlineState {
   clearError: () => void
   clearRoomClosedReason: () => void
   setServerAddress: (address: string) => void
-  /** "Escolher o lado que quer entrar": move você pra outro assento AI
-   * livre, antes da partida começar — como times são fixos por assento
-   * (0/2 = Nós, 1/3 = Eles), escolher o assento é escolher o lado. O
-   * anfitrião (assento 0) não pode se mover (ver rooms.ts). */
   chooseSeat: (seatIndex: number) => void
-  /** Renomeia você na sala atual, antes da partida começar. */
   rename: (name: string) => void
 }
 
-/** Builds the shareable "join this room" URL for the given room code, using
- * the server-reported LAN base URL when available so it works from another
- * device on the network (falls back to this page's own origin). */
 export function joinUrlFor(code: string, serverUrl: string | null): string {
   const base = serverUrl || window.location.origin
   return `${base}/?sala=${code}`
 }
 
 let socket: WebSocket | null = null
-// Remembered so a reconnect attempt can auto-rejoin the same room/name.
 let lastJoin: { name: string; code?: string; difficulty?: AIDifficulty } | null = null
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 let intentionalClose = false
-// B7: sem isso, uma conexão que nunca abre (ex.: nenhum servidor no
-// endereço, ou o APK tentando wss://localhost - ver wsUrl()) reagendava uma
-// nova tentativa a cada 1.5s PARA SEMPRE, silenciosamente, em background,
-// mesmo depois do usuário sair da tela online. Reseta a cada conexão bem-
-// sucedida (onopen) e a cada novo create()/join() explícito.
 let reconnectAttempts = 0
 const MAX_RECONNECT_ATTEMPTS = 5
 
-/** Fecha a conexão e cancela qualquer reconexão pendente — usado tanto por
- * leave() (saída intencional) quanto pelo handler de 'roomClosed' (a sala
- * foi fechada à força porque o anfitrião saiu, ver server/protocol.ts
- * handleClose). Sem marcar intentionalClose, o onclose do socket tentaria
- * reconectar numa sala que já não existe mais. */
 function teardownConnection(): void {
   intentionalClose = true
   lastJoin = null
@@ -226,12 +157,15 @@ function connect(onOpen: () => void): void {
   intentionalClose = false
   useOnlineStore.setState({ connection: 'connecting', errorMsg: null })
 
-  // `new WebSocket(...)` pode lançar SÍNCRONO (não é um erro assíncrono
-  // pego por onerror/onclose) em cenários de política do navegador/WebView -
-  // ex.: uma página https:// tentando abrir ws:// (mixed content) lança
-  // SecurityError na hora. Sem o try/catch, isso derrubava o handler de
-  // clique inteiro em silêncio: sem errorMsg, sem log, o usuário só via a
-  // tela voltar pro formulário como se nada tivesse acontecido.
+  if (socket) {
+    const previous = socket
+    previous.onopen = null
+    previous.onmessage = null
+    previous.onclose = null
+    previous.onerror = null
+    previous.close()
+    socket = null
+  }
   let ws: WebSocket
   try {
     ws = new WebSocket(resolveWsUrl(useOnlineStore.getState().serverAddress))
@@ -264,6 +198,7 @@ function connect(onOpen: () => void): void {
   }
 
   ws.onclose = () => {
+    if (ws !== socket) return
     useOnlineStore.setState({ connection: 'closed' })
     if (!intentionalClose && lastJoin) {
       if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
@@ -273,8 +208,6 @@ function connect(onOpen: () => void): void {
         return
       }
       reconnectAttempts++
-      // Best-effort reconnect: the server resumes a disconnected human seat
-      // with the same name (see server/rooms.ts joinRoom reconnection path).
       reconnectTimer = setTimeout(() => {
         connect(() => {
           if (lastJoin?.code) {
@@ -286,8 +219,6 @@ function connect(onOpen: () => void): void {
   }
 
   ws.onerror = () => {
-    // onclose fires right after (WebSocket sempre fecha após erro), que já
-    // atualiza connection/errorMsg - nada extra necessário aqui.
   }
 }
 
@@ -295,10 +226,6 @@ function handleServerMessage(msg: ServerMessage): void {
   switch (msg.type) {
     case 'joined': {
       lastJoin = { name: lastJoin?.name ?? '', code: msg.code, difficulty: lastJoin?.difficulty }
-      // Persiste código+nome pra sobreviver o app fechar/reabrir (ver
-      // loadLastRoom acima) - grava em TODO join bem-sucedido, seja criando
-      // sala nova ou reconectando numa existente, então "a última" sempre
-      // reflete a mais recente.
       const lastRoom = lastJoin.name ? { code: msg.code, name: lastJoin.name } : null
       if (lastRoom) saveLastRoom(lastRoom)
       useOnlineStore.setState({
@@ -327,11 +254,6 @@ function handleServerMessage(msg: ServerMessage): void {
       useOnlineStore.setState((s) => ({ log: [...s.log, ...msg.lines] }))
       break
     case 'error':
-      // 'room not found' é a resposta exata de rooms.ts quando o código
-      // simplesmente não existe mais no servidor (o processo/app do
-      // anfitrião reiniciou, ou a sala expirou de outro jeito) - sem isso,
-      // "Reconectar à sala X" ficava oferecendo pra sempre uma sala que já
-      // não existe, e todo clique repetia o mesmo erro.
       if (msg.message === 'room not found') {
         clearLastRoom()
         useOnlineStore.setState({ errorMsg: msg.message, lastRoom: null })
@@ -340,10 +262,6 @@ function handleServerMessage(msg: ServerMessage): void {
       }
       break
     case 'roomClosed':
-      // A sala JÁ NÃO EXISTE MAIS no servidor (o anfitrião saiu) - mesma
-      // limpeza de leave(), mas preservando o motivo pra App.tsx mostrar e
-      // então levar de volta ao menu sozinho (ver o efeito lá). Sem sala,
-      // não há nada pra "Reconectar" — limpa o código guardado também.
       teardownConnection()
       clearLastRoom()
       useOnlineStore.setState({
@@ -401,15 +319,7 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
 
   joinFromScannedLink: (raw, name) => {
     const link = parseJoinLink(raw)
-    // Sem código não dá pra entrar em sala nenhuma (ex.: QR de Wi-Fi, ou um
-    // link só com o servidor): o leitor continua lendo.
     if (!link || !link.code) return false
-    // O endereço vem ANTES do join: connect() lê serverAddress via
-    // getState() (ver connect/resolveWsUrl), e setServerAddress grava
-    // sincronamente - então o join já sai apontando pro servidor do QR,
-    // que é justamente o passo manual que o segundo aparelho tinha que
-    // fazer à mão. Link sem servidor (ex.: localhost, descartado por
-    // parseJoinLink) mantém o endereço já configurado.
     if (link.serverAddress) get().setServerAddress(link.serverAddress)
     get().join(link.code, name)
     return true
@@ -432,16 +342,6 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
 
   leave: () => {
     teardownConnection()
-    // NÃO limpa lastRoom aqui (correção de bug relatado pelo usuário: "a
-    // pessoa que saiu não consegue voltar pq o código da sala não está
-    // salvo"). A ideia original era "saída intencional = nada pra
-    // reconectar depois", mas na prática o único jeito de sair da tela de
-    // Gameplay quando a SUA PRÓPRIA conexão já caiu (ex.: o app ficou
-    // tentando reconectar sozinho e desistiu, ou você só quer voltar pro
-    // menu pra tentar de novo) é este mesmo botão "Sair" - e ele apagava o
-    // código bem na hora em que a pessoa mais precisava dele pra voltar.
-    // lastRoom só é limpo mesmo quando a sala DE VERDADE deixou de existir
-    // (ver o caso 'roomClosed' abaixo, quando o anfitrião sai).
     set({
       connection: 'idle',
       code: null,
@@ -479,8 +379,6 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
     try {
       window.localStorage.setItem(SERVER_ADDRESS_STORAGE_KEY, address)
     } catch {
-      // localStorage indisponível (ex.: modo privado) - só não persiste
-      // entre sessões, sem quebrar o app.
     }
   },
 
@@ -488,9 +386,6 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
 
   rename: (name) => send({ type: 'rename', name }),
 
-  // Duração de cada fantasma DEVE acompanhar a animação real (ver TOTAL_S
-  // de DrawAnimation.tsx e DURATION_S de CardFlyAnimation.tsx) + pequena
-  // folga — mesmos valores usados pelo Gameplay.tsx offline.
   playDrawAnim: (anim) => {
     const id = Date.now()
     set({ drawAnim: { id, ...anim } })

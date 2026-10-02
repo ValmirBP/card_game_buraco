@@ -14,28 +14,15 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        // Registro de plugin custom precisa vir ANTES de super.onCreate()
-        // (é aí que a Bridge do Capacitor é montada). HostServerPlugin é o
-        // servidor WebSocket embutido que deixa este celular ser o host de
-        // uma partida online - ver HostServerPlugin.java.
+
         registerPlugin(HostServerPlugin.class);
         super.onCreate(savedInstanceState);
-        // Fundo da janela = verde do feltro, pra qualquer área não coberta pela
-        // WebView (ex.: faixa do recorte da câmera) não aparecer branca/preta.
+
         getWindow().setBackgroundDrawable(new ColorDrawable(Color.parseColor("#0f5132")));
-        // Desenha também na área do recorte da câmera (edge-to-edge real): em
-        // paisagem, sem isso sobra uma faixa nas bordas onde fica o notch.
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             WindowManager.LayoutParams lp = getWindow().getAttributes();
-            // ALWAYS (API 30+), não SHORT_EDGES: SHORT_EDGES só deixa o
-            // conteúdo entrar no recorte das bordas CURTAS. Neste jogo, que
-            // roda travado em paisagem, o furo da câmera fica numa borda
-            // LATERAL - com SHORT_EDGES a janela era recuada ali e sobrava
-            // uma faixa onde a moldura de madeira da mesa não chegava,
-            // mostrando o fundo liso da janela. Com ALWAYS a WebView cobre a
-            // tela inteira e a moldura acompanha a borda real do aparelho.
-            // Os elementos que ficariam ATRÁS do furo já se protegem sozinhos
-            // com env(safe-area-inset-*) (ver GameBoard.tsx).
+
             lp.layoutInDisplayCutoutMode =
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
                     ? WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
@@ -48,19 +35,12 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
-        // Reaplica o modo imersivo sempre que a janela recupera o foco — as
-        // barras de sistema (status/navegação) voltam ao aparecer teclado,
-        // notificação, etc., então precisamos escondê-las de novo.
+
         if (hasFocus) {
             hideSystemBars();
         }
     }
 
-    /** Tela cheia "imersiva": esconde a barra de status e a barra/gesto de
-     * navegação (os controles de sistema do Android). No Android 11+ (API 30)
-     * usa o WindowInsetsController moderno; abaixo disso, cai no antigo
-     * setSystemUiVisibility. As barras reaparecem com um swipe da borda e
-     * somem de novo sozinhas. */
     @SuppressWarnings("deprecation")
     private void hideSystemBars() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {

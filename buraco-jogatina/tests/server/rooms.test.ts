@@ -86,15 +86,35 @@ describe('RoomManager', () => {
     expect(view.players[3].kind).toBe('ai')
   })
 
-  it('leaveRoom marks disconnection without freeing the seat', () => {
+  it('leaveRoom no lobby devolve o assento do convidado para a IA (sem assento fantasma)', () => {
     const rm = new RoomManager()
     const { code } = rm.createRoom('conn-host', 'Host', 'medium')
     rm.joinRoom(code, 'conn-2', 'Bob')
     rm.leaveRoom('conn-2')
     const room = rm.getRoom(code)!
+    expect(room.seats[1].kind).toBe('ai')
+    expect(room.seats[1].name).not.toBe('Bob')
+    expect(room.seats[1].connId).toBeUndefined()
+  })
+
+  it('leaveRoom com a partida em andamento mantém o assento humano (para reconectar)', () => {
+    const rm = new RoomManager()
+    const { code } = rm.createRoom('conn-host', 'Host', 'medium')
+    rm.joinRoom(code, 'conn-2', 'Bob')
+    rm.startRoom(code, 'conn-host')
+    rm.leaveRoom('conn-2')
+    const room = rm.getRoom(code)!
     expect(room.seats[1].kind).toBe('human')
     expect(room.seats[1].name).toBe('Bob')
     expect(room.seats[1].connId).toBeUndefined()
+  })
+
+  it('nomes são aparados e limitados a 24 caracteres ao criar e entrar', () => {
+    const rm = new RoomManager()
+    const { code, room } = rm.createRoom('conn-host', '  ' + 'H'.repeat(80) + '  ', 'medium')
+    expect(room.seats[0].name).toBe('H'.repeat(24))
+    rm.joinRoom(code, 'conn-2', 'B'.repeat(80))
+    expect(rm.getRoom(code)!.seats[1].name).toBe('B'.repeat(24))
   })
 
   it('reconnection by matching name reassumes the same seat', () => {

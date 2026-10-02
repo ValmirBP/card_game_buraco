@@ -84,7 +84,7 @@ describe('nativeHostServer', () => {
 
     const hostMessages: Array<Record<string, unknown>> = []
     const host = fakeHost.connectPeer((data) => hostMessages.push(JSON.parse(data)))
-    host.sendToServer(JSON.stringify({ type: 'create', name: 'Anfitriao', difficulty: 'medio' }))
+    host.sendToServer(JSON.stringify({ type: 'create', name: 'Anfitriao', difficulty: 'medium' }))
     await flush()
 
     const joined = hostMessages.find((m) => m.type === 'joined')
@@ -147,7 +147,7 @@ describe('nativeHostServer', () => {
     const messages: Array<Record<string, unknown>> = []
     const peer = fakeHost.connectPeer((data) => messages.push(JSON.parse(data)))
     peer.sendToServer('isto não é JSON válido {{{')
-    peer.sendToServer(JSON.stringify({ type: 'create', name: 'Continua Funcionando', difficulty: 'facil' }))
+    peer.sendToServer(JSON.stringify({ type: 'create', name: 'Continua Funcionando', difficulty: 'easy' }))
     await flush()
 
     expect(messages.some((m) => m.type === 'joined')).toBe(true)

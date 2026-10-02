@@ -28,7 +28,6 @@ export interface ErrorResult {
   error: string
 }
 
-/** Chars A-Z0-9 minus ambiguous O/0/I/1. */
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 const CODE_LENGTH = 5
 const SEAT_COUNT = 4
@@ -43,6 +42,12 @@ function randomCode(): string {
 
 function defaultAiName(seatIndex: number): string {
   return `IA ${seatIndex + 1}`
+}
+
+export const MAX_NAME_LENGTH = 24
+
+export function cleanName(name: unknown): string {
+  return typeof name === 'string' ? name.trim().slice(0, MAX_NAME_LENGTH) : ''
 }
 
 export class RoomManager {
@@ -61,7 +66,7 @@ export class RoomManager {
     const seats: RoomSeat[] = []
     for (let i = 0; i < SEAT_COUNT; i++) {
       if (i === 0) {
-        seats.push({ index: 0, kind: 'human', name: hostName, connId: hostConnId })
+        seats.push({ index: 0, kind: 'human', name: cleanName(hostName), connId: hostConnId })
       } else {
         seats.push({ index: i, kind: 'ai', name: defaultAiName(i) })
       }
@@ -92,14 +97,8 @@ export class RoomManager {
     const room = this.rooms.get(code)
     if (!room) return { error: 'room not found' }
 
-    // Reconnection: a disconnected human seat with the same name resumes it -
-    // runs BEFORE the `room.started` guard below on purpose, so it also works
-    // MID-MATCH, not just in the lobby (pedido do usuário: um jogador que
-    // caiu no meio de uma partida precisa conseguir voltar pro mesmo lugar,
-    // não só antes de começar). protocol.ts's handleJoin pushes a fresh
-    // `state` to the reconnecting seat right after this succeeds.
     const reconnectSeat = room.seats.find(
-      (s) => s.kind === 'human' && s.name === name && s.connId === undefined
+      (s) => s.kind === 'human' && s.name === cleanName(name) && s.connId === undefined
     )
     if (reconnectSeat) {
       reconnectSeat.connId = connId
@@ -107,41 +106,17 @@ export class RoomManager {
       return { seat: reconnectSeat.index }
     }
 
-    // Só chega aqui se NENHUM assento desconectado bate com esse nome - ou
-    // seja, isto seria um jogador NOVO tentando entrar, o que só é permitido
-    // antes da partida começar (depois disso os 4 assentos já estão
-    // congelados no GameSession, sem lugar pra alguém novo entrar).
     if (room.started) return { error: 'room already started' }
 
     const freeSeat = room.seats.find((s) => s.kind === 'ai')
     if (!freeSeat) return { error: 'room is full' }
 
     freeSeat.kind = 'human'
-    freeSeat.name = name
+    freeSeat.name = cleanName(name)
     freeSeat.connId = connId
     return { seat: freeSeat.index }
   }
 
-  /**
-   * Move o assento do chamador pra `targetIndex`, antes da partida começar —
-   * "escolher o lado que quer entrar" (pedido do usuário): os times são
-   * fixos por assento (0/2 = Nós, 1/3 = Eles), então escolher o assento É
-   * escolher o lado. Dois casos:
-   *  - assento alvo é IA: MOVE simples (meu lugar vira IA, eu assumo o
-   *    assento vazio) - comportamento original.
-   *  - assento alvo é outro HUMANO: TROCA de verdade, sem confirmação (pedido
-   *    do usuário: "um menu poderá ser aberto e selecionar o nome do
-   *    jogador que quiser trocar de lugar com ele") - os dois trocam de
-   *    lugar na hora. protocol.ts resincroniza os connStates dos DOIS
-   *    conectados depois disso (não só do chamador), senão a próxima jogada
-   *    de quem foi "empurrado" seria avaliada com o assento antigo.
-   *
-   * O ANFITRIÃO (assento 0) nunca pode se mover NEM ser alvo de troca:
-   * startRoom só autoriza quem está em `seats[0]` a iniciar a partida, então
-   * mexer nesse assento (esvaziar OU trocar o ocupante) arriscaria travar
-   * quem tem o botão "Iniciar Partida" ou confundir quem o vê. Assentos
-   * 1/2/3 podem se mover/trocar livremente entre si.
-   */
   chooseSeat(code: string, connId: string, targetIndex: number): JoinOk | ErrorResult {
     const room = this.rooms.get(code)
     if (!room) return { error: 'room not found' }
@@ -167,9 +142,6 @@ export class RoomManager {
       return { seat: target.index }
     }
 
-    // target.kind === 'human': troca completa de identidade entre os dois
-    // assentos (nome + connId) - ambos continuam 'human', só de lugar
-    // trocado.
     const myName = mySeat.name
     const myConnId = mySeat.connId
     mySeat.name = target.name
@@ -179,13 +151,6 @@ export class RoomManager {
     return { seat: target.index }
   }
 
-  /**
-   * Renomeia o assento do chamador, só antes da partida começar - o nome
-   * exibido DURANTE uma partida vem de uma cópia congelada dentro do
-   * GameSession (ver GameSession.ts, `name: cfg.name`), então renomear
-   * depois de startRoom não mudaria nada visível; melhor recusar do que
-   * fingir que funcionou.
-   */
   rename(code: string, connId: string, name: string): JoinOk | ErrorResult {
     const room = this.rooms.get(code)
     if (!room) return { error: 'room not found' }
@@ -194,7 +159,7 @@ export class RoomManager {
     const mySeat = room.seats.find((s) => s.connId === connId)
     if (!mySeat) return { error: 'voce nao esta em nenhuma sala' }
 
-    const trimmed = name.trim().slice(0, 24)
+    const trimmed = cleanName(name)
     if (!trimmed) return { error: 'nome nao pode ser vazio' }
     mySeat.name = trimmed
     return { seat: mySeat.index }
@@ -206,18 +171,12 @@ export class RoomManager {
     const seat = room.seats.find((s) => s.connId === connId)
     if (!seat) return
     seat.connId = undefined
+    if (!room.started && seat.index !== 0) {
+      seat.kind = 'ai'
+      seat.name = defaultAiName(seat.index)
+    }
   }
 
-  /**
-   * Remove a sala inteira — usado quando o ANFITRIÃO cai: sem ele (dono do
-   * assento 0), ninguém mais consegue iniciar a partida (startRoom exige
-   * especificamente `seats[0].connId`), então deixar a sala "zumbi"
-   * esperando ele reconectar - como o resto da reconexão faz pra
-   * convidados - só travaria o jogo pros outros pra sempre. Devolve os
-   * connIds dos assentos humanos AINDA conectados (exceto quem causou a
-   * saída, que já foi removido antes disso rodar), pra o protocolo avisar
-   * cada um antes de fechar de vez.
-   */
   closeRoom(code: string): string[] {
     const room = this.rooms.get(code)
     if (!room) return []

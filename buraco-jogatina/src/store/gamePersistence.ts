@@ -45,21 +45,9 @@ interface GameStateJSON {
   scoreBreakdowns?: TeamScoreBreakdown[]
   closerSeat?: number
   discardRecycles: number
-  /** Índice, na mão do jogador da vez, da carta bloqueada do lixo unitário
-   * (ver GameState.blockedDiscardCard) - salvo por ÍNDICE, não por valor,
-   * porque o bloqueio é comparado por REFERÊNCIA ao objeto Card exato. Ao
-   * restaurar, reaponta pro objeto reconstruído naquele mesmo índice, senão
-   * o bloqueio (ou sua ausência) se perderia silenciosamente. null quando
-   * não há carta bloqueada. */
   blockedDiscardCardHandIndex: number | null
 }
 
-/** Estado completo salvo em localStorage para "retomar partida": o `Game`
- * (engine) inteiro mais os campos do gameStore que vivem por cima dele
- * (placar da partida, config pra reconstruir os 4 jogadores em
- * startNextRound, log). `selectedCardIndices` fica de fora de propósito -
- * é seleção efêmera de UI, sempre volta vazia (mesmo comportamento de
- * resetGame/startNextRound). */
 export interface SavedGame {
   schemaVersion: number
   gameState: GameStateJSON
@@ -131,8 +119,6 @@ function teamFromJSON(json: TeamJSON): Team {
   }
 }
 
-/** Serializa a partida (Game + campos do gameStore por cima dela) para um
- * objeto JSON-safe. Retorna null se não há partida em andamento. */
 export function serializeGame(game: Game, storeFields: SavedGame['store']): SavedGame {
   const state = game.state
   const currentHand = state.players[state.currentPlayerIndex].hand.getCards()
@@ -162,10 +148,6 @@ export function serializeGame(game: Game, storeFields: SavedGame['store']): Save
   }
 }
 
-/** Reconstrói um `Game` (e os campos do gameStore) a partir do que
- * `serializeGame` salvou. Lança se `saved` estiver corrompido ou de um
- * schema incompatível - o chamador deve tratar isso como "nada pra
- * retomar" (ver loadSavedGame). */
 export function deserializeGame(saved: SavedGame): { game: Game; store: SavedGame['store'] } {
   if (saved.schemaVersion !== SCHEMA_VERSION) {
     throw new Error(`Unsupported saved game schema version: ${saved.schemaVersion}`)
@@ -208,21 +190,14 @@ function readStorage(): string | null {
   try {
     return window.localStorage.getItem(STORAGE_KEY)
   } catch {
-    // localStorage indisponível (modo privado restrito, etc.) - sem retomar.
     return null
   }
 }
 
-/** true se existe uma partida salva (sem precisar desserializá-la) - usado
- * pra decidir se o Menu mostra o botão "Continuar partida" sem custo de
- * reconstruir o Game inteiro. */
 export function hasSavedGame(): boolean {
   return readStorage() !== null
 }
 
-/** Lê e desserializa a partida salva. Retorna null se não há nenhuma, ou se
- * o que está salvo está corrompido/incompatível - nesse caso também limpa
- * a entrada, pra não tentar de novo com o mesmo dado quebrado. */
 export function loadSavedGame(): { game: Game; store: SavedGame['store'] } | null {
   const raw = readStorage()
   if (!raw) return null
@@ -241,8 +216,6 @@ export function saveGame(game: Game, storeFields: SavedGame['store']): void {
     const saved = serializeGame(game, storeFields)
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(saved))
   } catch {
-    // Storage cheia ou indisponível - retomar partida é um extra, não deixa
-    // de funcionar o resto do jogo por isso.
   }
 }
 
@@ -250,6 +223,5 @@ export function clearSavedGame(): void {
   try {
     window.localStorage.removeItem(STORAGE_KEY)
   } catch {
-    // Idem saveGame - falha silenciosa.
   }
 }

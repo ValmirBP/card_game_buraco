@@ -3,17 +3,12 @@ import type { TeamId, TeamScoreBreakdown } from '../engine/gameState'
 
 export type SeatKind = 'human' | 'ai'
 
-/** Config for one of the 4 seats (index 0..3) a GameSession is built with. */
 export interface SeatConfig {
   kind: SeatKind
   name: string
-  /** Only meaningful when kind === 'ai'; defaults to 'medium' when omitted. */
   difficulty?: AIDifficulty
 }
 
-/** Server-authoritative phase within a seat's turn: `draw` (must draw or
- * take the discard pile before anything else) then `play` (may meld any
- * number of times, must eventually discard to end the turn). */
 export type TurnPhase = 'draw' | 'play'
 
 export type Intent =
@@ -29,8 +24,6 @@ export interface IntentResult {
   error?: string
 }
 
-/** JSON-serializable stand-in for a Card (an engine `Card` instance carries
- * methods, so views hand back plain objects instead of raw class instances). */
 export interface PlainCard {
   suit: string
   rank: string
@@ -57,11 +50,6 @@ export interface SeatPlayerView {
   kind: SeatKind
   handCount: number
   teamId: TeamId
-  /** false quando este é um assento HUMANO cuja conexão caiu (o assento
-   * continua reservado pro mesmo nome - ver RoomManager.leaveRoom/joinRoom).
-   * Sempre true pra assentos de IA. Preenchido pelo protocolo do servidor
-   * (server/protocol.ts broadcastState), não pelo GameSession em si - a
-   * sessão não tem noção de rede, só de assentos/cartas. */
   connected: boolean
 }
 
@@ -72,9 +60,6 @@ export interface SeatTeamView {
   melds: MeldView[]
 }
 
-/** Redacted view of the table for a single seat: everything except other
- * seats' hands (only counts). `getPublicView()` produces the same shape with
- * `yourHand` empty and `seat` set to -1 (no seat is being addressed). */
 export interface SeatView {
   seat: number
   yourHand: PlainCard[]
@@ -92,14 +77,7 @@ export interface SeatView {
   matchWinner?: TeamId
   winnerTeam?: TeamId
   scoreBreakdowns?: TeamScoreBreakdown[]
-  /** Assento de quem BATEU nesta rodada (ver GameState.closerSeat) — pro
-   * banner "Fulano bateu!" antes do placar. */
   closerSeat?: number
   log: string[]
-  /** true enquanto QUALQUER assento humano estiver desconectado (ver
-   * `players[].connected` acima) — a partida fica congelada (nenhuma intent
-   * é aceita de ninguém, turnos de IA não avançam) até todo mundo voltar.
-   * Preenchido pelo protocolo do servidor, sempre false vindo direto do
-   * GameSession (que não sabe de rede). */
   paused: boolean
 }

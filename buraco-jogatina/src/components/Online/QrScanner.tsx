@@ -40,8 +40,6 @@ export default function QrScanner({ onScan, onClose }: QrScannerProps) {
             return
           }
         } catch {
-          // Falha pontual de decodificação num frame é normal (foco, luz):
-          // segue pro próximo frame em vez de derrubar o scanner.
         }
       }
       rafId = requestAnimationFrame(() => void tick(decode))

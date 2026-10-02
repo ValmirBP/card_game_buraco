@@ -15,14 +15,8 @@ import {
   TurnPhase,
 } from './types'
 
-/** See gameStore's identical constant: caps how many meld actions (play_canasta
- * / extend_meld) an AI can chain in a single turn before it's forced to
- * discard, guarding against an infinite loop if a strategy kept proposing
- * meld moves. */
 const MAX_AI_MELD_ACTIONS_PER_TURN = 12
 
-/** Default target for a match (first team to reach this many accumulated
- * points across however many rounds it takes, wins). */
 export const DEFAULT_MATCH_TARGET = 3000
 
 export type CanastraCount = { clean: number; dirty: number }
@@ -38,9 +32,6 @@ function countRoundCanastras(team: Team): CanastraCount {
   return { clean, dirty }
 }
 
-/** Pure accumulation step for the match layer, mirroring
- * gameStore.accumulateMatchRound but parametrized by matchTarget. Exported
- * for direct unit testing. */
 export function accumulateMatchRound(
   matchScores: Record<TeamId, number>,
   matchCanastras: Record<TeamId, CanastraCount>,
@@ -106,15 +97,6 @@ function buildPlayers(seats: SeatConfig[]): Player[] {
   )
 }
 
-/**
- * Headless orchestrator for one 4-seat Buraco match. Encapsulates the same
- * game-flow logic as `src/store/gameStore.ts` (draw/take-discard -> meld ->
- * discard, morto pickup, match-level score accumulation across rounds) but:
- *  - has no React/Zustand dependency (returns data/events instead of set()),
- *  - tracks the draw/play turn phase itself (authoritative on the server),
- *  - hands back redacted per-seat views instead of exposing the raw engine
- *    state (which would leak every seat's hand).
- */
 export class GameSession {
   private game: Game
   private readonly seatsConfig: SeatConfig[]
@@ -151,10 +133,6 @@ export class GameSession {
   get status(): 'playing' | 'finished' {
     return this.game.state.status === 'finished' ? 'finished' : 'playing'
   }
-
-  // ---------------------------------------------------------------------
-  // Intents
-  // ---------------------------------------------------------------------
 
   applyIntent(seat: number, intent: Intent): IntentResult {
     switch (intent.type) {
@@ -232,15 +210,9 @@ export class GameSession {
 
     const player = this.game.getCurrentPlayer()
     if (cardIndex < 0 || cardIndex >= player.hand.getSize()) return fail('indice de carta invalido')
-    // A1: game.discard() também recusa esvaziar a mão sem morto/canastra
-    // limpa (ver game.ts) - checa isso ANTES pra dar um erro específico, em
-    // vez do genérico "indice invalido" que o success===false abaixo
-    // devolveria pros dois casos.
     if (this.game.wouldDiscardEmptyHandIllegally(cardIndex)) {
       return fail('voce nao pode descartar a ultima carta sem poder bater')
     }
-    // Regra do lixo unitário (também recusada por game.discard) - erro
-    // específico pro cliente mostrar.
     if (this.game.isDiscardBlockedCard(cardIndex)) {
       return fail('voce pegou essa carta do descarte agora - nao pode devolve-la neste turno')
     }
@@ -329,8 +301,6 @@ export class GameSession {
     return ok()
   }
 
-  /** Resolves hand indices to Card instances (for playCanasta/extendMeld),
-   * returning null if any index is out of range. */
   private resolveCards(player: Player, cardIndices: number[]): Card[] | null {
     const handCards = player.hand.getCards()
     const cards = cardIndices.map(i => handCards[i]).filter((c): c is Card => Boolean(c))
@@ -367,14 +337,14 @@ export class GameSession {
     this.roundFinalized = true
   }
 
-  // ---------------------------------------------------------------------
-  // AI
-  // ---------------------------------------------------------------------
+  runNextAiTurn(): string[] {
+    const start = this.log.length
+    if (this.status === 'playing' && this.seatsConfig[this.currentSeat].kind === 'ai') {
+      this.runOneAiTurn()
+    }
+    return this.log.slice(start)
+  }
 
-  /** Runs AI turns in sequence starting at the current seat, for as long as
-   * the current seat is AI-controlled and the game is 'playing'. Stops the
-   * instant a human seat is up, or the round/match ends. Returns the log
-   * lines generated during this call (for the server to broadcast). */
   runAiTurns(): string[] {
     const start = this.log.length
     while (this.status === 'playing' && this.seatsConfig[this.currentSeat].kind === 'ai') {
@@ -400,9 +370,6 @@ export class GameSession {
     let lowestIndex = -1
     let lowestValue = Infinity
     for (let i = 0; i < cards.length; i++) {
-      // Regra do lixo unitário: a carta pega de um descarte que só tinha ela
-      // não pode voltar neste turno - o fallback pula essa carta pra nunca
-      // propor um descarte que o motor vai recusar.
       if (this.game.isDiscardBlockedCard(i)) continue
       const value = scoreCardValue(cards[i])
       if (value < lowestValue) {
@@ -514,10 +481,6 @@ export class GameSession {
     }
   }
 
-  // ---------------------------------------------------------------------
-  // Views
-  // ---------------------------------------------------------------------
-
   getViewFor(seat: number): SeatView {
     return this.buildView(seat, true)
   }
@@ -533,9 +496,6 @@ export class GameSession {
       kind: cfg.kind,
       handCount: this.game.state.players[i].hand.getSize(),
       teamId: teamIdOfSeat(i),
-      // GameSession não tem noção de rede - connected/paused sempre "tudo
-      // bem" aqui; o protocolo do servidor sobrescreve com o estado real das
-      // conexões antes de transmitir (ver server/protocol.ts broadcastState).
       connected: true,
     }))
 

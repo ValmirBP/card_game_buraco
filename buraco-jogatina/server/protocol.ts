@@ -1,4 +1,4 @@
-import { RoomManager, Room, Difficulty } from './rooms'
+import { RoomManager, Room, Difficulty, cleanName } from './rooms'
 import type { Intent, SeatView } from '../src/session/types'
 
 export interface ClientSocket {
@@ -13,6 +13,64 @@ export type ClientMessage =
   | { type: 'nextRound' }
   | { type: 'chooseSeat'; seatIndex: number }
   | { type: 'rename'; name: string }
+
+const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard']
+const MAX_CODE_LENGTH = 16
+const MAX_CARD_INDICES = 40
+
+function isIndex(value: unknown, max: number): value is number {
+  return Number.isInteger(value) && (value as number) >= 0 && (value as number) < max
+}
+
+function isIndexList(value: unknown): value is number[] {
+  return (
+    Array.isArray(value) &&
+    value.length <= MAX_CARD_INDICES &&
+    value.every(v => isIndex(v, 200)) &&
+    new Set(value).size === value.length
+  )
+}
+
+function isIntent(value: unknown): value is Intent {
+  if (typeof value !== 'object' || value === null) return false
+  const intent = value as Record<string, unknown>
+  switch (intent.type) {
+    case 'draw':
+    case 'takeDiscard':
+    case 'nextRound':
+      return true
+    case 'discard':
+      return isIndex(intent.cardIndex, 200)
+    case 'playCanasta':
+      return isIndexList(intent.cardIndices)
+    case 'extendMeld':
+      return isIndex(intent.meldIndex, 200) && isIndexList(intent.cardIndices)
+    default:
+      return false
+  }
+}
+
+export function isClientMessage(value: unknown): value is ClientMessage {
+  if (typeof value !== 'object' || value === null) return false
+  const msg = value as Record<string, unknown>
+  switch (msg.type) {
+    case 'create':
+      return typeof msg.name === 'string' && DIFFICULTIES.includes(msg.difficulty as Difficulty)
+    case 'join':
+      return typeof msg.code === 'string' && msg.code.length <= MAX_CODE_LENGTH && typeof msg.name === 'string'
+    case 'start':
+    case 'nextRound':
+      return true
+    case 'intent':
+      return isIntent(msg.intent)
+    case 'chooseSeat':
+      return isIndex(msg.seatIndex, 4)
+    case 'rename':
+      return typeof msg.name === 'string'
+    default:
+      return false
+  }
+}
 
 export interface LobbySeatView {
   index: number
@@ -34,11 +92,6 @@ interface ConnState {
   seat: number
 }
 
-/** Between AI turns, wait this long before applying+broadcasting the next
- * one, purely for pacing on the client - mesmos 2s do AI_THINK_DELAY_MS do
- * modo offline (Gameplay.tsx), pra dar tempo de acompanhar a jogada em vez
- * de tudo acontecer instantâneo (relato do usuário: "os bots estão muito
- * rápidos"). Set to 0 in tests. */
 const DEFAULT_AI_TURN_DELAY_MS = 2000
 
 export class ProtocolServer {
@@ -46,6 +99,7 @@ export class ProtocolServer {
   private sockets = new Map<string, ClientSocket>()
   private connStates = new Map<string, ConnState>()
   private aiTurnDelayMs: number
+  private aiLoops = new WeakSet<Room>()
   private serverUrl?: string
 
   constructor(opts?: { aiTurnDelayMs?: number; serverUrl?: string }) {
@@ -60,11 +114,6 @@ export class ProtocolServer {
   handleClose(connId: string): void {
     const state = this.connStates.get(connId)
 
-    // O ANFITRIÃO (assento 0) caiu: a sala inteira acaba, não só o assento
-    // dele. Sem seats[0].connId, startRoom nunca mais autoriza ninguém a
-    // iniciar - deixar a sala "zumbi" esperando ele reconectar travaria o
-    // jogo pros outros pra sempre (pedido do usuário: "quando o host cai a
-    // sala deve cair junto"). Avisa quem ainda estiver conectado.
     if (state?.seat === 0) {
       const remaining = this.rooms.closeRoom(state.roomCode)
       for (const otherConnId of remaining) {
@@ -82,11 +131,6 @@ export class ProtocolServer {
     if (!state) return
     this.broadcastLobby(state.roomCode)
 
-    // Se a partida já tinha começado, quem ficar precisa saber AGORA que
-    // pausou - broadcastLobby só é lido pela tela de LOBBY (ver
-    // OnlineGameplay.tsx, que nunca lê `lobby`), então sem isto o banner de
-    // pausa só apareceria na próxima vez que alguém tentasse jogar e
-    // levasse o erro de handleIntent.
     const room = this.rooms.getRoom(state.roomCode)
     if (room?.started && room.session) {
       this.broadcastState(room)
@@ -117,12 +161,6 @@ export class ProtocolServer {
     if (!room) return
     for (const seat of room.seats) {
       if (!seat.connId) continue
-      // `seat: seat.index` é o assento ATUAL desta conexão específica -
-      // sem isso, quem troca de assento via chooseSeat só recebe a lista
-      // de assentos (sem saber qual É o dele), e o cliente continuava
-      // achando que estava no assento ANTIGO (o destaque "(você)" e o
-      // lápis de editar nome ficavam grudados lá, agora ocupado por uma
-      // IA - relato do usuário: "o nome não vai e fica em destaque").
       this.send(seat.connId, {
         type: 'lobby',
         code: room.code,
@@ -134,9 +172,6 @@ export class ProtocolServer {
     }
   }
 
-  /** true enquanto QUALQUER assento humano estiver desconectado — a partida
-   * fica pausada até todo mundo voltar (pedido do usuário: "pausar o
-   * jogo"). Assentos de IA nunca contam. */
   private isPaused(room: Room): boolean {
     return room.seats.some((s) => s.kind === 'human' && s.connId === undefined)
   }
@@ -146,9 +181,6 @@ export class ProtocolServer {
     const paused = this.isPaused(room)
     for (const seat of room.seats) {
       if (!seat.connId || seat.kind !== 'human') continue
-      // getViewFor já devolve connected=true/paused=false pra tudo (o
-      // GameSession não sabe de rede) - aqui é onde o protocolo sobrescreve
-      // com o estado real das conexões antes de transmitir.
       const view = room.session.getViewFor(seat.index)
       view.paused = paused
       view.players = view.players.map((p) => ({
@@ -167,47 +199,60 @@ export class ProtocolServer {
     }
   }
 
-  /** Runs queued AI turns one at a time, broadcasting state after each, with
-   * a pacing delay between them. Resolves once it's a human's turn again or
-   * the round/match has ended. */
   private async runAiTurnsPaced(room: Room): Promise<void> {
-    if (!room.session) return
-    while (room.session.status === 'playing') {
-      // Alguém caiu no meio dessa sequência de turnos de IA (ou já estava
-      // pausado quando isto foi chamado) - para na hora. Retoma sozinho na
-      // próxima vez que handleIntent/handleJoin chamar isto de novo, depois
-      // que a reconexão levantar a pausa.
-      if (this.isPaused(room)) break
-      const seat = room.session.currentSeat
-      const config = room.seats[seat]
-      if (!config || config.kind !== 'ai') break
-      const lines = room.session.runAiTurns()
-      this.broadcastState(room)
-      this.broadcastLog(room, lines)
-      if (this.aiTurnDelayMs > 0) {
-        await new Promise((resolve) => setTimeout(resolve, this.aiTurnDelayMs))
+    if (!room.session || this.aiLoops.has(room)) return
+    this.aiLoops.add(room)
+    try {
+      while (room.session.status === 'playing' && this.rooms.getRoom(room.code) === room) {
+        if (this.isPaused(room)) break
+        const config = room.seats[room.session.currentSeat]
+        if (!config || config.kind !== 'ai') break
+        const lines = room.session.runNextAiTurn()
+        this.broadcastState(room)
+        this.broadcastLog(room, lines)
+        if (this.aiTurnDelayMs > 0) {
+          await new Promise((resolve) => setTimeout(resolve, this.aiTurnDelayMs))
+        }
       }
+    } finally {
+      this.aiLoops.delete(room)
     }
   }
 
-  async handleMessage(connId: string, raw: ClientMessage): Promise<void> {
-    switch (raw.type) {
-      case 'create':
-        return this.handleCreate(connId, raw.name, raw.difficulty)
-      case 'join':
-        return this.handleJoin(connId, raw.code, raw.name)
-      case 'start':
-        return this.handleStart(connId)
-      case 'intent':
-        return this.handleIntent(connId, raw.intent)
-      case 'nextRound':
-        return this.handleIntent(connId, { type: 'nextRound' })
-      case 'chooseSeat':
-        return this.handleChooseSeat(connId, raw.seatIndex)
-      case 'rename':
-        return this.handleRename(connId, raw.name)
-      default:
-        this.sendError(connId, 'mensagem desconhecida')
+  private launchAiTurns(room: Room): void {
+    this.runAiTurnsPaced(room)
+      .then(() => this.broadcastState(room))
+      .catch((err) => {
+        console.error('Falha nos turnos da IA:', err)
+        this.broadcastState(room)
+      })
+  }
+
+  async handleMessage(connId: string, raw: unknown): Promise<void> {
+    if (!isClientMessage(raw)) {
+      this.sendError(connId, 'mensagem invalida')
+      return
+    }
+    try {
+      switch (raw.type) {
+        case 'create':
+          return this.handleCreate(connId, raw.name, raw.difficulty)
+        case 'join':
+          return this.handleJoin(connId, raw.code, raw.name)
+        case 'start':
+          return this.handleStart(connId)
+        case 'intent':
+          return this.handleIntent(connId, raw.intent)
+        case 'nextRound':
+          return this.handleIntent(connId, { type: 'nextRound' })
+        case 'chooseSeat':
+          return this.handleChooseSeat(connId, raw.seatIndex)
+        case 'rename':
+          return this.handleRename(connId, raw.name)
+      }
+    } catch (err) {
+      console.error('Erro ao tratar mensagem:', err)
+      this.sendError(connId, 'erro interno ao processar a mensagem')
     }
   }
 
@@ -222,13 +267,6 @@ export class ProtocolServer {
       this.sendError(connId, result.error)
       return
     }
-    // O assento mudou - connStates precisa acompanhar, senão a próxima
-    // intent/start deste jogador seria avaliada com o assento ANTIGO. Não dá
-    // pra só atualizar o CHAMADOR aqui: rooms.chooseSeat agora também troca
-    // de lugar com outro HUMANO (não só um assento de IA vazio), e nesse
-    // caso o connId de QUEM FOI TROCADO também mudou de assento - resincroniza
-    // os dois de uma vez varrendo room.seats (mais simples e robusto do que
-    // rooms.chooseSeat ter que devolver quem mais foi afetado).
     const room = this.rooms.getRoom(state.roomCode)
     if (room) {
       for (const seat of room.seats) {
@@ -255,14 +293,22 @@ export class ProtocolServer {
   }
 
   private handleCreate(connId: string, name: string, difficulty: Difficulty): void {
-    const { code } = this.rooms.createRoom(connId, name, difficulty)
+    if (this.connStates.has(connId)) {
+      this.sendError(connId, 'voce ja esta em uma sala')
+      return
+    }
+    const { code } = this.rooms.createRoom(connId, cleanName(name) || 'Jogador', difficulty)
     this.connStates.set(connId, { roomCode: code, seat: 0 })
     this.send(connId, { type: 'joined', code, seat: 0, isHost: true, serverUrl: this.serverUrl })
     this.broadcastLobby(code)
   }
 
   private handleJoin(connId: string, code: string, name: string): void {
-    const result = this.rooms.joinRoom(code, connId, name)
+    if (this.connStates.has(connId)) {
+      this.sendError(connId, 'voce ja esta em uma sala')
+      return
+    }
+    const result = this.rooms.joinRoom(code, connId, cleanName(name) || 'Jogador')
     if ('error' in result) {
       this.sendError(connId, result.error)
       return
@@ -277,18 +323,10 @@ export class ProtocolServer {
     })
     this.broadcastLobby(code)
 
-    // Reconexão NO MEIO de uma partida (rooms.ts joinRoom agora permite isso
-    // pra um assento que já estava desconectado): sem isso, quem voltou só
-    // recebia `joined`+`lobby` e ficava preso na tela de lobby pra sempre,
-    // já que o cliente só troca pra tela de jogo quando um `state` chega
-    // (ver OnlineLobby.tsx). broadcastState manda pra TODO MUNDO - também
-    // limpa o banner de pausa de quem já estava esperando, já que este
-    // assento volta a aparecer `connected: true`. Se a pausa acabou de ser
-    // levantada, retoma turnos de IA que possam ter ficado travados.
     const room = this.rooms.getRoom(code)
     if (room?.started && room.session) {
       this.broadcastState(room)
-      void this.runAiTurnsPaced(room).then(() => this.broadcastState(room))
+      this.launchAiTurns(room)
     }
   }
 
@@ -306,7 +344,7 @@ export class ProtocolServer {
     const room = this.rooms.getRoom(state.roomCode)
     if (!room) return
     this.broadcastState(room)
-    void this.runAiTurnsPaced(room).then(() => this.broadcastState(room))
+    this.launchAiTurns(room)
   }
 
   private handleIntent(connId: string, intent: Intent): void {
@@ -330,6 +368,6 @@ export class ProtocolServer {
       return
     }
     this.broadcastState(room)
-    void this.runAiTurnsPaced(room).then(() => this.broadcastState(room))
+    this.launchAiTurns(room)
   }
 }
