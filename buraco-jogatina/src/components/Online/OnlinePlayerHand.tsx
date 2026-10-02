@@ -3,8 +3,6 @@ import { CardComponent } from '../Card'
 import { asCard } from '../../online/cardAdapter'
 import type { PlainCard, SeatView } from '../../session/types'
 
-/** Idêntico ao HAND_CARD_SIZE de PlayerHand.tsx (offline) — ver lá para a
- * explicação completa. */
 const HAND_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-14 landscape:h-[4.25rem]'
 
 const SUIT_ORDER: Record<PlainCard['suit'], number> = {
@@ -14,8 +12,6 @@ const SUIT_ORDER: Record<PlainCard['suit'], number> = {
   diamonds: 3,
 }
 
-/** Idêntico a handRankValue de PlayerHand.tsx: Ás BAIXO (A=1), crescente:
- * A 2 3 4 5 6 7 8 9 10 J Q K. */
 function handRankValue(rank: PlainCard['rank']): number {
   if (rank === 'A') return 1
   if (rank === 'J') return 11
@@ -25,8 +21,6 @@ function handRankValue(rank: PlainCard['rank']): number {
   return isNaN(n) ? 0 : n
 }
 
-/** Idêntico a orderedHand de PlayerHand.tsx: agrupa por naipe, A→K dentro do
- * naipe, curingas por último. */
 function orderedHand(hand: PlainCard[]): { card: PlainCard; index: number }[] {
   return hand
     .map((card, index) => ({ card, index }))
@@ -42,9 +36,6 @@ interface OnlinePlayerHandProps {
   view: SeatView
 }
 
-/** Online equivalent of PlayerHand.tsx — mesma ordenação (A→K por naipe),
- * mesma "meia carta" em paisagem, mesmos naipes grandes no canto, mesma
- * seleção sem subir a carta (só realce). */
 export default function OnlinePlayerHand({ view }: OnlinePlayerHandProps) {
   const selectedCardIndices = useOnlineStore(s => s.selectedCardIndices)
   const toggleCardSelection = useOnlineStore(s => s.toggleCardSelection)
@@ -63,9 +54,6 @@ export default function OnlinePlayerHand({ view }: OnlinePlayerHandProps) {
           : 'Selecione cartas: 1 para descartar, 3+ para baixar um jogo.'
 
   return (
-    // Sem painel próprio: o painel visual (borda/fundo) é o container
-    // compartilhado em OnlineGameplay.tsx, que abriga mão E descarte lado a
-    // lado — igual ao PlayerHand offline.
     <div className="flex h-full min-w-0 flex-col space-y-1 landscape:space-y-0">
       <div className="flex flex-nowrap items-baseline justify-between gap-x-3">
         <h3 className="shrink-0 font-display text-sm text-card-gold landscape:text-[10px]">

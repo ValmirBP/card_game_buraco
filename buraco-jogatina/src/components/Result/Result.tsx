@@ -4,17 +4,12 @@ import type { TeamId, TeamScoreBreakdown } from '../../engine/gameState'
 
 interface ResultProps {
   onBackToMenu: () => void
-  /** Advances to the next round of the SAME match (match still in
-   * progress — no `matchWinner` yet). */
   onNextRound: () => void
-  /** Starts a brand-new match (current match just ended — `matchWinner`
-   * is set). */
   onNewMatch: () => void
 }
 
 const TEAM_LABEL: Record<TeamId, string> = { A: 'Nós', B: 'Eles' }
 
-/** One line of the score breakdown (label + signed value). */
 function BreakdownRow({ label, value, muted }: { label: string; value: number; muted?: boolean }) {
   const sign = value > 0 ? '+' : value < 0 ? '−' : ''
   const color = value > 0 ? 'text-green-300' : value < 0 ? 'text-red-300' : 'text-gray-400'
@@ -30,8 +25,6 @@ function BreakdownRow({ label, value, muted }: { label: string; value: number; m
 }
 
 export default function Result({ onBackToMenu, onNextRound, onNewMatch }: ResultProps) {
-  // `version` selected alongside `game` per the store's reactivity contract
-  // (game is a mutable engine instance with a stable reference).
   useGameStore(s => s.version)
   const game = useGameStore(s => s.game)
   const matchScores = useGameStore(s => s.matchScores)
@@ -42,7 +35,6 @@ export default function Result({ onBackToMenu, onNextRound, onNewMatch }: Result
   if (!game) return null
 
   const { teams, players, winnerTeam, scoreBreakdowns } = game.state
-  // Team A is always seats [0, 2] = the human + their AI partner ("Nós").
   const humanMatchWon = matchWinner === 'A'
   const sortedTeams = [...teams].sort((a, b) => b.score - a.score)
 
@@ -134,10 +126,6 @@ export default function Result({ onBackToMenu, onNextRound, onNewMatch }: Result
                       value={b.mortoPenalty}
                     />
                   )}
-                  {/* Cartas na mão de CADA jogador, separadamente. Um
-                      jogador com counted=false (pegou o morto e não chegou a
-                      usar) aparece riscado: as cartas dele não descontam -
-                      o time já pagou os -100 do morto acima. */}
                   {b.handBySeat.map(h =>
                     h.points === 0 ? null : h.counted ? (
                       <BreakdownRow key={h.seat} label={`Mão de ${h.playerName}`} value={-h.points} />

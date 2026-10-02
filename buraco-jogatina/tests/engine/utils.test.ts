@@ -142,7 +142,6 @@ describe('isValidCanasta', () => {
 
     test('[A,3,4] same suit -> true (ace low, no 2 involved)', () => {
       const cards = [real('A'), real('3'), real('4'), joker()]
-      // needs the joker to fill the "2" gap since no natural 2 present
       expect(isValidCanasta(cards)).toBe(true)
     })
 
@@ -233,10 +232,7 @@ describe('isValidCanasta', () => {
       expect(isValidCanasta(cards)).toBe(true)
       const analysis = analyzeMeld(cards)
       expect(analysis).not.toBeNull()
-      // suja (o 2 está atuando como curinga numa sequência alta)
       expect(analysis!.isClean).toBe(false)
-      // o curinga ocupa a posição da Q (valor 12), ABAIXO da sequência K-A —
-      // nunca acima do Ás (que seria o wrap ilegal K-A-2)
       const twoEntry = analysis!.layout.find(e => e.card.rank === '2')
       expect(twoEntry!.representsValue).toBe(12)
       expect(Math.max(...analysis!.layout.map(e => e.representsValue))).toBe(14)
@@ -448,7 +444,6 @@ describe('canExtendMeld', () => {
 
 describe('Ace at both ends simultaneously (double-ace sequence, A..K..A)', () => {
   function fullRunNoLowAce(suit: Suit = 'hearts'): Card[] {
-    // 2,3,4,5,6,7,8,9,10,J,Q,K,A - 13 cards, single Ace at the high end.
     const ranks: Rank[] = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
     return ranks.map(r => real(r, suit))
   }
@@ -472,7 +467,6 @@ describe('Ace at both ends simultaneously (double-ace sequence, A..K..A)', () =>
   })
 
   test('double-ace sequence with an internal gap filled by a curinga is valid but dirty', () => {
-    // Missing the 7; joker fills it. Aces anchor both ends.
     const ranks: Rank[] = ['2', '3', '4', '5', '6', '8', '9', '10', 'J', 'Q', 'K']
     const cards = [real('A', 'hearts'), ...ranks.map(r => real(r, 'hearts')), real('A', 'hearts'), joker()]
     const analysis = analyzeMeld(cards)!
@@ -494,7 +488,6 @@ describe('Ace at both ends simultaneously (double-ace sequence, A..K..A)', () =>
     const cards = [real('K'), real('A'), two('hearts')]
     expect(isValidCanasta(cards)).toBe(true)
     const layout = resolveMeldLayout(cards)!
-    // curinga (2) na posição da Q (12), teto no Ás (14): Q-K-A, sem dar a volta
     expect(layout.find(e => e.card.rank === '2')!.representsValue).toBe(12)
     expect(Math.max(...layout.map(e => e.representsValue))).toBe(14)
   })

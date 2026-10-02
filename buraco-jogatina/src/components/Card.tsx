@@ -6,47 +6,12 @@ interface CardProps {
   onClick?: () => void
   selected?: boolean
   index?: number
-  /** Overrides the default footprint (see CARD_SIZE_CLASSES). Used by the
-   * single-player landscape table layout to shrink table cards while
-   * leaving every other caller (Online, the player's hand) untouched. */
   sizeClassName?: string
-  /** Opt-in: shrinks the rank/suit glyphs and jester illustration ONLY in
-   * landscape orientation (via a `landscape:` Tailwind variant baked into
-   * the class strings below), to match a `sizeClassName` that also shrinks
-   * only in landscape. Left `undefined`/false everywhere except the
-   * single-player table/melds, so Online (which never passes this prop)
-   * and the player's hand keep their normal glyph size in every
-   * orientation. */
   compactOnLandscape?: boolean
-  /** Overrides the corner rank/suit glyph size classes. Used pela mão do
-   * humano em paisagem, que fica em "meia carta" (só o topo aparece) e por
-   * isso quer o rank/naipe do canto BEM grandes/legíveis, sem depender do
-   * símbolo central (que fica escondido abaixo da dobra). */
   cornerClassName?: string
-  /** 'row' põe rank e naipe LADO A LADO (em vez de empilhados) no índice do
-   * canto — usado nas colunas de jogos baixados em paisagem (GameBoard),
-   * onde as cartas se sobrepõem tanto que só uma faixa fina do canto de cada
-   * carta (abaixo da carta de cima) fica visível; empilhado, o naipe some
-   * nessa faixa. Default 'column' (empilhado, como uma carta real) em todo
-   * outro lugar (mão, monte, descarte). */
   cornerLayout?: 'column' | 'row'
 }
 
-/**
- * Naipes desenhados em SVG, NÃO como caractere de fonte (♥♦♣♠).
- *
- * Motivo: a Roboto (fonte do Android) não tem os glifos de naipe, então o
- * sistema caía na fonte de EMOJI, que desenha um bitmap com a cor embutida
- * e ignora o `color` do CSS. Resultado medido na tela: espadas saíam
- * (70,76,79) - cinza-azulado - em vez da cor do tema, e os vermelhos vinham
- * num tom fixo mais berrante que o resto da carta. O seletor de texto
- * (U+FE0E) não resolveu, porque sem nenhuma fonte de texto com o glifo o
- * fallback volta pro emoji.
- *
- * Com SVG + `fill="currentColor"`, a cor é exatamente a do CSS
- * (--color-suit-*), idêntica em qualquer aparelho, e o tamanho acompanha o
- * font-size (1em) como se fosse texto.
- */
 export function SuitIcon({ suit, className = '' }: { suit: CardType['suit']; className?: string }) {
   const common = {
     viewBox: '0 0 24 24',
@@ -92,14 +57,8 @@ const SUIT_COLOR_CLASS: Record<CardType['suit'], string> = {
   spades: 'text-suit-spades',
 }
 
-/** Shared footprint for both the face card and the card back so hands, melds
- * and the draw pile all line up visually. Sized generously so rank + suit
- * stay legible even with a full hand (rows scroll horizontally). */
 export const CARD_SIZE_CLASSES = 'w-16 h-24 sm:w-20 sm:h-28'
 
-/** Small illustrated jester — cap with three bell-tipped points over a
- * simple masked face — used on wild cards instead of a plain star so the
- * card reads as an actual illustrated Joker. */
 function JesterIllustration({ compactOnLandscape }: { compactOnLandscape?: boolean }) {
   return (
     <svg
@@ -125,10 +84,6 @@ function JesterIllustration({ compactOnLandscape }: { compactOnLandscape?: boole
   )
 }
 
-/** Posição dos NAIPES REPETIDOS (pips) no corpo da carta, por rank, em
- * porcentagem [x, y] da face — o layout clássico de baralho impresso
- * (2 colunas + coluna central pros ímpares), como na foto de referência do
- * usuário. A/J/Q/K não usam pips (ver o JSX: naipe central único grande). */
 const PIP_POSITIONS: Record<string, Array<[number, number]>> = {
   '2': [
     [50, 28],
@@ -220,10 +175,6 @@ export function CardComponent({
     : compactOnLandscape
       ? 'text-sm sm:text-base landscape:text-[10px] landscape:leading-none'
       : 'text-sm sm:text-base'
-  // Naipe central: em paisagem a carta é pequena (56x68 na mão) e mostrada
-  // em "meia carta", então um glifo grande demais tomava conta dela toda -
-  // o usuário reclamou de "naipes muito grandes". text-sm mantém o naipe
-  // legível e proporcional ao rank do canto.
   const centerTextClass = compactOnLandscape
     ? 'text-2xl sm:text-3xl landscape:text-sm'
     : 'text-2xl sm:text-3xl'
@@ -231,11 +182,6 @@ export function CardComponent({
   const cornerGapBottom = compactOnLandscape
     ? 'bottom-1.5 right-2 landscape:bottom-0.5 landscape:right-1'
     : 'bottom-1.5 right-2'
-  // 'row': rank e naipe lado a lado, cabe numa faixa mais baixa (ver
-  // CardProps.cornerLayout) — só em PAISAGEM (landscape:), onde a carta é
-  // pequena e a sobreposição das colunas deixa pouca altura por carta. Em
-  // retrato a carta é grande (sobra altura de sobra) e continua empilhada
-  // (o layout tradicional de carta real), mesmo quando cornerLayout='row'.
   const cornerFlexClass = cornerLayout === 'row' ? 'flex-col landscape:flex-row landscape:gap-0.5' : 'flex-col'
   const suitSpacingClass = cornerLayout === 'row' ? '-mt-[0.1em] landscape:mt-0' : '-mt-[0.1em]'
 
@@ -243,9 +189,6 @@ export function CardComponent({
     <motion.div
       layout
       initial={{ opacity: 0, y: 24, scale: 0.9 }}
-      // A carta NÃO sobe ao ser selecionada — a seleção só a REALÇA (anel
-      // dourado + leve zoom), sem mudar a altura da fileira (a mão fica em
-      // "meia carta" fixa). Sem lift no hover também.
       animate={{ opacity: 1, y: 0, scale: selected ? 1.06 : 1 }}
       whileHover={{ scale: 1.08, zIndex: 40 }}
       whileTap={{ scale: 0.94 }}
@@ -260,7 +203,6 @@ export function CardComponent({
       aria-pressed={onClick ? Boolean(selected) : undefined}
       className={[
         sizeClassName ?? CARD_SIZE_CLASSES,
-        // rounded-md (não -xl): pontas menos arredondadas, pedido do usuário.
         'relative select-none rounded-md border shadow-md',
         onClick ? 'cursor-pointer' : '',
         card.isWild
@@ -284,13 +226,6 @@ export function CardComponent({
         </div>
       ) : (
         <>
-          {/* Índice do canto (estilo carta real): rank em cima, naipe logo
-              abaixo bem juntinho (leading tight + tucking), no topo-esquerdo e
-              espelhado no rodapé-direito.
-              O tamanho da fonte vai no CONTAINER e o naipe usa 0.78em: assim
-              ele fica sempre PROPORCIONALMENTE menor que o rank, em qualquer
-              contexto (mão, mesa, descarte), como numa carta impressa - antes
-              os dois tinham o mesmo tamanho e o naipe pesava demais. */}
           <div
             className={`absolute flex items-center leading-[0.85] ${cornerFlexClass} ${cornerGap} ${suitClass} ${cornerTextClass}`}
           >
@@ -303,12 +238,6 @@ export function CardComponent({
             <span className="font-bold tracking-tight">{card.rank}</span>
             <SuitIcon suit={card.suit} className={`${suitSpacingClass} text-[0.78em]`} />
           </div>
-          {/* Corpo da carta. Em PAISAGEM (o jogo de verdade, cartas
-              pequenas): um ÚNICO naipe central — os naipes repetidos (pips)
-              viravam poluição visual nesse tamanho ("tem muito desenho na
-              carta", feedback do usuário). Em RETRATO (cartas grandes, ex.:
-              leque do menu), as numéricas 2-10 mantêm os pips estilo baralho
-              impresso, onde há espaço pra eles respirarem. */}
           {PIP_POSITIONS[card.rank] && (
             <div className="relative h-full w-full landscape:hidden" aria-hidden="true">
               {PIP_POSITIONS[card.rank].map(([x, y], pi) => (
@@ -335,11 +264,6 @@ export function CardComponent({
   )
 }
 
-/** Face-down card used for the draw pile / opponent's hand. Purely
- * decorative — same footprint as CardComponent so it lines up in rows.
- * `variant` gives the two physical decks (Buraco is played with 2 merged
- * 52-card decks + wilds) distinct back colors, blue and red, as on a real
- * casino table. */
 export function CardBack({
   className = '',
   variant = 'blue',
@@ -348,10 +272,7 @@ export function CardBack({
 }: {
   className?: string
   variant?: 'blue' | 'red'
-  /** See CardComponent's `sizeClassName` — overrides the default footprint. */
   sizeClassName?: string
-  /** See CardComponent's `compactOnLandscape` — shrinks the "B" glyph to
-   * match, only in landscape orientation. */
   compactOnLandscape?: boolean
 }) {
   return (

@@ -1,20 +1,3 @@
-/**
- * Testa a ponte JS (src/online/nativeHostServer.ts) contra uma implementação
- * FALSA da superfície do plugin nativo (HostServerPlugin.java) — a falsa se
- * comporta como o servidor Java-WebSocket de verdade se comportaria (eventos
- * connectionOpen -> message -> connectionClosed; `send` entrega pro peer
- * certo), sem precisar de um socket TCP real nem da camada Android nativa.
- *
- * O que isso prova: a ponte conduz corretamente o MESMO ProtocolServer que
- * server/index.ts usa no servidor de desktop — então qualquer fluxo de
- * create/join/jogar que já funciona contra o servidor de desktop também
- * funciona hospedado a partir de um celular. A parte que este teste NÃO
- * cobre é o transporte nativo em si (o plugin Java real, o bind da porta,
- * o handshake WebSocket de verdade) — essa parte foi verificada à parte,
- * rodando o app no emulador com `adb forward` (ver o build/relatório da
- * sessão).
- */
-
 interface FakeConn {
   onMessageFromServer: (data: string) => void
 }
@@ -54,8 +37,6 @@ function makeFakeHostServerPlugin() {
     }),
   }
 
-  /** Simula outro aparelho conectando (host ou convidado) — equivalente a
-   * um `new WebSocket(...)` de verdade abrindo contra o servidor nativo. */
   function connectPeer(onMessageFromServer: (data: string) => void) {
     const connId = `native-${nextId++}`
     conns.set(connId, { onMessageFromServer })
@@ -79,8 +60,6 @@ jest.mock('@capacitor/core', () => ({
   registerPlugin: () => fakeHost.plugin,
 }))
 
-/** Deixa qualquer microtask pendente (ex.: o .catch() de handleMessage)
- * assentar antes de inspecionar o que foi recebido. */
 async function flush(): Promise<void> {
   await Promise.resolve()
   await Promise.resolve()
@@ -122,8 +101,6 @@ describe('nativeHostServer', () => {
     host.sendToServer(JSON.stringify({ type: 'start' }))
     await flush()
 
-    // Depois de "start", o estado da partida chega pros dois assentos
-    // humanos - exatamente como no servidor de desktop.
     expect(hostMessages.some((m) => m.type === 'state')).toBe(true)
     expect(guestMessages.some((m) => m.type === 'state')).toBe(true)
   })

@@ -22,7 +22,6 @@ export function createDeck(): Card[] {
   const ranks: Rank[] = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
   const deck: Card[] = []
 
-  // 2 decks padrão
   for (let d = 0; d < 2; d++) {
     for (const suit of suits) {
       for (const rank of ranks) {
@@ -31,17 +30,14 @@ export function createDeck(): Card[] {
     }
   }
 
-  // 4 curingas
   for (let i = 0; i < 4; i++) {
-    deck.push(new Card('hearts', '2', true)) // Representa curinga
+    deck.push(new Card('hearts', '2', true))
   }
 
   shuffleInPlace(deck)
   return deck
 }
 
-/** Fisher-Yates in place. Também usado quando o LIXO é embaralhado pra virar
- * o novo monte após monte+mortos esgotarem (ver Game.drawFromDeck). */
 export function shuffleInPlace(cards: Card[]): void {
   for (let i = cards.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1))

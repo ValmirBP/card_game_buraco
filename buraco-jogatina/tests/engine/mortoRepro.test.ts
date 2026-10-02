@@ -31,21 +31,20 @@ describe('REPRO: zerar a mão com morto ainda disponível deve PEGAR o morto, n�
     game.setup()
     const teamA = game.state.teams.find(t => t.id === 'A')!
     teamA.hasTakenMorto = false
-    teamA.melds = [cleanCanastra()] // já tem canastra limpa (canClose seria true SE tivesse morto)
-    game.state.mortos = [Array.from({ length: 11 }, () => new Card('clubs', '3', false))] // 1 morto disponível
+    teamA.melds = [cleanCanastra()]
+    game.state.mortos = [Array.from({ length: 11 }, () => new Card('clubs', '3', false))]
     game.state.currentPlayerIndex = 0
 
-    // seat 0 com 1 carta na mão
     const p0 = game.state.players[0]
     while (p0.hand.getSize() > 0) p0.hand.removeCard(0)
     p0.hand.addCard(new Card('spades', 'K', false))
 
-    game.discard(0) // descarta a última carta
+    game.discard(0)
 
-    expect(game.state.mortos.length).toBe(0)          // morto foi consumido
-    expect(teamA.hasTakenMorto).toBe(true)            // time pegou o morto
-    expect(p0.hand.getSize()).toBe(11)                // mão reabastecida
-    expect(game.isGameOver()).toBe(false)             // NÃO acabou
+    expect(game.state.mortos.length).toBe(0)
+    expect(teamA.hasTakenMorto).toBe(true)
+    expect(p0.hand.getSize()).toBe(11)
+    expect(game.isGameOver()).toBe(false)
   })
 
   test('playCanasta que zera a mão: time sem morto + morto disponível → pega o morto, não bate', () => {
@@ -59,7 +58,6 @@ describe('REPRO: zerar a mão com morto ainda disponível deve PEGAR o morto, n�
 
     const p0 = game.state.players[0]
     while (p0.hand.getSize() > 0) p0.hand.removeCard(0)
-    // mão = exatamente uma sequência limpa de 7 (baixar zera a mão)
     const seq = ['4', '5', '6', '7', '8', '9', '10'].map(r => new Card('spades', r as never, false))
     seq.forEach(c => p0.hand.addCard(c))
 

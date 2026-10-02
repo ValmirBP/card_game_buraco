@@ -24,37 +24,17 @@ const TEAM_TEXT_CLASS: Record<TeamId, string> = {
   A: 'text-card-gold',
   B: 'text-fuchsia-300',
 }
-// Onde cada painel de dupla fica na grade. Retrato: empilhado (fallback).
-// Paisagem ("estilo Jogatina"): Nós na coluna 2, Eles na coluna 3 — as duas
-// colunas centrais (1fr cada) que ocupam a MAIOR parte do feltro; os
-// jogadores ficam nas colunas-borda (1 e 4), FORA da área dos jogos.
 const TEAM_GRID_CLASS: Record<TeamId, string> = {
   A: 'order-4 landscape:col-start-2 landscape:row-start-1',
   B: 'order-4 landscape:col-start-3 landscape:row-start-1',
 }
 
-/** Footprint do MONTE — grande em retrato (legibilidade), mas compacto em
- * paisagem: o monte é só um botão de comprar, não precisa do mesmo tamanho
- * das cartas da mão — pedido do usuário pra sobrar mais espaço horizontal
- * pros quadros de baixar carta. */
 const PILE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-12 landscape:h-16'
-/** Footprint do MORTO — mesmo tamanho do monte (pedido do usuário: "deixe
- * o morto no mesmo tamanho do monte"). Alias direto pra nunca dessincronizar
- * dos dois — se o monte mudar de tamanho de novo, o morto acompanha. */
 const MORTO_CARD_SIZE = PILE_CARD_SIZE
-/** Footprint das cartas do DESCARTE — MESMO tamanho das cartas da mão, pra a
- * fileira do descarte ficar paralela à mão e visualmente consistente. Deve
- * acompanhar HAND_CARD_SIZE em PlayerHand.tsx. */
 const HAND_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-14 landscape:h-[4.25rem]'
-/** Naipes/rank do canto grandes e legíveis (usado na mão e no descarte). */
 const BIG_CORNER = 'text-sm font-normal sm:text-base landscape:text-lg landscape:leading-none'
 
-/** The 4-seat table: opponents/partner around a center that shows the draw
- * pile, discard pile (with a small fan of the last few cards), the two
- * mortos (crossed face-down cards until taken), and the two teams' melds. */
 export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExtendMeld }: GameBoardProps) {
-  // Subscribed so the board re-renders whenever any part of `game` mutates
-  // (see the REACTIVITY CONTRACT comment on GameStore.game).
   useGameStore(s => s.version)
   const game = useGameStore(s => s.game)
   const selectedCardIndices = useGameStore(s => s.selectedCardIndices)
@@ -70,8 +50,6 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
     setHint(message)
     window.setTimeout(() => setHint(current => (current === message ? null : current)), 2600)
   }
-
-  // ---- Manipulação direta: monte / descarte / mesa (sem botões) ----------
 
   const canClickDeck = isHumanTurn && phase === 'draw'
   const canClickDropZone = isHumanTurn && phase === 'play' && selectedCardIndices.length >= 3
@@ -114,10 +92,8 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
     meldIndex: number,
     meldCards: import('../../engine/card').Card[]
   ) => {
-    // Clicar num jogo existente é "estender"; não deve borbulhar para o
-    // painel "Nós" (que baixaria um jogo novo).
     event.stopPropagation()
-    if (teamId !== 'A') return // only the human (seat 0) acts; only Team A melds are extendable by them
+    if (teamId !== 'A') return
     if (!isHumanTurn || phase !== 'play' || selectedCardIndices.length === 0) return
 
     const handCards = players[0].hand.getCards()
@@ -136,12 +112,6 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
     const targetRect = event.currentTarget.getBoundingClientRect()
     onExtendMeld(meldIndex, selectedCardIndices, targetRect)
   }
-
-  // ---------------------------------------------------------------------
-  // Blocos reutilizados na grade (definidos como JSX pra a grade em si ficar
-  // legível). Monte (canto sup-esq), mortos (ao lado do monte), descarte
-  // (embaixo, logo acima da mão).
-  // ---------------------------------------------------------------------
 
   const deckPile =
     deck.length > 0 ? (
@@ -183,8 +153,6 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
         <div className="relative flex h-12 w-12 items-center justify-center landscape:h-12 landscape:w-12">
           <AnimatePresence>
             {mortos.map((morto, i) => {
-              // i === 0 -> morto 1 deitado por cima; i === 1 -> morto 2 em pé
-              // por baixo (cruz). Se só resta um, fica em pé, centralizado.
               const isCrossed = mortos.length === 2
               const rotate = isCrossed && i === 0 ? 90 : 0
               return (
@@ -217,33 +185,13 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
     </div>
   )
 
-  // O DESCARTE não mora mais aqui: virou o componente DiscardRow, embutido
-  // no painel da mão (lado a lado) — ver Gameplay.tsx.
-
   return (
     <div className="relative h-full min-h-0 rounded-2xl border border-white/10 bg-black/25 p-2 shadow-lg backdrop-blur-sm sm:p-4 landscape:rounded-xl landscape:border-0 landscape:p-2 landscape:overflow-hidden">
-      {/* Retrato: empilha (fallback decente). Paisagem ("estilo Jogatina"):
-          grade com os JOGADORES nas colunas-borda (fora do feltro de jogo),
-          o MONTE no canto sup-esquerdo, o DESCARTE embaixo (logo acima da
-          mão) e os painéis "Nós"/"Eles" ocupando as duas colunas centrais —
-          a MAIOR parte da mesa. Nada aqui rola: a grade encolhe pra caber
-          (minmax(0,1fr)) e o "quadro de baixar carta" de cada dupla ajusta
-          o tamanho das cartas pra TODOS os jogos caberem nele (MeldArea). */}
       <div className="flex flex-col gap-3 sm:gap-4 landscape:grid landscape:h-full landscape:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_auto] landscape:grid-rows-1 landscape:items-stretch landscape:gap-x-2 landscape:gap-y-1">
-        {/* Monte — em retrato ocupa seu próprio lugar no topo, como sempre.
-            Em paisagem vira um selo flutuante SOBRE o quadro "Nós" (ver bloco
-            landscape:col-start-2 logo abaixo, dentro da MESMA célula da
-            grade que o painel) — pedido do usuário: sem linha própria
-            reservada no topo, o quadro de baixar carta cresce até o topo da
-            tela. */}
         <div className="order-1 flex items-center justify-center landscape:hidden">
           {deckPile}
         </div>
 
-        {/* Parceiro: em paisagem mora no placar (Scoreboard.tsx), entre os
-            dois placares - pedido do usuário, libera essa linha inteira do
-            tabuleiro pro quadro de baixar carta. Em retrato continua aqui,
-            como sempre. */}
         <div data-seat-index={2} className="order-2 flex justify-center landscape:hidden">
           <Seat
             name={players[2].name}
@@ -253,8 +201,6 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
           />
         </div>
 
-        {/* Adversário 1 (Ana) — borda esquerda, ocupa a única linha da grade
-            (row1/col1), centralizado verticalmente nela. */}
         <div data-seat-index={1} className="order-3 flex justify-start landscape:col-start-1 landscape:row-start-1 landscape:self-center landscape:justify-self-center">
           <Seat
             name={players[1].name}
@@ -264,7 +210,6 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
           />
         </div>
 
-        {/* Adversário 2 (Carlos) — borda direita (row1/col4) */}
         <div data-seat-index={3} className="order-5 flex justify-end landscape:col-start-4 landscape:row-start-1 landscape:self-center landscape:justify-self-center">
           <Seat
             name={players[3].name}
@@ -274,28 +219,10 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
           />
         </div>
 
-        {/* Monte, versão paisagem: fica no canto sup-esquerdo, mesma coluna
-            de Ana (col1/row1) — como ela agora fica centralizada na altura
-            toda da linha, sobra espaço vazio acima dela, onde o monte
-            flutua sem empurrar nenhum painel nem cobrir o rótulo/placar
-            "Nós"/"Eles" (pedido do usuário: "deixa o monte no canto mesmo").
-            Só um dos dois `data-deck-pile` (este ou o de retrato acima) tem
-            tamanho de verdade a cada vez — mesmo cuidado do
-            parceiro/Scoreboard: ver o querySelectorAll + filtro de
-            visibilidade em Gameplay.tsx. */}
         <div className="hidden landscape:block landscape:col-start-1 landscape:row-start-1 landscape:z-20 landscape:self-start landscape:justify-self-center landscape:ml-[env(safe-area-inset-left)]">
           {deckPile}
         </div>
 
-        {/* ---- Jogos baixados por dupla (Nós/Eles) — colunas centrais,
-            ocupam a maior parte do feltro. Cada jogo é uma coluna de TIRAS
-            (rank+naipe de cada carta), dimensionada por MeldArea pra que
-            TODOS os jogos caibam no quadro sem rolagem. O painel "Nós" (Time
-            A) é a zona de baixar: com 3+ cartas selecionadas, clicar nele
-            forma uma canastra nova; clicar num jogo já baixado estende
-            aquele jogo. Em paisagem o cabeçalho tem altura FIXA (h-6), pra o
-            quadro não mudar de tamanho — e as cartas de escala — quando o
-            botão "Baixar jogo" aparece. ---- */}
         {teams.map(team => {
           const canClickToExtend =
             team.id === 'A' && isHumanTurn && phase === 'play' && selectedCardIndices.length > 0
@@ -318,12 +245,6 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
               <div className="flex items-center justify-between gap-2 landscape:h-6 landscape:shrink-0 landscape:px-1">
                 <h4 className={`flex shrink-0 items-center font-display text-sm landscape:text-sm landscape:leading-none ${TEAM_TEXT_CLASS[team.id]}`}>
                   {TEAM_LABEL[team.id]}
-                  {/* Botão SEMPRE visível no cabeçalho (que nunca é coberto
-                      pelas colunas de cartas): com a mesa cheia, o fundo do
-                      painel some atrás dos jogos e não sobra área vazia pra
-                      clicar - o botão garante que "baixar" nunca fica
-                      inalcançável (pedido do usuário). stopPropagation pra
-                      não disparar o clique do painel de novo. */}
                   {isDropTarget && (
                     <button
                       type="button"
@@ -363,9 +284,6 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
                       onClick: event => handleMeldClick(event, team.id, ci, canasta.cards),
                     }
                   })}
-                  // Slot tracejado "Baixar" no fim — sempre presente no
-                  // quadro do jogador, mesmo com a mesa cheia (pedido do
-                  // usuário); acende dourado com 3+ cartas selecionadas.
                   dock={team.id === 'A' ? { active: isDropTarget, onClick: handleDropZoneClick } : undefined}
                 />
               )}
@@ -373,7 +291,6 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
           )
         })}
 
-        {/* Você — só em retrato (a própria mão faz esse papel em paisagem) */}
         <div className="order-7 flex justify-center landscape:hidden">
           <Seat
             name={players[0].name}
@@ -385,20 +302,10 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
         </div>
       </div>
 
-      {/* Morto — escondido num canto discreto (topo-direito), pequeno.
-          landscape:mr-[env(...)]: única proteção contra o recorte de câmera
-          que sobrou aqui (ver comentário em Layout.tsx) — se o recorte cair
-          do lado direito nessa rotação, empurra só este badge, não o
-          tabuleiro inteiro. */}
-      {/* landscape:scale-100: sem encolher o morto por transform — agora
-          que MORTO_CARD_SIZE já é igual a PILE_CARD_SIZE, um scale menor
-          que 1 voltaria a deixar o morto visualmente menor que o monte
-          (pedido do usuário: "deixe o morto no mesmo tamanho do monte"). */}
       <div className="pointer-events-none absolute right-1 top-6 z-20 origin-top-right scale-[0.62] landscape:scale-100 landscape:mr-[env(safe-area-inset-right)]">
         {mortoBlock}
       </div>
 
-      {/* Selo de turno (sobreposto, canto sup-direito) */}
       <div className="pointer-events-none absolute right-2 top-2 z-30 landscape:mr-[env(safe-area-inset-right)]">
         <AnimatePresence>
           {status === 'playing' && !isHumanTurn && (
@@ -427,7 +334,6 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
         </AnimatePresence>
       </div>
 
-      {/* Dica/erro — sobreposta embaixo, não reserva altura */}
       <div className="pointer-events-none absolute inset-x-0 bottom-1 z-20 flex justify-center px-2">
         <AnimatePresence>
           {hint && (

@@ -12,11 +12,6 @@ describe('lanAddresses', () => {
   })
 
   test('prefers a real Wi-Fi/Ethernet interface over a VPN tunnel, regardless of enumeration order', () => {
-    // Reproduz o bug real: usuário com VPN ativa (utun) tinha o Mac com DUAS
-    // redes - a Wi-Fi de verdade (en0) e o túnel da VPN (utun4). Sem o
-    // filtro, se o utun aparecesse primeiro na ordem do SO, o QR code/campo
-    // "Entrar em uma Sala" sugeria um IP que só o próprio Mac alcançava,
-    // nunca os celulares na mesma Wi-Fi.
     const nets = {
       utun4: [ipv4('192.168.180.3')],
       en0: [ipv4('192.168.2.142')],

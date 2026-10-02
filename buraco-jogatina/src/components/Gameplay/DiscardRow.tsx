@@ -4,27 +4,16 @@ import { useGameStore } from '../../store/gameStore'
 import { CardComponent } from '../Card'
 import type { TurnPhase } from './Gameplay'
 
-// MESMO footprint das cartas da mão (PlayerHand.HAND_CARD_SIZE), pra as duas
-// fileiras — mão e descarte — ficarem paralelas e visualmente idênticas
-// dentro do mesmo painel.
 const HAND_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-14 landscape:h-[4.25rem]'
 const BIG_CORNER = 'text-sm font-normal sm:text-base landscape:text-lg landscape:leading-none'
 
 interface DiscardRowProps {
   phase: TurnPhase
-  /** Whether "pegar o descarte" is currently a legal move (pile non-empty
-   * and it's the human's turn to draw) — drives the glow. */
   canTakeDiscard: boolean
   onTakeDiscardPile: () => void
   onDiscardSelected: () => void
 }
 
-/**
- * Fileira do DESCARTE, embutida no mesmo painel da mão (lado a lado — pedido
- * do usuário: "o quadro do descarte imbuído no da minha mão, em paralelo").
- * Era a row-3 da grade do GameBoard; movida pra cá com os mesmos IDs de
- * âncora (#discard-pile / #discard-top) que as animações de voo usam.
- */
 export default function DiscardRow({ phase, canTakeDiscard, onTakeDiscardPile, onDiscardSelected }: DiscardRowProps) {
   useGameStore(s => s.version)
   const game = useGameStore(s => s.game)
@@ -53,7 +42,6 @@ export default function DiscardRow({ phase, canTakeDiscard, onTakeDiscardPile, o
       onTakeDiscardPile()
       return
     }
-    // phase === 'play'
     if (selectedCardIndices.length === 0) {
       flashHint('Selecione 1 carta para descartar.')
       return
@@ -62,8 +50,6 @@ export default function DiscardRow({ phase, canTakeDiscard, onTakeDiscardPile, o
       flashHint('Selecione apenas 1 carta para descartar.')
       return
     }
-    // Regra do lixo unitário: a carta pega de um descarte que só tinha ela
-    // não pode voltar no mesmo turno (ver Game.takeDiscardPile).
     if (game.isDiscardBlockedCard(selectedCardIndices[0])) {
       flashHint('Você pegou essa carta do descarte agora — não pode devolvê-la neste turno.')
       return
@@ -116,7 +102,6 @@ export default function DiscardRow({ phase, canTakeDiscard, onTakeDiscardPile, o
         )}
       </div>
 
-      {/* Toast de dica local (mesmo estilo do GameBoard) */}
       <AnimatePresence>
         {hint && (
           <motion.div

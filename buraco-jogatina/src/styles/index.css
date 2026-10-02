@@ -1,31 +1,22 @@
 @import 'tailwindcss';
 
 @theme {
-  /* Felt / table tones */
   --color-card-green: #0f5132;
   --color-card-green-light: #146b41;
   --color-card-green-dark: #0a2e1e;
   --color-felt-edge: #071f15;
 
-  /* Casino gold */
   --color-card-gold: #d4af37;
   --color-card-gold-light: #f1d580;
   --color-card-gold-dark: #a3801f;
 
-  /* Card face — marfim/creme (carta de baralho tradicional), não branco puro */
   --color-card-face: #f6efd8;
 
-  /* Suit colors — baralho tradicional de 2 cores. Tons SUAVIZADOS sobre o
-     creme da carta (--color-card-face): o vermelho #d4143c e o quase-preto
-     #16161a ficavam com contraste duro demais, cansando a vista numa tela
-     de celular cheia de cartas pequenas. Estes são o vermelho e o grafite
-     de tinta impressa, ainda bem legíveis. */
   --color-suit-hearts: #b3253f;
   --color-suit-diamonds: #b3253f;
   --color-suit-clubs: #33333a;
   --color-suit-spades: #33333a;
 
-  /* Display font for titles */
   --font-display: 'Righteous', 'Segoe UI', sans-serif;
 }
 
@@ -44,24 +35,19 @@ html, body, #root {
 }
 
 html, body {
-  /* Evita pull-to-refresh e bounce lateral no meio da partida (mobile). */
   overscroll-behavior: none;
-  /* App de jogo: nada de seleção de texto (um toque mais longo numa carta ou
-     na mesa abria o menu "Copiar/Traduzir" do Android por cima do jogo) nem
-     do balão de "callout" do iOS. Inputs continuam editáveis (ver abaixo). */
+
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Campos de texto (nome do jogador etc.) precisam continuar selecionáveis. */
 input, textarea {
   -webkit-user-select: text;
   user-select: text;
 }
 
-/* Thin, gold-tinted scrollbars for horizontally-scrolling card rows */
 .scrollbar-gold {
   scrollbar-width: thin;
   scrollbar-color: rgba(212, 175, 55, 0.6) transparent;
@@ -84,8 +70,6 @@ input, textarea {
   background-color: rgba(212, 175, 55, 0.8);
 }
 
-/* Diagonal card-back patterns — one color per physical deck (Buraco is
- * played with 2 merged decks + wilds), so the draw pile can show both. */
 .card-back-pattern-blue {
   background-image: repeating-linear-gradient(
       45deg,

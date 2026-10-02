@@ -17,13 +17,9 @@ describe('GameSession.getViewFor', () => {
 
     expect(view.seat).toBe(0)
     expect(view.yourHand).toHaveLength(11)
-    // No other seat's cards appear anywhere in the view.
     view.players.forEach(p => {
       expect(p.handCount).toBe(11)
     })
-    // Only seat 0's 11 cards should ever be serialized as {suit,...} objects
-    // in the whole view (discard pile is empty, no melds yet) — no other
-    // seat's hand leaks in anywhere.
     const suitOccurrences = (JSON.stringify(view).match(/"suit":/g) ?? []).length
     expect(suitOccurrences).toBe(11)
   })

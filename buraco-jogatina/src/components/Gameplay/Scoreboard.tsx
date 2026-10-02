@@ -10,8 +10,6 @@ interface TeamPillProps {
 }
 
 function TeamPill({ team, matchTotal, prev }: TeamPillProps) {
-  // "Canastras" = só os jogos completos (7+ cartas); jogos ainda incompletos
-  // na mesa não contam como canastra.
   const canastraCount = team.melds.filter(m => m.isCanastra).length
   return (
     <div
@@ -40,23 +38,7 @@ function TeamPill({ team, matchTotal, prev }: TeamPillProps) {
   )
 }
 
-/**
- * Always-visible team scoreboard: sticks to the top of the viewport while
- * scrolling so the score/canastras/morto status for both teams stay in
- * sight throughout the round, casino-style (dark background, gold accents
- * for Team A, magenta for Team B).
- *
- * Em paisagem, o PARCEIRO (assento 2) aparece AQUI, entre os dois placares —
- * pedido do usuário: "separa os scores no topo da tela, coloca o jogador
- * entre eles, assim a gente ganha mais tela lá em cima" - libera o topo da
- * mesa (GameBoard.tsx), que antes reservava uma linha inteira só pra essa
- * mesma informação, pro quadro de baixar carta ter mais espaço embaixo. Em
- * retrato o parceiro continua aparecendo no próprio tabuleiro, como sempre
- * (ver o `landscape:hidden` no bloco correspondente em GameBoard.tsx).
- */
 export default function Scoreboard() {
-  // Subscribed per the store's REACTIVITY CONTRACT (see gameStore.ts):
-  // `game` keeps a stable reference across mutations.
   useGameStore(s => s.version)
   const game = useGameStore(s => s.game)
   const matchScores = useGameStore(s => s.matchScores)
@@ -71,12 +53,6 @@ export default function Scoreboard() {
   const partner = players[2]
   const partnerIsTurn = status === 'playing' && currentPlayerIndex === 2
 
-  // "Pontos atuais" da partida = rodadas já fechadas (matchScores) + a
-  // rodada em andamento (team.score) - MAS só enquanto a rodada ainda não
-  // foi contabilizada. No frame final (round finished),
-  // finalizeRoundIfNeeded() já somou team.score dentro de matchScores;
-  // somar de novo aqui mostraria o dobro por um frame, até o Gameplay
-  // desmontar (o useEffect que troca de tela roda depois do paint).
   const totalFor = (team: Team) => matchScores[team.id] + (roundFinalized ? 0 : team.score)
 
   return (

@@ -5,8 +5,8 @@ import { Canasta } from './canasta'
 export type PlayerMove = {
   type: 'draw' | 'play_canasta' | 'discard' | 'take_discard' | 'extend_meld'
   cardIndex?: number
-  meldIndex?: number // para extend_meld: índice do meld do time a estender
-  cards?: Card[] // Para play_canasta/extend_meld, quais cartas usar
+  meldIndex?: number
+  cards?: Card[]
 }
 
 export interface Player {
@@ -30,8 +30,6 @@ export class HumanPlayer implements Player {
   }
 
   playTurn(): PlayerMove | null {
-    // HumanPlayer espera input do React/UI
-    // Retorna null até que a UI chame playTurn() com uma ação
     return null
   }
 

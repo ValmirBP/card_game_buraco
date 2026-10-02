@@ -23,10 +23,6 @@ function fakeTeam(id: 'A' | 'B', score: number, melds: Canasta[] = []): Team {
   return { id, seats: id === 'A' ? [0, 2] : [1, 3], melds, score, hasTakenMorto: false }
 }
 
-/** Forces the current round to end via the real draw/discard flow: gives the
- * current player's team a clean canastra + morto already taken, shrinks
- * their hand to 1 card, then discards it so the round finishes. Mirrors
- * tests/store/matchScore.test.ts's forceRoundEnd against the real store. */
 function forceRoundEnd(session: GameSession, teamId: 'A' | 'B' = 'A') {
   const seat = session.currentSeat
   session.applyIntent(seat, { type: 'draw' })

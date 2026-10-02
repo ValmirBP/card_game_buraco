@@ -23,9 +23,6 @@ interface OnlineResultProps {
   onBackToMenu: () => void
 }
 
-/** Online equivalent of Result.tsx — mesmo layout "fit" sem rolagem em
- * paisagem (cards + botões lado a lado), mesmo clamp de barra de progresso
- * (B2), mas "Nós"/"Eles" relativo ao próprio time (myTeamId), não fixo em A. */
 export default function OnlineResult({ view, onBackToMenu }: OnlineResultProps) {
   const isHost = useOnlineStore(s => s.isHost)
   const nextRound = useOnlineStore(s => s.nextRound)
@@ -123,7 +120,6 @@ export default function OnlineResult({ view, onBackToMenu }: OnlineResultProps) 
                       value={b.mortoPenalty}
                     />
                   )}
-                  {/* Mão de cada jogador separadamente (ver Result.tsx). */}
                   {b.handBySeat.map(h =>
                     h.points === 0 ? null : h.counted ? (
                       <BreakdownRow key={h.seat} label={`Mão de ${h.playerName}`} value={-h.points} />

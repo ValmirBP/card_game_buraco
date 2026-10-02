@@ -5,8 +5,6 @@ import { CardComponent } from '../Card'
 import { asCard, asCards } from '../../online/cardAdapter'
 import type { SeatView } from '../../session/types'
 
-// Idêntico ao DiscardRow offline: mesmo footprint da mão, pras duas fileiras
-// ficarem paralelas dentro do mesmo painel.
 const HAND_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-14 landscape:h-[4.25rem]'
 const BIG_CORNER = 'text-sm font-normal sm:text-base landscape:text-lg landscape:leading-none'
 
@@ -14,12 +12,6 @@ interface OnlineDiscardRowProps {
   view: SeatView
 }
 
-/**
- * Online equivalent do DiscardRow (offline): fileira do descarte embutida no
- * painel da mão, lado a lado. Validações profundas (carta bloqueada do lixo
- * unitário, esvaziar a mão sem bater) moram no SERVIDOR (GameSession) e
- * chegam via errorMsg — aqui só as checagens estruturais instantâneas.
- */
 export default function OnlineDiscardRow({ view }: OnlineDiscardRowProps) {
   const selectedCardIndices = useOnlineStore(s => s.selectedCardIndices)
   const sendIntent = useOnlineStore(s => s.sendIntent)
@@ -42,9 +34,6 @@ export default function OnlineDiscardRow({ view }: OnlineDiscardRowProps) {
         flashHint('O descarte está vazio.')
         return
       }
-      // Ao contrário da COMPRA (draw), aqui as cartas que vão pra mão já são
-      // conhecidas ANTES de mandar a intent (é a pilha inteira, visível no
-      // cliente) — dá pra animar na hora do clique, como o offline faz.
       const fromRect = (document.getElementById('discard-top') ?? document.getElementById('discard-pile'))
         ?.getBoundingClientRect()
       const toRect = document.getElementById('player-hand-anchor')?.getBoundingClientRect()
@@ -59,7 +48,6 @@ export default function OnlineDiscardRow({ view }: OnlineDiscardRowProps) {
       sendIntent({ type: 'takeDiscard' })
       return
     }
-    // phase === 'play'
     if (selectedCardIndices.length === 0) {
       flashHint('Selecione 1 carta para descartar.')
       return

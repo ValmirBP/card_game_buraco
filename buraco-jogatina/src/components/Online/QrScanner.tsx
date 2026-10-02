@@ -7,27 +7,14 @@ export { canScanQr } from '../../online/qrDecode'
 type ScanState = 'starting' | 'scanning' | 'error'
 
 interface QrScannerProps {
-  /** Recebe o texto CRU do QR — quem chama decide o que fazer (ver
-   * parseJoinLink em src/online/joinLink.ts). Retornar false significa
-   * "não era um convite válido": o scanner continua lendo em vez de fechar,
-   * pra um QR aleatório (Wi-Fi, boleto) não abortar a leitura. */
   onScan: (raw: string) => boolean
   onClose: () => void
 }
 
-/**
- * Leitor de QR em tela cheia, usando SÓ APIs do próprio navegador/WebView
- * (getUserMedia + BarcodeDetector) — sem plugin nativo e sem dependência
- * nova. Funciona no navegador (onde dá pra testar hoje) e dentro do APK,
- * que carrega de http://localhost e por isso conta como contexto seguro
- * pra câmera.
- */
 export default function QrScanner({ onScan, onClose }: QrScannerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const [state, setState] = useState<ScanState>('starting')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  // Refs (não state) porque o laço de leitura roda fora do ciclo do React e
-  // precisa enxergar o valor mais novo sem re-assinar o rAF.
   const stoppedRef = useRef(false)
   const streamRef = useRef<MediaStream | null>(null)
   const onScanRef = useRef(onScan)
@@ -45,10 +32,9 @@ export default function QrScanner({ onScan, onClose }: QrScannerProps) {
     const tick = async (decode: QrDecoder) => {
       if (stoppedRef.current) return
       const video = videoRef.current
-      if (video && video.readyState >= 2 /* HAVE_CURRENT_DATA */) {
+      if (video && video.readyState >= 2 ) {
         try {
           const raw = await decode(video)
-          // onScan decide se era um convite: se sim, para o laço.
           if (raw && onScanRef.current(raw)) {
             stoppedRef.current = true
             return
@@ -61,8 +47,6 @@ export default function QrScanner({ onScan, onClose }: QrScannerProps) {
       rafId = requestAnimationFrame(() => void tick(decode))
     }
 
-    // Motor escolhido ANTES da câmera abrir: se nem o jsQR estiver
-    // disponível não faz sentido pedir permissão ao usuário.
     Promise.all([
       createQrDecoder(),
       navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } } }),

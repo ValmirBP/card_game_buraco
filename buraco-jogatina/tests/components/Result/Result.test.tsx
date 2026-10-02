@@ -9,12 +9,6 @@ describe('Result', () => {
 
   test('B2: match progress bar never gets a negative width when a team has a negative score', () => {
     useGameStore.getState().initGame('Alice', 'easy')
-    // Cenário do bug: uma dupla termina a partida no negativo (penalidades
-    // de morto/cartas na mão superam os pontos de jogo). Antes do fix,
-    // Math.min(100, ...) sem o Math.max(0, ...) deixava a largura NEGATIVA
-    // no style (ex.: "width: -4%"), que o CSSOM descarta -> vira width:auto
-    // (100%) - a dupla no negativo aparecia com a barra MAIS CHEIA que a
-    // adversária positiva.
     useGameStore.setState({ matchScores: { A: -120, B: 250 } })
 
     const { container } = render(

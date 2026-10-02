@@ -2,17 +2,9 @@ import type { ReactNode } from 'react'
 
 interface LayoutProps {
   children: ReactNode
-  /** When true, the whole screen is locked to the viewport height with no
-   * page scroll (used by the gameplay screen so the table, hand and actions
-   * all fit at once). When false (default), the content flows and the page
-   * scrolls normally (menu, result). */
   fit?: boolean
 }
 
-/** Subtle woven-fabric noise for the felt, as an inline SVG data URI (no
- * external assets — keeps the app fully offline/PWA-friendly). A sparse
- * field of tiny semi-transparent dots gives the felt a bit of tooth without
- * reading as "noisy" or busy. */
 const FELT_NOISE_SVG =
   "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"
 
@@ -25,33 +17,14 @@ export function Layout({ children, fit = false }: LayoutProps) {
       style={{
         backgroundColor: '#0f5132',
         backgroundImage: [
-          // Soft vignette for depth, as if lit from above-center.
           'radial-gradient(ellipse 90% 60% at 50% 0%, rgba(255,255,255,0.05), transparent 60%)',
           'radial-gradient(ellipse 120% 90% at 50% 100%, rgba(0,0,0,0.35), transparent 65%)',
-          // Faint repeating conic sheen to suggest woven fabric direction.
           'repeating-conic-gradient(from 45deg, rgba(255,255,255,0.015) 0deg 2deg, transparent 2deg 8deg)',
           `url("${FELT_NOISE_SVG}")`,
         ].join(', '),
         backgroundBlendMode: 'normal, normal, overlay, overlay',
       }}
     >
-      {/* Wooden table frame: a rounded border "moldura" around the play
-       * area, warm brown gradient with a subtle inner bevel — CSS only.
-       *
-       * Safe-area-inset (A6): o Android desenha atrás do recorte de câmera
-       * (LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES no MainActivity +
-       * viewport-fit=cover no index.html), e em paisagem o recorte cai numa
-       * das bordas LATERAIS (esquerda ou direita, dependendo da rotação). O
-       * fundo da janela já é o mesmo verde do feltro (ver MainActivity), então
-       * deixar o feltro ir até a borda de verdade é visualmente perfeito —
-       * um furo de câmera sobre fundo verde contínuo não aparece. Por isso
-       * NÃO reservamos mais o inset inteiro como padding do tabuleiro inteiro
-       * (isso encolhia o jogo todo por ~130px numa tela de 6.3" só pra
-       * proteger uma furo de ~1cm) — cada elemento perto da borda que
-       * realmente pode colidir com o recorte (selo de turno, morto, monte)
-       * se protege individualmente, ver GameBoard.tsx. A altura ainda
-       * desconta os insets de cima/baixo (esses não têm o mesmo fundo
-       * contínuo por trás — ver `h-[calc(...)]` abaixo). */}
       <div
         className={`relative z-10 mx-auto max-w-7xl rounded-[2rem] p-1.5 sm:p-2.5 ${
           fit

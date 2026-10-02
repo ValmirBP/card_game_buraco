@@ -8,20 +8,11 @@ interface RulesModalProps {
   onClose: () => void
 }
 
-// Valores lidos DIRETO do motor (não hardcoded) — B1: o texto já divergiu do
-// motor de verdade uma vez (dizia "14 cartas"/"500/300 pontos" quando o
-// motor usa 11 cartas e 200/100/500/1000). Importar em vez de repetir os
-// números evita a próxima divergência.
 const CLEAN_POINTS = canastaPoints('limpa', 7)
 const DIRTY_POINTS = canastaPoints('suja', 7)
 const QUINHENTOS_POINTS = canastaPoints('quinhentos', 13)
 const REAL_POINTS = canastaPoints('real', 14)
 
-/** Um ícone por seção, mesmo tratamento visual do DifficultySelector (cartão
- * com ícone à esquerda) - antes disso as Regras eram a única tela do Menu
- * sem esse acabamento, só um bloco de texto corrido. Puramente visual: o
- * texto de cada seção não muda, então os testes de regressão do conteúdo
- * continuam batendo. */
 const SECTION_ICONS = {
   objetivo: '🎯',
   preparacao: '🎴',

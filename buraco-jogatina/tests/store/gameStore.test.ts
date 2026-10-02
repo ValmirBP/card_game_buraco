@@ -26,7 +26,6 @@ describe('useGameStore', () => {
     expect(game!.state.players[0].name).toBe('Alice')
 
     expect(game!.state.mortos).toHaveLength(2)
-    // Descarte começa vazio: 108 − 44 (mãos) − 22 (mortos) = 42 no baço.
     expect(game!.state.discardPile).toHaveLength(0)
     expect(game!.state.deck.length).toBe(108 - 4 * 11 - 2 * 11)
   })
@@ -70,7 +69,6 @@ describe('useGameStore', () => {
   test('takeDiscardPile moves the whole discard pile into the current player hand', () => {
     useGameStore.getState().initGame('Alice', 'easy')
     const game = useGameStore.getState().game!
-    // O descarte agora começa vazio — semeia 3 cartas para o teste.
     game.state.discardPile.push(
       new Card('hearts', '5', false),
       new Card('spades', '9', false),
@@ -140,7 +138,6 @@ describe('useGameStore', () => {
     const teamScoreBefore = teamA.score
     const versionBefore = useGameStore.getState().version
 
-    // First 2 cards of a freshly dealt hand are essentially never a valid canasta.
     useGameStore.getState().playCanasta([0, 1])
 
     const state = useGameStore.getState()
@@ -184,7 +181,7 @@ describe('useGameStore', () => {
 
   test('aiTurn runs one AI seat and advances currentPlayerIndex, logging the AI name', () => {
     useGameStore.getState().initGame('Alice', 'easy')
-    useGameStore.getState().discard(0) // human's turn -> seat 1 (AI, "Ana")
+    useGameStore.getState().discard(0)
     expect(useGameStore.getState().game!.state.currentPlayerIndex).toBe(1)
 
     const versionBefore = useGameStore.getState().version
@@ -198,19 +195,16 @@ describe('useGameStore', () => {
 
   test('aiTurn does not get stuck when the engine rejects a hand-emptying meld (team already took morto, no clean canastra): falls back to discard and ends the turn', () => {
     useGameStore.getState().initGame('Alice', 'easy')
-    useGameStore.getState().discard(0) // human's turn -> seat 1 (AI, "Ana")
+    useGameStore.getState().discard(0)
     const game = useGameStore.getState().game!
     expect(game.state.currentPlayerIndex).toBe(1)
 
     const aiPlayer = game.getCurrentPlayer()
     const teamB = game.getTeamOfCurrentPlayer()
-    teamB.hasTakenMorto = true // already took the morto
-    game.state.mortos = [] // none left to auto-pick-up
-    teamB.melds = [] // no clean canastra
+    teamB.hasTakenMorto = true
+    game.state.mortos = []
+    teamB.melds = []
 
-    // Force the AI's hand down to exactly one valid (non-canastra) trio, so
-    // any meld strategy that proposes playing it would empty the hand -
-    // exactly the confirmed-bug scenario the engine now refuses.
     while (!aiPlayer.hand.isEmpty()) {
       aiPlayer.hand.removeCard(0)
     }
@@ -221,8 +215,6 @@ describe('useGameStore', () => {
     useGameStore.getState().aiTurn()
 
     const state = useGameStore.getState()
-    // The turn must have progressed to the next seat (2) rather than
-    // stalling on seat 1 with an empty/unplayable hand.
     expect(state.game!.state.currentPlayerIndex).toBe(2)
     expect(teamB.hasTakenMorto).toBe(true)
   })
@@ -242,7 +234,7 @@ describe('useGameStore', () => {
   test('picking up the morto keeps the round going, and logs the pickup', () => {
     useGameStore.getState().initGame('Alice', 'easy')
     const game = useGameStore.getState().game!
-    const player = game.getCurrentPlayer() // Alice, seat 0, team A
+    const player = game.getCurrentPlayer()
     while (player.hand.getSize() > 1) {
       player.hand.removeCard(0)
     }
@@ -252,8 +244,6 @@ describe('useGameStore', () => {
     useGameStore.getState().discard(0)
 
     const state = useGameStore.getState()
-    // Team A took the morto automatically, so the hand refills instead of
-    // ending the round.
     expect(state.game!.state.teams.find(t => t.id === 'A')!.hasTakenMorto).toBe(true)
     expect(player.hand.getSize()).toBe(11)
     expect(state.game!.state.status).toBe('playing')
@@ -263,12 +253,8 @@ describe('useGameStore', () => {
   test('game finishes (status finished) once a player empties their hand a second time, having already taken the morto', () => {
     useGameStore.getState().initGame('Alice', 'easy')
     const game = useGameStore.getState().game!
-    const player = game.getCurrentPlayer() // Alice, seat 0, team A
+    const player = game.getCurrentPlayer()
 
-    // Manually mark the team as having already taken the morto, give it a
-    // clean canastra (7+ cards, no wilds — now required to close), and empty
-    // deck/mortos so the second empty-hand triggers the round end rather than
-    // another auto pickup.
     const teamA = game.state.teams.find(t => t.id === 'A')!
     teamA.hasTakenMorto = true
     teamA.melds.push(
@@ -304,13 +290,9 @@ describe('useGameStore', () => {
     game.state.deck = []
     game.state.mortos = []
 
-    // Descarta com monte+mortos esgotados: antes isso ENCERRAVA a rodada
-    // com cartas na mao ("o jogo finaliza quando tem uma carta na mao",
-    // bug reportado). Agora o jogo segue - so termina com batida (0 cartas).
     useGameStore.getState().discard(0)
     expect(useGameStore.getState().game!.state.status).toBe('playing')
 
-    // A proxima compra recicla o lixo (embaralhado) como novo monte.
     useGameStore.getState().drawFromDeck()
     const state = useGameStore.getState()
     expect(state.game!.state.status).toBe('playing')
@@ -368,14 +350,12 @@ describe('useGameStore', () => {
     test('resetGame() with matchScores still at {0,0} (never scored) does NOT overwrite previousMatchScores with zeros', () => {
       useGameStore.getState().initGame('Alice', 'easy')
       useGameStore.setState({ matchScores: { A: 2000, B: 1500 } })
-      useGameStore.getState().resetGame() // previousMatchScores = {A:2000,B:1500}
+      useGameStore.getState().resetGame()
 
-      // Start and immediately abandon a fresh match without ever scoring.
       useGameStore.getState().initGame('Carol', 'easy')
       expect(useGameStore.getState().matchScores).toEqual({ A: 0, B: 0 })
       useGameStore.getState().resetGame()
 
-      // Still the earlier real match, not wiped to {0,0}.
       expect(useGameStore.getState().previousMatchScores).toEqual({ A: 2000, B: 1500 })
     })
   })

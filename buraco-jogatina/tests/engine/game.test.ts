@@ -138,12 +138,10 @@ describe('Game', () => {
         Array.from({ length: 11 }, () => new Card('clubs', '5', false)),
       ]
 
-      // Drain what becomes the deck after the first morto (morto 2) converts.
       while (game.drawFromDeck() !== null) {
         // drain
       }
 
-      // Both mortos consumed by now; deck and mortos empty -> game over by exhaustion.
       expect(game.state.deck.length).toBe(0)
       expect(game.state.mortos.length).toBe(0)
       expect(game.isGameOver()).toBe(true)
@@ -154,7 +152,7 @@ describe('Game', () => {
     test('removes card from current player hand and adds to discard pile', () => {
       const players = makeFourPlayers()
       players[0].hand.addCard(new Card('hearts', '5', false))
-      players[0].hand.addCard(new Card('clubs', 'K', false)) // keeper: discarding down to 0 needs morto/close rights (see A1 tests below); this test is about discard mechanics only
+      players[0].hand.addCard(new Card('clubs', 'K', false))
       const game = new Game(players)
       const success = game.discard(0)
       expect(success).toBe(true)
@@ -188,7 +186,7 @@ describe('Game', () => {
               return joker
             })(),
           ]),
-        ] // 7-card SUJA canastra -> canClose stays false
+        ]
         players[0].hand.addCard(new Card('diamonds', 'Q', false))
 
         const success = game.discard(0)
@@ -214,7 +212,7 @@ describe('Game', () => {
             new Card('spades', '8', false),
             new Card('spades', '9', false),
           ]),
-        ] // 7-card LIMPA canastra -> canClose true
+        ]
         players[0].hand.addCard(new Card('diamonds', 'Q', false))
 
         const success = game.discard(0)
@@ -234,18 +232,11 @@ describe('Game', () => {
         const success = game.discard(0)
 
         expect(success).toBe(true)
-        // hand empties then immediately auto-refills from the morto
         expect(players[0].hand.getSize()).toBe(11)
         expect(teamA.hasTakenMorto).toBe(true)
       })
 
       test('returns true when discarding down to 1 card (2 -> 1 is normal play, not a lockup)', () => {
-        // This is the key regression guard: reusing the meld/extend threshold
-        // (which requires 2+ REMAINING cards) for discard() too would block
-        // this completely ordinary discard forever once a team's hand
-        // shrinks to 2 cards with no morto/close rights - a much worse
-        // lockup than the bug A1 fixes. discard() must only refuse going
-        // all the way to 0, not down to 1.
         const players = makeFourPlayers()
         const game = new Game(players)
         const teamA = game.state.teams.find(t => t.id === 'A')!
@@ -280,22 +271,13 @@ describe('Game', () => {
               return joker
             })(),
           ]),
-        ] // dirty only -> no closing rights yet
+        ]
         players[0].hand.addCard(new Card('diamonds', 'Q', false))
-        // Partner (seat 2, Team A) needs a non-empty hand too - makeFourPlayers()
-        // gives every seat an EMPTY hand by default, and an empty hand alone
-        // already satisfies isGameOver()'s `p.hand.isEmpty()` half once the
-        // team gets closing rights below. Without this, the test would
-        // spuriously "prove" a phantom-bonus bug caused by the untouched
-        // fixture default, not by player 0's refused discard.
         players[2].hand.addCard(new Card('hearts', 'J', false))
 
-        // the illegal discard-to-zero is refused...
         expect(game.discard(0)).toBe(false)
         expect(players[0].hand.getSize()).toBe(1)
 
-        // ...even if the partner later closes a clean canastra, this
-        // player's hand was never actually emptied, so no phantom batida:
         teamA.melds.push(
           new Canasta([
             new Card('clubs', '3', false),
@@ -367,9 +349,6 @@ describe('Game', () => {
         new Card('hearts', '7', false),
       ]
       const keeper = new Card('clubs', 'K', false)
-      // 2nd keeper: a meld must leave 2+ cards without morto/close rights
-      // (see A1 tests below) - leaving just 1 would force the same turn's
-      // mandatory discard down to 0 with no rights.
       const keeper2 = new Card('clubs', 'Q', false)
       const players = makeFourPlayers()
       players[0].hand.addCard(canastaCards[0])
@@ -404,12 +383,11 @@ describe('Game', () => {
       players[2].hand.addCard(cards[0])
       players[2].hand.addCard(cards[1])
       players[2].hand.addCard(cards[2])
-      // 2 keepers: see the "2 keepers" comment above (A1 - must leave 2+).
       players[2].hand.addCard(new Card('clubs', 'K', false))
       players[2].hand.addCard(new Card('clubs', 'Q', false))
       const game = new Game(players)
-      game.endTurn() // -> seat 1
-      game.endTurn() // -> seat 2 (Team A partner)
+      game.endTurn()
+      game.endTurn()
       expect(game.getCurrentPlayer().name).toBe('Bot2')
 
       const success = game.playCanasta(cards)
@@ -441,7 +419,6 @@ describe('Game', () => {
       players[0].hand.addCard(new Card('clubs', 'Q', false))
       const game = new Game(players)
 
-      // Lixo com UMA carta.
       const single = new Card('hearts', '7', false)
       game.state.discardPile.push(single)
 
@@ -449,20 +426,18 @@ describe('Game', () => {
       expect(taken).toHaveLength(1)
       for (const c of taken) players[0].hand.addCard(c)
 
-      // Descartar a MESMA carta (mesmo objeto) é recusado...
       const idx = players[0].hand.getCards().findIndex(c => c === single)
       expect(game.isDiscardBlockedCard(idx)).toBe(true)
       expect(game.discard(idx)).toBe(false)
-      expect(players[0].hand.getSize()).toBe(3) // nada mudou
+      expect(players[0].hand.getSize()).toBe(3)
 
-      // ...mas descartar OUTRA carta é normal.
       const otherIdx = players[0].hand.getCards().findIndex(c => c !== single)
       expect(game.discard(otherIdx)).toBe(true)
     })
 
     test('a cópia-gêmea (baralho duplo) que JÁ estava na mão continua descartável', () => {
       const players = makeFourPlayers()
-      const twin = new Card('hearts', '7', false) // cópia idêntica pré-existente na mão
+      const twin = new Card('hearts', '7', false)
       players[0].hand.addCard(twin)
       players[0].hand.addCard(new Card('clubs', 'K', false))
       const game = new Game(players)
@@ -471,7 +446,6 @@ describe('Game', () => {
       const taken = game.takeDiscardPile()!
       for (const c of taken) players[0].hand.addCard(c)
 
-      // Bloqueio é por REFERÊNCIA: a cópia antiga da mão não é bloqueada.
       const twinIdx = players[0].hand.getCards().findIndex(c => c === twin)
       expect(game.isDiscardBlockedCard(twinIdx)).toBe(false)
       expect(game.discard(twinIdx)).toBe(true)
@@ -487,7 +461,6 @@ describe('Game', () => {
       const taken = game.takeDiscardPile()!
       for (const c of taken) players[0].hand.addCard(c)
 
-      // Descarta outra carta, turno passa 4 vezes (volta ao seat 0).
       const otherIdx = players[0].hand.getCards().findIndex(c => c !== single)
       expect(game.discard(otherIdx)).toBe(true)
       game.endTurn()
@@ -517,18 +490,13 @@ describe('Game', () => {
   })
 
   describe('regra do morto pego mas não usado (perde os 100 do morto, não as cartas da mão)', () => {
-    /** Monta um jogo em que o seat 0 esvazia a mão descartando e pega o
-     * morto automaticamente; retorna o game pronto pra terminar a rodada. */
     function setupMortoTaken() {
       const players = makeFourPlayers()
-      // Seat 0: 1 carta (vai descartá-la e pegar o morto).
       players[0].hand.addCard(new Card('clubs', '5', false))
-      // Parceiro (seat 2) e adversários com mãos não-vazias.
       players[1].hand.addCard(new Card('hearts', 'K', false))
-      players[2].hand.addCard(new Card('spades', 'K', false)) // K = 10 pts
+      players[2].hand.addCard(new Card('spades', 'K', false))
       players[3].hand.addCard(new Card('diamonds', 'K', false))
       const game = new Game(players)
-      // Mortos na mesa (2, como no jogo real). Conteúdo conhecido: 11 cartas de 10 pts.
       const morto1: Card[] = []
       for (const rank of ['8', '9', '10', 'J', 'Q', 'K', '8', '9', '10', 'J', 'Q'] as const) {
         morto1.push(new Card('hearts', rank, false))
@@ -539,7 +507,6 @@ describe('Game', () => {
 
     test('rodada termina logo após pegar o morto (sem usar): -100 do morto, cartas da mão NÃO descontam', () => {
       const { game, players } = setupMortoTaken()
-      // Descarta a única carta -> mão esvazia -> pega o morto automaticamente.
       expect(game.discard(0)).toBe(true)
       const teamA = game.state.teams.find(t => t.id === 'A')!
       expect(teamA.hasTakenMorto).toBe(true)
@@ -548,13 +515,10 @@ describe('Game', () => {
 
       game.finish()
       const bA = game.state.scoreBreakdowns!.find(b => b.teamId === 'A')!
-      // -100 do morto (pego e não usado)...
       expect(bA.mortoPenalty).toBe(-100)
-      // ...e as 11 cartas do morto na mão do seat 0 NÃO contam.
       const seat0 = bA.handBySeat.find(h => h.seat === 0)!
       expect(seat0.counted).toBe(false)
       expect(seat0.points).toBeGreaterThan(0)
-      // A mão do PARCEIRO (seat 2, K=10) continua descontando normalmente.
       const seat2 = bA.handBySeat.find(h => h.seat === 2)!
       expect(seat2.counted).toBe(true)
       expect(bA.handPenalty).toBe(-10)
@@ -562,21 +526,19 @@ describe('Game', () => {
 
     test('se o jogador que pegou o morto JOGA com ele (descarta no turno seguinte), penalidade normal', () => {
       const { game } = setupMortoTaken()
-      expect(game.discard(0)).toBe(true) // pega o morto
+      expect(game.discard(0)).toBe(true)
       const teamA = game.state.teams.find(t => t.id === 'A')!
 
-      // Turno passa e volta pro seat 0, que agora joga com a mão nova.
       game.endTurn()
       game.endTurn()
       game.endTurn()
       game.endTurn()
       expect(game.state.currentPlayerIndex).toBe(0)
-      expect(game.discard(0)).toBe(true) // usou o morto
+      expect(game.discard(0)).toBe(true)
       expect(teamA.mortoUsed).toBe(true)
 
       game.finish()
       const bA = game.state.scoreBreakdowns!.find(b => b.teamId === 'A')!
-      // Sem penalidade de morto (pegou E usou); as cartas restantes contam.
       expect(bA.mortoPenalty).toBe(0)
       const seat0 = bA.handBySeat.find(h => h.seat === 0)!
       expect(seat0.counted).toBe(true)
@@ -585,12 +547,11 @@ describe('Game', () => {
 
     test('time que nunca pegou morto disponível: -100 e mãos contam (regra antiga preservada)', () => {
       const { game } = setupMortoTaken()
-      // Ninguém pega o morto; rodada termina direto.
       game.finish()
       const bB = game.state.scoreBreakdowns!.find(b => b.teamId === 'B')!
       expect(bB.mortoPenalty).toBe(-100)
       expect(bB.handBySeat.every(h => h.counted)).toBe(true)
-      expect(bB.handPenalty).toBe(-20) // K + K
+      expect(bB.handPenalty).toBe(-20)
     })
   })
 
@@ -600,10 +561,6 @@ describe('Game', () => {
       const game = new Game(players)
       const teamA = game.state.teams.find(t => t.id === 'A')!
 
-      // seed an existing meld directly on the team (as if played earlier) -
-      // pushed straight onto team.melds rather than via playCanasta, so this
-      // seeding step is independent of the hand-emptying legality rule under
-      // test in the 'extendMeld' describe block below.
       const seedMeld = new Canasta([
         new Card('hearts', '5', false),
         new Card('hearts', '6', false),
@@ -615,9 +572,6 @@ describe('Game', () => {
       const scoreBeforeExtend = teamA.score
 
       players[0].hand.addCard(new Card('hearts', '8', false))
-      // 2 keepers: a meld/extend must leave 2+ cards without morto/close
-      // rights (see A1 tests below) - leaving just 1 would force the same
-      // turn's mandatory discard down to 0 with no rights.
       players[0].hand.addCard(new Card('clubs', 'K', false))
       players[0].hand.addCard(new Card('clubs', 'Q', false))
       const success = game.extendMeld(0, [new Card('hearts', '8', false)])
@@ -633,13 +587,6 @@ describe('Game', () => {
       expect(game.extendMeld(0, [new Card('hearts', '8', false)])).toBe(false)
     })
 
-    // Exemplo exato do usuário (2026-08-19), agora pelo fluxo COMPLETO do
-    // jogo (playCanasta + extendMeld - o mesmo caminho usado pelo offline e
-    // pelo servidor online): baixa 3-4-5-6-7-[2 no lugar do 8]-9 (nasce
-    // suja, pois o 9 entrou com o 2 fora da posição natural) e depois
-    // estende com o 8 real. O 2 desliza pra posição natural e a canastra
-    // FICA LIMPA - regra oficial do Jogatina, corrigida a pedido do usuário
-    // em 2026-08-31 (antes, ela ficava suja pra sempre).
     test('completar a sequência com a carta real volta a limpar a canastra (exemplo 3..7+2(=8)+9, depois 8 real)', () => {
       const players = makeFourPlayers()
       const meldCards = [
@@ -654,7 +601,6 @@ describe('Game', () => {
       for (const c of meldCards) players[0].hand.addCard(c)
       const eight = new Card('spades', '8', false)
       players[0].hand.addCard(eight)
-      // keepers: baixar/estender deve deixar 2+ cartas na mão (regra A1)
       players[0].hand.addCard(new Card('clubs', 'K', false))
       players[0].hand.addCard(new Card('clubs', 'Q', false))
       players[0].hand.addCard(new Card('clubs', 'J', false))
@@ -666,7 +612,6 @@ describe('Game', () => {
       expect(teamA.melds[0].kind).toBe('suja')
 
       expect(game.extendMeld(0, [eight])).toBe(true)
-      // O 2 desliza pra posição natural (2..9, sequência completa) - limpa.
       expect(teamA.melds[0].isClean).toBe(true)
       expect(teamA.melds[0].kind).toBe('limpa')
       expect(teamA.melds[0].cards).toHaveLength(8)
@@ -705,9 +650,8 @@ describe('Game', () => {
       )
 
       game.endTurn()
-      game.endTurn() // seat 2, Team A partner
+      game.endTurn()
       players[2].hand.addCard(new Card('hearts', '8', false))
-      // 2 keepers: see the "2 keepers" comment above (A1 - must leave 2+).
       players[2].hand.addCard(new Card('clubs', 'K', false))
       players[2].hand.addCard(new Card('clubs', 'Q', false))
       const success = game.extendMeld(0, [new Card('hearts', '8', false)])
@@ -829,11 +773,9 @@ describe('Game', () => {
       teamA.hasTakenMorto = false
       teamA.melds = [cleanCanastra()]
 
-      // Ainda existe um morto na mesa -> não pode bater sem pegá-lo.
       game.state.mortos = [[new Card('clubs', '4', false)]]
       expect(game.canClose(teamA)).toBe(false)
 
-      // Mortos esgotados (ex.: viraram monte) -> exigência do morto é liberada.
       game.state.mortos = []
       expect(game.canClose(teamA)).toBe(true)
     })
@@ -895,9 +837,6 @@ describe('Game', () => {
       expect(game.isGameOver()).toBe(false)
     })
 
-    // Regra do usuário: "o jogo somente finaliza quando o jogador tem 0
-    // cartas" - esgotar monte+mortos NÃO termina mais a rodada enquanto o
-    // lixo tiver cartas (ele vira o novo monte, ver drawFromDeck).
     test('monte+mortos esgotados mas lixo com cartas: NAO termina; a compra recicla o lixo como novo monte', () => {
       const game = new Game(makeFourPlayers())
       game.setup()
@@ -913,8 +852,8 @@ describe('Game', () => {
 
       const card = game.drawFromDeck()
       expect(card).not.toBeNull()
-      expect(game.state.discardPile).toHaveLength(0) // lixo virou monte
-      expect(game.state.deck.length).toBe(2) // 3 recicladas - 1 comprada
+      expect(game.state.discardPile).toHaveLength(0)
+      expect(game.state.deck.length).toBe(2)
       expect(game.state.discardRecycles).toBe(1)
       expect(game.isGameOver()).toBe(false)
     })
@@ -932,13 +871,11 @@ describe('Game', () => {
       const players = makeFourPlayers()
       players[0].hand.addCard(new Card('clubs', 'K', false))
       const game = new Game(players)
-      // Pega um lixo unitário -> carta bloqueada.
       const single = new Card('hearts', '7', false)
       game.state.discardPile.push(single)
       const taken = game.takeDiscardPile()!
       for (const c of taken) players[0].hand.addCard(c)
       expect(game.state.blockedDiscardCard).toBe(single)
-      // Monte/mortos esgotam e o lixo (repopulado) é reciclado.
       game.state.deck = []
       game.state.mortos = []
       game.state.discardPile = [new Card('spades', '4', false), new Card('clubs', '8', false)]
@@ -957,7 +894,7 @@ describe('Game', () => {
       teamA.mortoUsed = true
       teamA.melds = [cleanCanastra()]
       while (!players[2].hand.isEmpty()) {
-        players[2].hand.removeCard(0) // o PARCEIRO (seat 2) bate
+        players[2].hand.removeCard(0)
       }
       game.finish()
       expect(game.state.closerSeat).toBe(2)
@@ -975,33 +912,22 @@ describe('Game', () => {
   })
 
   describe('finish - team scoring', () => {
-    // NOTE: team.score is now fully DERIVED by finish() from 4 components
-    // (meldPoints computed fresh from team.melds via canasta.getScore(),
-    // batidaBonus, mortoPenalty, handPenalty - see "Parte B" below), rather
-    // than adjusted relative to whatever team.score happened to hold before
-    // finish() ran. So these tests no longer pre-seed team.score as a proxy
-    // for "already accumulated meld points" - they push real melds when they
-    // want meld points to count, and assert the resulting derived total.
     test('subtracts sum of remaining hand values (both partners) from team score', () => {
       const players = makeFourPlayers()
-      players[0].hand.addCard(new Card('hearts', 'A', false)) // 15
-      players[0].hand.addCard(new Card('hearts', 'K', false)) // 10
-      players[2].hand.addCard(new Card('clubs', '9', false)) // 10 (official table: 8,9,10=10)
+      players[0].hand.addCard(new Card('hearts', 'A', false))
+      players[0].hand.addCard(new Card('hearts', 'K', false))
+      players[2].hand.addCard(new Card('clubs', '9', false))
       const game = new Game(players)
       const teamA = game.state.teams.find(t => t.id === 'A')!
       const teamB = game.state.teams.find(t => t.id === 'B')!
-      // Both teams took their morto so this test isolates the hand-penalty
-      // math from the separate -100 no-morto penalty (covered below).
       teamA.hasTakenMorto = true
       teamB.hasTakenMorto = true
       game.finish()
-      // 0 (no melds) - (15+10+10) = -35
       expect(teamA.score).toBe(-35)
     })
 
     test('team that closed (a player emptied hand with morto taken + clean canastra) gets +100 bonus', () => {
       const players = makeFourPlayers()
-      // seat 0 hand empty, team A has taken morto and has a clean canastra -> team A closed
       players[1].hand.addCard(new Card('clubs', '9', false))
       const game = new Game(players)
       const teamA = game.state.teams.find(t => t.id === 'A')!
@@ -1010,9 +936,7 @@ describe('Game', () => {
       teamB.hasTakenMorto = true
       teamA.melds = [cleanCanastra()]
       game.finish()
-      // teamA: meldPoints 255 (cleanCanastra) + batida 100 + 0 + 0 hand = 355
       expect(teamA.score).toBe(355)
-      // teamB: 0 meld + 0 batida + 0 morto - 10 hand = -10
       expect(teamB.score).toBe(-10)
     })
 
@@ -1054,35 +978,33 @@ describe('Game', () => {
       teamA.hasTakenMorto = true
       teamB.hasTakenMorto = true
       game.finish()
-      expect(teamA.score).toBe(-15) // 0 meld - 15 hand
-      expect(teamB.score).toBe(-10) // 0 meld - 10 hand
+      expect(teamA.score).toBe(-15)
+      expect(teamB.score).toBe(-10)
     })
 
     describe('morto penalty (-100 for a team that never took a morto, only while a morto remains on the table)', () => {
       test('a team with hasTakenMorto === false loses an extra 100 points when mortos.length > 0', () => {
         const players = makeFourPlayers()
         const game = new Game(players)
-        // A morto is still sitting on the table (not yet promoted to deck),
-        // so failing to take it is what's being penalized.
         game.state.mortos = [Array.from({ length: 11 }, () => new Card('clubs', '4', false))]
         const teamA = game.state.teams.find(t => t.id === 'A')!
         const teamB = game.state.teams.find(t => t.id === 'B')!
         teamA.hasTakenMorto = true
         teamB.hasTakenMorto = false
         game.finish()
-        expect(teamA.score).toBe(0) // took the morto, no hand cards, no meld -> untouched
-        expect(teamB.score).toBe(-100) // no morto taken, one still available -> penalized
+        expect(teamA.score).toBe(0)
+        expect(teamB.score).toBe(-100)
       })
 
       test('the penalty stacks with the remaining-hand penalty', () => {
         const players = makeFourPlayers()
-        players[1].hand.addCard(new Card('clubs', '9', false)) // 10
+        players[1].hand.addCard(new Card('clubs', '9', false))
         const game = new Game(players)
         game.state.mortos = [Array.from({ length: 11 }, () => new Card('clubs', '4', false))]
         const teamB = game.state.teams.find(t => t.id === 'B')!
         teamB.hasTakenMorto = false
         game.finish()
-        expect(teamB.score).toBe(-110) // 0 meld - 10 (hand) - 100 (no morto)
+        expect(teamB.score).toBe(-110)
       })
 
       test('a team that took the morto is never charged the -100', () => {
@@ -1110,9 +1032,6 @@ describe('Game', () => {
       test('team without morto but mortos turned into the deck (mortos=[]) -> NO penalty', () => {
         const players = makeFourPlayers()
         const game = new Game(players)
-        // Both mortos already got promoted to the baço (deck ran dry and
-        // was refilled from a morto - see Game.drawFromDeck) - nobody could
-        // still take one, so nobody should be charged for not having one.
         game.state.mortos = []
         const teamA = game.state.teams.find(t => t.id === 'A')!
         const teamB = game.state.teams.find(t => t.id === 'B')!
@@ -1137,14 +1056,14 @@ describe('Game', () => {
     describe('Parte B - scoreBreakdowns (per-team score detail)', () => {
       test('breakdown with melds + batida + morto penalty + hand penalty sums correctly for each team', () => {
         const players = makeFourPlayers()
-        players[1].hand.addCard(new Card('clubs', '9', false)) // 10, team B hand penalty
+        players[1].hand.addCard(new Card('clubs', '9', false))
         const game = new Game(players)
         game.state.mortos = [Array.from({ length: 11 }, () => new Card('clubs', '4', false))]
         const teamA = game.state.teams.find(t => t.id === 'A')!
         const teamB = game.state.teams.find(t => t.id === 'B')!
         teamA.hasTakenMorto = true
         teamB.hasTakenMorto = false
-        teamA.melds = [cleanCanastra()] // 255 meld points; seat 0's empty hand -> team A closes
+        teamA.melds = [cleanCanastra()]
         game.finish()
 
         const breakdowns = game.state.scoreBreakdowns!
@@ -1177,7 +1096,7 @@ describe('Game', () => {
         const firstBreakdowns = game.state.scoreBreakdowns
         const firstScore = teamA.score
         game.finish()
-        expect(game.state.scoreBreakdowns).toBe(firstBreakdowns) // same reference, no-op
+        expect(game.state.scoreBreakdowns).toBe(firstBreakdowns)
         expect(teamA.score).toBe(firstScore)
       })
 
@@ -1209,9 +1128,6 @@ describe('Game', () => {
       const success = game.playCanasta(cards)
       expect(success).toBe(true)
 
-      // Direct batida: hand emptied by the meld itself -> morto comes in
-      // immediately as the new hand, and the turn keeps going (no discard
-      // happened, so nothing advances currentPlayerIndex).
       const teamA = game.state.teams.find(t => t.id === 'A')!
       expect(teamA.hasTakenMorto).toBe(true)
       expect(players[0].hand.getSize()).toBe(11)
@@ -1250,8 +1166,8 @@ describe('Game', () => {
       players[0].hand.addCard(cards[2])
       const game = new Game(players)
       const teamA = game.state.teams.find(t => t.id === 'A')!
-      teamA.hasTakenMorto = true // already took the morto
-      game.state.mortos = [] // no morto left to auto-pick-up anyway
+      teamA.hasTakenMorto = true
+      game.state.mortos = []
 
       const success = game.playCanasta(cards)
 
@@ -1320,7 +1236,7 @@ describe('Game', () => {
 
       teamA.hasTakenMorto = true
       game.state.mortos = []
-      players[0].hand.addCard(new Card('hearts', '8', false)) // last card in hand
+      players[0].hand.addCard(new Card('hearts', '8', false))
 
       const success = game.extendMeld(0, [new Card('hearts', '8', false)])
 
@@ -1350,7 +1266,7 @@ describe('Game', () => {
         new Card('hearts', '10', false),
         new Card('hearts', 'J', false),
       ]
-      for (const c of extraCards) players[0].hand.addCard(c) // last cards in hand
+      for (const c of extraCards) players[0].hand.addCard(c)
 
       const success = game.extendMeld(0, extraCards)
 
@@ -1374,7 +1290,7 @@ describe('Game', () => {
 
       teamA.hasTakenMorto = false
       game.state.mortos = [Array.from({ length: 11 }, () => new Card('clubs', '4', false))]
-      players[0].hand.addCard(new Card('hearts', '8', false)) // last card in hand
+      players[0].hand.addCard(new Card('hearts', '8', false))
 
       const success = game.extendMeld(0, [new Card('hearts', '8', false)])
 
@@ -1430,14 +1346,10 @@ describe('Game', () => {
     })
 
     test('wouldPlayCanastaEmptyHandIllegally: true when it would leave just 1 card (no morto/close rights)', () => {
-      // 1 keeper leaves exactly 1 card after the meld - that commits the
-      // player to discarding it this same turn, which would empty the hand
-      // to 0 with no closing rights. So this is illegal (A1 fix), even
-      // though the meld itself doesn't literally empty the hand to zero.
       const players = makeFourPlayers()
       const cards = [new Card('hearts', '5', false), new Card('hearts', '6', false), new Card('hearts', '7', false)]
       for (const c of cards) players[0].hand.addCard(c)
-      players[0].hand.addCard(new Card('clubs', 'K', false)) // 1 keeper -> leaves 1 card
+      players[0].hand.addCard(new Card('clubs', 'K', false))
       const game = new Game(players)
       const teamA = game.state.teams.find(t => t.id === 'A')!
       teamA.hasTakenMorto = true
@@ -1450,7 +1362,7 @@ describe('Game', () => {
       const players = makeFourPlayers()
       const cards = [new Card('hearts', '5', false), new Card('hearts', '6', false), new Card('hearts', '7', false)]
       for (const c of cards) players[0].hand.addCard(c)
-      players[0].hand.addCard(new Card('clubs', 'K', false)) // 2 keepers -> leaves 2 cards
+      players[0].hand.addCard(new Card('clubs', 'K', false))
       players[0].hand.addCard(new Card('clubs', 'Q', false))
       const game = new Game(players)
       const teamA = game.state.teams.find(t => t.id === 'A')!
@@ -1522,10 +1434,6 @@ describe('Game', () => {
     expect(clone.state.deck.length).not.toBe(game.state.deck.length)
   })
 
-  /** Regressão: playCanasta passava só o meld NOVO para wouldEmptyHandIllegally,
-   * em vez da mesa resultante. Como canCloseWithMelds só olha a lista recebida,
-   * a canastra limpa já baixada ficava invisível e a batida era recusada — com
-   * a UI liberando o botão, porque o helper dela sempre olhou a lista inteira. */
   test('permite bater baixando um jogo novo quando o time JA tem canastra limpa na mesa', () => {
     const game = new Game(makeFourPlayers())
     const s = game.state
@@ -1545,14 +1453,11 @@ describe('Game', () => {
     mao.forEach(c => player.hand.addCard(c))
 
     expect(game.canClose(teamA)).toBe(true)
-    // a UI e o motor precisam concordar
     expect(game.wouldPlayCanastaEmptyHandIllegally(mao)).toBe(false)
     expect(game.playCanasta(mao)).toBe(true)
     expect(player.hand.getCards().length).toBe(0)
   })
 
-  /** O outro lado da mesma regra: SEM canastra limpa (nem na mesa, nem no jogo
-   * que está sendo baixado), esvaziar a mão continua proibido. */
   test('continua recusando esvaziar a mao quando o time nao pode fechar', () => {
     const game = new Game(makeFourPlayers())
     const s = game.state

@@ -5,7 +5,6 @@ describe('RoomManager', () => {
     const rm = new RoomManager()
     const { code } = rm.createRoom('conn-host', 'Host', 'medium')
     expect(code).toMatch(/^[A-Z0-9]{4,6}$/)
-    // no ambiguous chars
     expect(code).not.toMatch(/[O0I1]/)
   })
 
@@ -121,7 +120,6 @@ describe('RoomManager', () => {
     expect(rejoin).toEqual({ seat: 1 })
     const room = rm.getRoom(code)!
     expect(room.seats[1].connId).toBe('conn-2-new')
-    // A partida em si continua intacta - reconectar não recomeça nada.
     expect(room.session).toBeDefined()
     expect(room.started).toBe(true)
   })
@@ -169,15 +167,13 @@ describe('RoomManager', () => {
     it('tocar num assento já ocupado por outro humano TROCA os dois de lugar (pedido do usuário)', () => {
       const rm = new RoomManager()
       const { code } = rm.createRoom('conn-host', 'Host', 'medium')
-      rm.joinRoom(code, 'conn-2', 'Bob') // assento 1
-      rm.joinRoom(code, 'conn-3', 'Carol') // assento 2
+      rm.joinRoom(code, 'conn-2', 'Bob')
+      rm.joinRoom(code, 'conn-3', 'Carol')
 
       const result = rm.chooseSeat(code, 'conn-2', 2)
       expect(result).toEqual({ seat: 2 })
 
       const room = rm.getRoom(code)!
-      // Bob (era assento 1, conn-2) agora está no 2; Carol (era 2) foi
-      // "empurrada" pro 1 - os DOIS continuam humanos, só trocaram de lugar.
       expect(room.seats[2]).toMatchObject({ kind: 'human', name: 'Bob', connId: 'conn-2' })
       expect(room.seats[1]).toMatchObject({ kind: 'human', name: 'Carol', connId: 'conn-3' })
     })

@@ -17,8 +17,6 @@ export interface BotNames {
 interface MenuProps {
   onStart: (difficulty: AIDifficulty, playerName: string, names: BotNames) => void
   onPlayOnline: () => void
-  /** true quando há uma partida offline salva (fechou o app sem sair pelo
-   * botão) esperando ser retomada - ver App.tsx/gamePersistence.ts. */
   canResume?: boolean
   onResume?: () => void
 }
@@ -29,7 +27,6 @@ const DEFAULT_BOT_NAMES: BotNames = {
   opponent2: 'Carlos',
 }
 
-/** Purely decorative fan of cards shown behind the title. */
 const FAN_CARDS: { card: EngineCard; rotate: number; x: number }[] = [
   { card: new EngineCard('spades', 'K'), rotate: -18, x: -78 },
   { card: new EngineCard('hearts', 'A'), rotate: -9, x: -39 },
@@ -59,20 +56,13 @@ export default function Menu({ onStart, onPlayOnline, canResume, onResume }: Men
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col items-center justify-center gap-4 overflow-y-auto px-3 py-2 landscape:justify-center landscape:gap-1.5 landscape:overflow-hidden">
-      {/* pt em paisagem abre espaço pro leque, que antes era landscape:hidden
-          (a tela inicial ficava sem carta nenhuma no celular). */}
       <div className="relative flex flex-col items-center pt-4 text-center landscape:pt-14">
         <div className="pointer-events-none absolute -top-2 flex h-20 origin-bottom items-end justify-center sm:-top-4 sm:h-24 landscape:-top-1 landscape:h-14 landscape:scale-[0.52]">
           {FAN_CARDS.map((f, i) => (
             <motion.div
               key={i}
               className="absolute"
-              // x/rotate como props do Framer (NÃO um `transform` inline): o
-              // Framer gerencia a transform inteira e sobrescreveria a string
-              // CSS, empilhando as cartas todas no centro.
               style={{ x: f.x, rotate: f.rotate }}
-              // Balanço leve e contínuo, defasado por carta: dá vida ao leque
-              // sem distrair (a mesa de verdade fica embaixo).
               animate={{ y: [0, -5, 0] }}
               transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut', delay: i * 0.22 }}
             >
@@ -87,7 +77,6 @@ export default function Menu({ onStart, onPlayOnline, canResume, onResume }: Men
       </div>
 
       <div className="grid w-full max-w-3xl grid-cols-1 gap-4 px-2 landscape:grid-cols-2 landscape:items-start landscape:gap-4 landscape:px-4">
-        {/* Coluna esquerda (paisagem): nome + edição de nomes */}
         <div className="flex flex-col gap-2 landscape:gap-1">
           <div className="w-full">
             <label htmlFor="player-name" className="sr-only">
@@ -181,7 +170,6 @@ export default function Menu({ onStart, onPlayOnline, canResume, onResume }: Men
           </div>
         </div>
 
-        {/* Coluna direita (paisagem): ações principais */}
         <div className="flex w-full flex-col gap-3 landscape:gap-1.5">
           {canResume && onResume && (
             <motion.button

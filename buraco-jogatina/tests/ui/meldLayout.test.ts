@@ -7,17 +7,11 @@ import {
   type MeldLayout,
 } from '../../src/components/Gameplay/meldLayout'
 
-/** Quadros de baixar carta medidos/estimados em paisagem:
- *  - TIPICO: medido no navegador a 844x390 (MeldArea.clientWidth/Height);
- *  - PEQUENO: celular de 640x360;
- *  - GRANDE: tablet/celular grande. */
 const TIPICO = { width: 323, height: 221 }
 const PEQUENO = { width: 215, height: 190 }
 const GRANDE = { width: 420, height: 300 }
 const PAINEIS = { TIPICO, PEQUENO, GRANDE }
 
-/** A mesa de teste usada no emulador: 10 jogos, 54 cartas (uma canastra
- * real de 14, duas fechadas de 7, e jogos curtos). */
 const MESA_CHEIA = [14, 7, 7, 3, 3, 3, 3, 4, 6, 4]
 
 function assertFits(layout: MeldLayout, W: number, H: number, count: number) {
@@ -30,7 +24,6 @@ function assertFits(layout: MeldLayout, W: number, H: number, count: number) {
     expect(p.y + p.height).toBeLessThanOrEqual(H)
     expect(Number.isFinite(p.width) && Number.isFinite(p.height)).toBe(true)
   }
-  // Nenhuma caixa encosta/cobre outra.
   const ps = layout.placements
   for (let i = 0; i < ps.length; i++) {
     for (let j = i + 1; j < ps.length; j++) {
@@ -44,7 +37,6 @@ function assertFits(layout: MeldLayout, W: number, H: number, count: number) {
   expect(layout.totalWidth).toBeLessThanOrEqual(W)
 }
 
-/** Gerador determinístico (LCG) — mesas "aleatórias" reprodutíveis. */
 function rng(seed: number) {
   let s = seed >>> 0
   return () => {
@@ -136,7 +128,6 @@ describe('computeMeldLayout — forma dos jogos', () => {
       if (sameLine) expect(ps[i].x).toBeGreaterThan(ps[i - 1].x)
       else expect(ps[i].y).toBeGreaterThan(ps[i - 1].y)
     }
-    // O slot "Baixar" é sempre o último.
     expect(ps[ps.length - 1].index).toBe(MESA_CHEIA.length)
   })
 

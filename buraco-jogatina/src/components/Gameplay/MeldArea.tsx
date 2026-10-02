@@ -6,38 +6,28 @@ import { computeMeldLayout, MELD_SUBCOL_GAP, type MeldMetrics, type MeldPlacemen
 
 export interface MeldAreaStrip {
   card: CardType
-  /** Curinga ocupando a posição de outra carta (coringa, ou um 2 fora do
-   * seu lugar natural). */
   wild: boolean
 }
 
 export interface MeldAreaMeld {
-  /** Cartas já na ordem de exibição (a ordem da sequência). */
   strips: MeldAreaStrip[]
   closed: boolean
   clean: boolean
   kind: string
   points: number
-  /** Realce enquanto o jogador escolhe onde estender: 'compatible' aceita as
-   * cartas selecionadas, 'dim' não. */
   highlight: 'compatible' | 'dim' | null
   onClick: (event: MouseEvent<HTMLDivElement>) => void
 }
 
 interface MeldAreaProps {
   melds: MeldAreaMeld[]
-  /** Slot tracejado "Baixar" no fim — só no quadro da dupla do jogador. */
   dock?: { active: boolean; onClick: () => void }
 }
 
-/** Naipe de um jogo: o da primeira carta natural (nem coringa, nem 2). */
 export function meldSuitOf(cards: CardType[]): CardType['suit'] | undefined {
   return cards.find(c => !c.isWild && c.rank !== '2')?.suit
 }
 
-/** Mesma regra do engine (isWildInMeld, utils.ts): um '2' só é natural
- * quando é do MESMO naipe do jogo E ocupa a posição 2 da sequência; em
- * qualquer outro caso é curinga (o jogo é sujo). Coringas sempre. */
 export function isWildStrip(
   card: CardType,
   representsValue: number | undefined,
@@ -62,7 +52,6 @@ const SUIT_NAME: Record<CardType['suit'], string> = {
   spades: 'espadas',
 }
 
-/** Texto curto da faixa no topo de uma canastra fechada. */
 export const KIND_BADGE: Record<string, string> = {
   real: 'REAL',
   quinhentos: '500',
@@ -123,12 +112,6 @@ function Strip({ strip, m }: { strip: MeldAreaStrip; m: MeldMetrics }) {
   )
 }
 
-/** A cor da moldura conta o ESTADO do jogo (aberto / canastra limpa /
- * canastra suja) e nunca muda com a seleção. O realce "compatível" (as
- * cartas selecionadas estendem este jogo) é um contorno azul por FORA da
- * moldura — se ele pintasse a moldura de dourado, uma sequência aberta
- * pareceria uma canastra fechada limpa (e uma suja pareceria limpa) justo
- * na hora em que o jogador escolhe onde baixar. */
 export function frameClass(meld: MeldAreaMeld): string {
   const fill = !meld.closed ? 'bg-white/10' : meld.clean ? 'bg-card-gold' : 'bg-orange-400'
   if (meld.highlight === 'compatible') {
@@ -163,8 +146,6 @@ function MeldColumn({ meld, place, m }: { meld: MeldAreaMeld; place: MeldPlaceme
       }`}
       style={{ left: place.x, top: place.y, width: place.width, height: place.height, padding: place.frame }}
     >
-      {/* Canastra FECHADA: faixa com o tipo escrito (a cor da moldura já
-          diz limpa/suja, o texto tira qualquer dúvida). */}
       {place.headerH > 0 && (
         <div
           className="flex shrink-0 items-center justify-center font-black uppercase leading-none tracking-wide text-black"
@@ -194,12 +175,6 @@ function MeldColumn({ meld, place, m }: { meld: MeldAreaMeld; place: MeldPlaceme
   )
 }
 
-/**
- * O "quadro de baixar carta" de uma dupla: mede o espaço que sobrou no
- * painel e distribui TODOS os jogos nele, sem rolagem — ver meldLayout.ts.
- * Em paisagem (o jogo de verdade) o quadro tem altura fixa e o tamanho das
- * cartas se ajusta pra caber; em retrato o quadro cresce com o conteúdo.
- */
 export default function MeldArea({ melds, dock }: MeldAreaProps) {
   const boxRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ w: 0, h: 0 })

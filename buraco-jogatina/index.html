@@ -12,9 +12,6 @@
 </head>
 <body>
   <div id="root">
-    <!-- Fallback visível até o React montar. Se ele ficar preso na tela, é
-         sinal de que o JS não carregou/rodou. Se aparecer um erro em vermelho,
-         é o erro real do WebView (diagnóstico direto, em vez de tela verde). -->
     <div id="boot-fallback" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0f5132;color:#d4af37;font-family:sans-serif;text-align:center;padding:16px">
       <div>
         <div style="font-size:24px;font-weight:bold">Buraco Jogatina</div>
@@ -23,13 +20,6 @@
     </div>
   </div>
   <script>
-    // Mostra qualquer erro de carregamento na própria tela (para diagnóstico
-    // dentro do APK, onde não dá pra ver o console facilmente).
-    //
-    // Guarda o texto numa variável global ANTES de tocar no DOM, caso o
-    // próprio innerHTML falhe por algum motivo - assim o erro ainda fica
-    // acessível (ex.: via WebView remote debugging) mesmo se a tela não
-    // atualizar.
     window.__bootError = null
 
     function showBootError(message) {
@@ -42,15 +32,7 @@
         String(message) + '</div>'
     }
 
-    // `true` (fase de CAPTURA) é essencial aqui: erro de CARREGAMENTO de
-    // recurso (script/asset que falhou) dispara no próprio elemento e NÃO
-    // borbulha até window - só chega em quem escuta na fase de captura. Sem
-    // isso, o cenário exato que este diagnóstico existe para pegar (asset
-    // que não carrega -> tela verde/em branco) passava batido, e só erros
-    // de runtime (que borbulham normalmente) eram mostrados.
     window.addEventListener('error', function (e) {
-      // Erro de recurso: e.target é o elemento (script/link/img) que falhou,
-      // não a window. ErrorEvent de runtime tem e.message/e.filename.
       if (e && e.target && e.target !== window) {
         var src = e.target.src || e.target.href || '(recurso desconhecido)'
         showBootError('Falha ao carregar: ' + src)
@@ -64,11 +46,6 @@
       showBootError('Promise rejeitada: ' + String((reason && (reason.message || reason)) || reason))
     })
 
-    // Watchdog: se depois de 8s o #boot-fallback ainda estiver na tela, o
-    // bundle carregou mas travou antes de montar o React (cenário que os
-    // listeners de erro acima não pegam - não é um erro, é um silêncio). O
-    // React substitui #boot-fallback ao montar, então achá-lo ainda presente
-    // aqui é prova de que o app nunca terminou de subir.
     window.setTimeout(function () {
       if (document.getElementById('boot-fallback')) {
         showBootError('O app não terminou de carregar (timeout de 8s). O pacote JS pode ter travado antes de montar a tela.')

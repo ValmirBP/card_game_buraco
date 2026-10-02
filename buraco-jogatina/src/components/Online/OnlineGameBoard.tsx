@@ -9,22 +9,11 @@ import { asCard, asCards } from '../../online/cardAdapter'
 import Seat from '../Gameplay/Seat'
 import MeldArea, { isWildStrip, meldSuitOf } from '../Gameplay/MeldArea'
 
-/** Footprint do MONTE — idêntico ao PILE_CARD_SIZE offline. */
 const PILE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-12 landscape:h-16'
-/** Footprint do MORTO — mesmo tamanho do monte (pedido do usuário: "deixe
- * o morto no mesmo tamanho do monte"). Alias direto pra nunca dessincronizar
- * dos dois — se o monte mudar de tamanho de novo, o morto acompanha. */
 const MORTO_CARD_SIZE = PILE_CARD_SIZE
-/** Footprints dos fantasmas de animação — idênticos aos GHOST_*_SIZE de
- * Gameplay.tsx (offline). Repetidos aqui de propósito (não importados), pra
- * não acoplar este arquivo à estrutura interna de PlayerHand — só os
- * valores literais precisam bater. */
 const GHOST_HAND_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-14 landscape:h-[4.25rem]'
 const GHOST_TABLE_SIZE = 'w-20 h-28 landscape:w-12 landscape:h-16'
 
-/** Entre os índices de cartas selecionadas na mão, acha o elemento
- * `[data-hand-index]` MAIS À ESQUERDA na tela — ver a mesma função em
- * Gameplay.tsx (offline) para a explicação completa. */
 function leftmostHandCardRect(cardIndices: number[]): DOMRect | undefined {
   const rects = cardIndices
     .map(i => document.querySelector(`[data-hand-index="${i}"]`)?.getBoundingClientRect())
@@ -39,23 +28,6 @@ interface OnlineGameBoardProps {
   view: SeatView
 }
 
-/** Online equivalent of GameBoard.tsx — MESMA mesa "estilo Jogatina"
- * (monte no canto, morto escondido, jogadores nas bordas, jogos em colunas
- * verticais dominando o centro, descarte em fileira acima da mão,
- * manipulação direta em vez de botões), mas alimentada pela SeatView
- * redigida que o servidor manda (sem acesso direto ao motor) e SEM assumir
- * que o jogador é sempre o Time A — "Nós"/"Eles" e a posição das colunas
- * são relativos ao próprio assento (myTeamId), não fixos.
- *
- * Diferença chave de validação: offline consulta o motor local
- * (wouldDiscardEmptyHandIllegally etc.) para recusar uma jogada ilegal
- * ANTES de mandar, com hint instantâneo. Online não tem o motor local — a
- * validação estrutural óbvia (isValidCanasta/canExtendMeld) ainda dá hint
- * instantâneo, mas a checagem de "esvaziaria a mão sem poder bater" só
- * existe no servidor (GameSession.ts, que roda o MESMO Game.wouldEmpty...
- * do motor) e chega via errorMsg do WebSocket - um pouco mais lenta, mas
- * correta e sempre a mesma regra dos dois lados.
- */
 export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
   const selectedCardIndices = useOnlineStore(s => s.selectedCardIndices)
   const sendIntent = useOnlineStore(s => s.sendIntent)
@@ -77,15 +49,11 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
     [myTeamId]: 'text-card-gold',
     [otherTeamId]: 'text-fuchsia-300',
   } as Record<'A' | 'B', string>
-  // "Nós" sempre na coluna central esquerda (col-start-2), "Eles" na direita
-  // (col-start-3) — igual offline, mas relativo ao próprio time.
   const TEAM_GRID_CLASS: Record<'A' | 'B', string> = {
     [myTeamId]: 'order-4 landscape:col-start-2 landscape:row-start-1',
     [otherTeamId]: 'order-4 landscape:col-start-3 landscape:row-start-1',
   } as Record<'A' | 'B', string>
 
-  // [esquerda, topo(parceiro), direita] — sempre nessa ordem relativa ao
-  // próprio assento (ver seatLayout.ts).
   const [leftSeat, partnerSeat, rightSeat] = otherSeatsInOrder(view.seat)
 
   const flashHint = (message: string) => {
@@ -93,18 +61,9 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
     window.setTimeout(() => setHint(current => (current === message ? null : current)), 2600)
   }
 
-  // ---- Manipulação direta: monte / descarte / mesa (sem botões) ----------
-
   const canClickDeck = isMyTurn && phase === 'draw'
   const canClickDropZone = isMyTurn && phase === 'play' && selectedCardIndices.length >= 3
 
-  // Fantasma da COMPRA: ao contrário do offline (que muta o estado local e
-  // síncrono, lendo a carta comprada na hora), aqui a carta só é conhecida
-  // depois que o servidor responde com o novo `state`. `pendingDrawRef`
-  // marca "acabei de pedir pra comprar"; o efeito abaixo, disparado quando
-  // a mão CRESCE, consome a marca e anima com a última carta da mão nova —
-  // sem confundir com o crescimento da mão por pegar o descarte ou o morto,
-  // que já têm (ou não precisam de) fantasma próprio.
   const pendingDrawRef = useRef(false)
   const prevHandLenRef = useRef(yourHand.length)
   useEffect(() => {
@@ -112,12 +71,8 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
     prevHandLenRef.current = yourHand.length
     if (!pendingDrawRef.current) return
     pendingDrawRef.current = false
-    if (yourHand.length <= prevLen) return // intent recusada (chegou um error, não um novo state)
+    if (yourHand.length <= prevLen) return
 
-    // O MONTE tem DOIS elementos possíveis com `data-deck-pile`: um no
-    // tabuleiro (visível só em retrato) e outro flutuando sobre o quadro
-    // "Nós" (visível só em paisagem) — mesmo cuidado do assento do parceiro
-    // (ver Scoreboard.tsx): pega o PRIMEIRO com tamanho de verdade.
     const fromRect = Array.from(document.querySelectorAll('[data-deck-pile]'))
       .map(el => el.getBoundingClientRect())
       .find(r => r.width > 0 || r.height > 0)
@@ -167,8 +122,6 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
   }
 
   const handleMeldClick = (event: MouseEvent, teamId: 'A' | 'B', meldIndex: number, meldCards: PlainCard[]) => {
-    // Clicar num jogo existente é "estender"; não deve borbulhar para o
-    // painel "Nós" (que baixaria um jogo novo).
     event.stopPropagation()
     if (teamId !== myTeamId) return
     if (!isMyTurn || phase !== 'play' || selectedCardIndices.length === 0) return
@@ -191,8 +144,6 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
     }
     sendIntent({ type: 'extendMeld', meldIndex, cardIndices: selectedCardIndices })
   }
-
-  // ---------------------------------------------------------------------
 
   const deckPile =
     deckCount > 0 ? (
@@ -266,29 +217,13 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
     </div>
   )
 
-  // O DESCARTE não mora mais aqui: virou o componente OnlineDiscardRow,
-  // embutido no painel da mão (lado a lado) — ver OnlineGameplay.tsx.
-
   return (
     <div className="relative h-full min-h-0 rounded-2xl border border-white/10 bg-black/25 p-2 shadow-lg backdrop-blur-sm sm:p-4 landscape:rounded-xl landscape:border-0 landscape:p-2 landscape:overflow-hidden">
-      {/* Nada rola - ver o mesmo comentário em GameBoard.tsx (offline): o
-          "quadro de baixar carta" de cada dupla ajusta o tamanho das cartas
-          pra todos os jogos caberem (MeldArea). */}
       <div className="flex flex-col gap-3 sm:gap-4 landscape:grid landscape:h-full landscape:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_auto] landscape:grid-rows-1 landscape:items-stretch landscape:gap-x-2 landscape:gap-y-1">
-        {/* Monte — em retrato ocupa seu próprio lugar no topo, como sempre.
-            Em paisagem vira um selo flutuante SOBRE o quadro do time do
-            jogador (ver bloco landscape:col-start-2 logo abaixo, dentro da
-            MESMA célula da grade que o painel) — pedido do usuário: sem
-            linha própria reservada no topo, o quadro de baixar carta cresce
-            até o topo da tela. */}
         <div className="order-1 flex items-center justify-center landscape:hidden">
           {deckPile}
         </div>
 
-        {/* Parceiro: em paisagem mora no placar (ver o header em
-            OnlineGameplay.tsx), entre os dois placares - pedido do usuário,
-            libera essa linha inteira do tabuleiro pro quadro de baixar
-            carta. Em retrato continua aqui, como sempre. */}
         {partnerSeat !== undefined && players[partnerSeat] && (
           <div data-seat-index={partnerSeat} className="order-2 flex justify-center landscape:hidden">
             <Seat
@@ -300,8 +235,6 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
           </div>
         )}
 
-        {/* Adversário à esquerda — ocupa a única linha da grade (row1/col1),
-            centralizado verticalmente nela. */}
         {leftSeat !== undefined && players[leftSeat] && (
           <div
             data-seat-index={leftSeat}
@@ -316,7 +249,6 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
           </div>
         )}
 
-        {/* Adversário à direita (row1/col4) */}
         {rightSeat !== undefined && players[rightSeat] && (
           <div
             data-seat-index={rightSeat}
@@ -331,18 +263,10 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
           </div>
         )}
 
-        {/* Monte, versão paisagem: fica no canto sup-esquerdo, mesma coluna
-            do adversário à esquerda (col1/row1) — como ele agora fica
-            centralizado na altura toda da linha, sobra espaço vazio acima
-            dele, onde o monte flutua sem empurrar nenhum painel nem cobrir o
-            rótulo/placar (pedido do usuário: "deixa o monte no canto
-            mesmo"). Só um dos dois `data-deck-pile` (este ou o de retrato
-            acima) tem tamanho de verdade a cada vez. */}
         <div className="hidden landscape:block landscape:col-start-1 landscape:row-start-1 landscape:z-20 landscape:self-start landscape:justify-self-center">
           {deckPile}
         </div>
 
-        {/* ---- Jogos baixados por dupla — colunas centrais ---- */}
         {teams.map(team => {
           const canClickToExtend = team.id === myTeamId && isMyTurn && phase === 'play' && selectedCardIndices.length > 0
           const isDropTarget = team.id === myTeamId && canClickDropZone
@@ -361,14 +285,9 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
                 isDropTarget ? 'cursor-pointer border-card-gold shadow-[0_0_16px_rgba(212,175,55,0.5)]' : ''
               }`}
             >
-              {/* Cabeçalho com altura FIXA em paisagem (h-6) — ver GameBoard
-                  offline: o quadro não muda de tamanho quando o botão
-                  "Baixar jogo" aparece. */}
               <div className="flex items-center justify-between gap-2 landscape:h-6 landscape:shrink-0 landscape:px-1">
                 <h4 className={`flex shrink-0 items-center font-display text-sm landscape:text-sm landscape:leading-none ${TEAM_TEXT_CLASS[team.id]}`}>
                   {TEAM_LABEL[team.id]}
-                  {/* Botão sempre visível no cabeçalho - mesa cheia não deixa
-                      área vazia clicável no painel (ver GameBoard offline). */}
                   {isDropTarget && (
                     <button
                       type="button"
@@ -411,7 +330,6 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
                       onClick: event => handleMeldClick(event, team.id, ci, meldCards),
                     }
                   })}
-                  // Slot tracejado "Baixar" fixo — ver GameBoard offline.
                   dock={team.id === myTeamId ? { active: isDropTarget, onClick: handleDropZoneClick } : undefined}
                 />
               )}
@@ -419,7 +337,6 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
           )
         })}
 
-        {/* Você — só em retrato */}
         <div className="order-7 flex justify-center landscape:hidden">
           <Seat
             name={players[view.seat]?.name ?? 'Você'}
@@ -431,16 +348,10 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
         </div>
       </div>
 
-      {/* Morto — escondido num canto discreto */}
-      {/* landscape:scale-100: sem encolher o morto por transform — agora
-          que MORTO_CARD_SIZE já é igual a PILE_CARD_SIZE, um scale menor
-          que 1 voltaria a deixar o morto visualmente menor que o monte
-          (pedido do usuário: "deixe o morto no mesmo tamanho do monte"). */}
       <div className="pointer-events-none absolute right-1 top-6 z-20 origin-top-right scale-[0.62] landscape:scale-100">
         {mortoBlock}
       </div>
 
-      {/* Selo de turno */}
       <div className="pointer-events-none absolute right-2 top-2 z-30">
         <AnimatePresence>
           {status === 'playing' && !isMyTurn && (
@@ -469,7 +380,6 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
         </AnimatePresence>
       </div>
 
-      {/* Dica/erro local */}
       <div className="pointer-events-none absolute inset-x-0 bottom-1 z-20 flex justify-center px-2">
         <AnimatePresence>
           {hint && (

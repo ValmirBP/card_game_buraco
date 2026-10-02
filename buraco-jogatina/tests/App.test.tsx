@@ -3,16 +3,6 @@ import App from '../src/App'
 import { useGameStore } from '../src/store/gameStore'
 import { useOnlineStore } from '../src/online/onlineStore'
 
-/**
- * Cobre o roteamento do botão VOLTAR de hardware do Android (App.tsx),
- * motivado pelo relato do usuário: "em momento nenhum tem um botão de
- * voltar durante o processo... o voltar pode ser pelo voltar normal do
- * Android ou um botão na tela". Sem isso, o padrão do WebView era minimizar
- * o app inteiro em QUALQUER tela — este teste prova que cada tela tem uma
- * ação sensata, com confirmação exatamente onde algo em andamento seria
- * perdido.
- */
-
 let backButtonHandler: (() => void) | null = null
 const exitAppMock = jest.fn()
 
@@ -29,7 +19,6 @@ jest.mock('@capacitor/app', () => ({
   },
 }))
 
-/** WebSocket falso e controlável — mesmo padrão de tests/online/reconnectLoop.test.ts. */
 class FakeWebSocket {
   static instances: FakeWebSocket[] = []
   static readonly CONNECTING = 0
@@ -101,7 +90,7 @@ describe('App — botão voltar (hardware Android)', () => {
     pressHardwareBack()
 
     expect(window.confirm).toHaveBeenCalledWith(expect.stringMatching(/sair da partida/i))
-    expect(useGameStore.getState().game).toBeNull() // resetGame() rodou
+    expect(useGameStore.getState().game).toBeNull()
   })
 
   test('recusando a confirmação: a partida offline continua intacta', () => {
@@ -113,7 +102,7 @@ describe('App — botão voltar (hardware Android)', () => {
     ;(window.confirm as jest.Mock).mockReturnValue(false)
     pressHardwareBack()
 
-    expect(useGameStore.getState().game).not.toBeNull() // resetGame() NÃO rodou
+    expect(useGameStore.getState().game).not.toBeNull()
     expect(exitAppMock).not.toHaveBeenCalled()
   })
 
@@ -125,7 +114,6 @@ describe('App — botão voltar (hardware Android)', () => {
     pressHardwareBack()
 
     expect(window.confirm).not.toHaveBeenCalled()
-    // De volta ao menu: o botão "Jogar vs IA" reaparece.
     expect(screen.getByRole('button', { name: 'Jogar vs IA' })).toBeInTheDocument()
   })
 
@@ -146,6 +134,6 @@ describe('App — botão voltar (hardware Android)', () => {
     pressHardwareBack()
 
     expect(window.confirm).toHaveBeenCalledWith(expect.stringMatching(/sair da sala/i))
-    expect(useOnlineStore.getState().code).toBeNull() // leave() rodou
+    expect(useOnlineStore.getState().code).toBeNull()
   })
 })

@@ -3,18 +3,12 @@ import { CardComponent } from '../Card'
 import type { Card } from '../../engine/card'
 import type { TurnPhase } from './Gameplay'
 
-// A mão do jogador humano é a única fileira de cartas que precisa continuar
-// bem legível em paisagem — só ligeiramente menor que o tamanho padrão
-// (usado no modo Online), pra a fileira caber numa faixa fina embaixo da
-// mesa. Opt-in (passado explicitamente), então o modo Online (que não passa
-// `sizeClassName`) fica com CARD_SIZE_CLASSES normal, intocado.
 const HAND_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-14 landscape:h-[4.25rem]'
 
 interface PlayerHandProps {
   phase: TurnPhase
 }
 
-// Ordem de exibição dos naipes na mão (agrupa cartas do mesmo naipe).
 const SUIT_ORDER: Record<Card['suit'], number> = {
   spades: 0,
   hearts: 1,
@@ -22,8 +16,6 @@ const SUIT_ORDER: Record<Card['suit'], number> = {
   diamonds: 3,
 }
 
-/** Valor do rank pra ordenar a mão com o ÁS BAIXO (A=1), da esquerda pra
- * direita: A 2 3 4 5 6 7 8 9 10 J Q K. */
 function handRankValue(rank: Card['rank']): number {
   if (rank === 'A') return 1
   if (rank === 'J') return 11
@@ -33,9 +25,6 @@ function handRankValue(rank: Card['rank']): number {
   return isNaN(n) ? 0 : n
 }
 
-/** Ordena a mão para exibição — agrupa por naipe e, dentro do naipe, em ordem
- * CRESCENTE começando pelo Ás: A 2 3 4 5 6 7 8 9 10 J Q K. Curingas ficam por
- * último. Preserva o índice original de cada carta (seleção/descarte). */
 function orderedHand(hand: Card[]): { card: Card; index: number }[] {
   return hand
     .map((card, index) => ({ card, index }))
@@ -48,8 +37,6 @@ function orderedHand(hand: Card[]): { card: Card; index: number }[] {
 }
 
 export default function PlayerHand({ phase }: PlayerHandProps) {
-  // Subscribed so the hand re-renders after draw/discard/playCanasta mutate
-  // the human player's cards in place.
   useGameStore(s => s.version)
   const game = useGameStore(s => s.game)
   const selectedCardIndices = useGameStore(s => s.selectedCardIndices)
@@ -71,8 +58,6 @@ export default function PlayerHand({ phase }: PlayerHandProps) {
           : 'Selecione cartas: 1 para descartar, 3+ para baixar um jogo.'
 
   return (
-    // Sem painel próprio: o painel visual (borda/fundo) agora é o container
-    // compartilhado em Gameplay.tsx, que abriga mão E descarte lado a lado.
     <div className="flex h-full min-w-0 flex-col space-y-1 landscape:space-y-0">
       <div className="flex flex-nowrap items-baseline justify-between gap-x-3">
         <h3 className="shrink-0 font-display text-sm text-card-gold landscape:text-[10px]">
@@ -80,13 +65,6 @@ export default function PlayerHand({ phase }: PlayerHandProps) {
         </h3>
         {hint && <span className="truncate text-[10px] text-gray-300 sm:text-xs landscape:text-[8px]">{hint}</span>}
       </div>
-      {/* "Meia carta" em paisagem: a faixa da mão fica baixa e corta a
-          metade inferior das cartas (overflow-y-hidden + max-height fixo) —
-          só a metade de cima "espia" (rank/naipe do canto, grandes,
-          continuam legíveis). A mão NÃO cresce ao selecionar (o jogador não
-          precisa ver a carta inteira) — a seleção só REALÇA a carta com o
-          anel dourado (ver Card.tsx), sem subir nada. O eixo X continua
-          rolável se a mão não couber. */}
       <div
         id="player-hand-anchor"
         className="scrollbar-gold flex -space-x-6 overflow-x-auto px-1 pb-3 pt-3 sm:-space-x-7 landscape:max-h-[2.7rem] landscape:-space-x-4 landscape:overflow-y-hidden landscape:pb-0.5 landscape:pt-1"
@@ -104,9 +82,6 @@ export default function PlayerHand({ phase }: PlayerHandProps) {
               onClick={isHumanTurn ? () => toggleCardSelection(index) : undefined}
               sizeClassName={HAND_CARD_SIZE}
               compactOnLandscape
-              // Naipes GRANDES no canto: em paisagem a mão fica em "meia carta"
-              // (só o topo aparece), então o rank/naipe do canto precisa ser
-              // bem legível por si só.
               cornerClassName="text-sm font-normal sm:text-base landscape:text-lg landscape:leading-none"
             />
           </div>

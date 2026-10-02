@@ -8,15 +8,10 @@ import QrScanner, { canScanQr } from './QrScanner'
 import type { AIDifficulty } from '../../engine/ai'
 import { loadStoredPlayerName, savePlayerName } from '../../playerName'
 
-/** Room code from a `?sala=CODE` invite link, read once on first render.
- * Used to pre-fill the join view so scanning the QR from OnlineLobby just
- * needs a name + tap. Returns null (and leaves the URL untouched) when the
- * param isn't present. */
 function readInviteCodeFromUrl(): string | null {
   const params = new URLSearchParams(window.location.search)
   const code = params.get('sala')
   if (!code) return null
-  // Clean the param so a refresh/back doesn't re-trigger the prefill.
   params.delete('sala')
   const query = params.toString()
   window.history.replaceState({}, '', window.location.pathname + (query ? `?${query}` : ''))
@@ -25,7 +20,6 @@ function readInviteCodeFromUrl(): string | null {
 
 interface OnlineLobbyProps {
   onBackToMenu: () => void
-  /** Fires once the match actually starts (first `state` view arrives). */
   onGameStart: () => void
 }
 
@@ -50,10 +44,6 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
   const clearError = useOnlineStore((s) => s.clearError)
   const chooseSeat = useOnlineStore((s) => s.chooseSeat)
   const renameSeatOnServer = useOnlineStore((s) => s.rename)
-  // Persiste também quando o nome é editado DENTRO da sala (lápis na sua
-  // linha), não só na tela inicial - a mesma chave compartilhada garante
-  // que os dois sentidos fiquem sincronizados (edita em qualquer lugar,
-  // reflete em todos os outros).
   const renameSeat = (newName: string) => {
     savePlayerName(newName)
     renameSeatOnServer(newName)
@@ -61,26 +51,12 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
 
   const [inviteCode] = useState(readInviteCodeFromUrl)
   const [name, setName] = useState(loadStoredPlayerName)
-  // "Criar Sala" no APK instalado sobe o servidor embutido NESTE aparelho
-  // (ver src/online/nativeHostServer.ts) antes de criar a sala — nenhum
-  // computador precisa estar ligado. hostStarting cobre o intervalo entre
-  // o clique e o servidor responder; hostError é só dessa etapa (falha
-  // aqui nunca chega a abrir um WebSocket, então não é o `errorMsg` do
-  // store, que é sobre a CONEXÃO).
   const [hostStarting, setHostStarting] = useState(false)
   const [hostError, setHostError] = useState<string | null>(null)
   const [joinCode, setJoinCode] = useState(inviteCode ?? '')
   const [showScanner, setShowScanner] = useState(false)
-  // Calculado uma vez: a câmera/decodificador existem neste aparelho? Só
-  // mostra o botão onde ele de fato funciona (ver canScanQr).
   const [scanSupported] = useState(canScanQr)
 
-  /**
-   * QR lido: delega pro store, que configura o endereço do servidor embutido
-   * no link e entra na sala — o passo manual ("digite o IP do computador")
-   * que o segundo aparelho tinha que fazer. Retorna false pra QR que não é
-   * um convite, pro scanner continuar lendo em vez de fechar.
-   */
   const handleScan = (raw: string): boolean => {
     const entered = joinFromScannedLink(raw, name.trim() || 'Você')
     if (entered) setShowScanner(false)
@@ -113,21 +89,12 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
     }
   }, [code, serverUrl])
 
-  // Um QR só serve pra quem escaneia se apontar pra um endereço alcançável
-  // NA REDE. Sem serverUrl ele viraria window.location.origin (localhost no
-  // APK) - ver o aviso na tela da sala.
   const qrUsable = Boolean(qrDataUrl) && Boolean(serverUrl)
 
   const handleCreate = async (difficulty: AIDifficulty) => {
     setShowDifficulty(false)
     setHostError(null)
 
-    // No app instalado, este aparelho vira o próprio host: sobe o
-    // servidor embutido (Java-WebSocket dentro do APK, ver
-    // HostServerPlugin.java) e usa o IP de rede DELE MESMO, em vez de
-    // pedir o IP de um computador que o usuário talvez nem tenha por
-    // perto. No navegador (não-nativo) nada muda — cria a sala como
-    // sempre, contra o serverAddress já configurado.
     if (Capacitor.isNativePlatform()) {
       setHostStarting(true)
       const { startNativeHost } = await import('../../online/nativeHostServer')
@@ -137,11 +104,6 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
         setHostError('Não foi possível criar o servidor neste aparelho. Tente novamente.')
         return
       }
-      // Sem IP de rede (ex.: sem Wi-Fi conectado): ainda assim usa
-      // 127.0.0.1 pra ESTE aparelho conseguir se conectar ao próprio
-      // servidor e jogar sozinho contra as IAs — só o QR/convite pra
-      // outros aparelhos é que não vai funcionar (mesmo aviso que já
-      // existe pra um servidor de desktop sem LAN, via `qrUsable`).
       setServerAddress(info.address ? `${info.address}:${info.port}` : `127.0.0.1:${info.port}`)
     }
 
@@ -194,9 +156,6 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
         </motion.p>
       )}
 
-      {/* Mesmo PADRÃO da tela inicial (Menu.tsx): em paisagem vira uma grade
-          de 2 colunas — esquerda com o nome/config, direita com os botões —
-          o que faz tudo caber sem rolagem. Em retrato continua empilhado. */}
       {!inRoom && (
         <div className="grid w-full max-w-sm grid-cols-1 gap-4 landscape:max-w-3xl landscape:grid-cols-2 landscape:items-start landscape:gap-4 landscape:px-4">
           <div className="space-y-4 landscape:space-y-1.5">
@@ -219,13 +178,6 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
               className="min-h-[44px] w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-center text-white placeholder-gray-400 shadow-inner outline-none backdrop-blur-sm transition focus:ring-4 focus:ring-card-gold/70 landscape:min-h-0 landscape:py-1.5 landscape:text-sm"
             />
 
-            {/* "Reconectar à sala X": aparece só quando há uma sala salva
-                de uma sessão anterior (ver lastRoom em onlineStore.ts) —
-                pedido do usuário: manter o código pra quem caiu conseguir
-                voltar, mesmo depois do app fechar/reabrir. Funciona tanto
-                se a sala ainda está no lobby quanto NO MEIO de uma partida
-                (ver server/rooms.ts joinRoom) — nesse caso a tela troca
-                sozinha pra Gameplay assim que o `state` chega. */}
             {lastRoom && mode === 'choose' && (
               <motion.button
                 type="button"
@@ -261,8 +213,6 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
               >
                 Entrar em uma Sala
               </motion.button>
-              {/* Caminho SEM digitação: lê o QR do outro celular e já
-                  configura endereço do servidor + código da sala. */}
               {scanSupported && (
                 <motion.button
                   type="button"
@@ -315,10 +265,6 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
         </div>
       )}
 
-      {/* Mesmo padrão do bloco !inRoom: em paisagem vira grade de 2 colunas
-          (esquerda = código + QR, direita = assentos + iniciar), senão o
-          painel empilhado estoura a altura de um celular e "Iniciar Partida"
-          fica fora da tela, sem rolagem pra alcançar. */}
       {inRoom && (
         <div className="w-full max-w-sm space-y-6 landscape:max-w-3xl landscape:grid landscape:grid-cols-2 landscape:items-start landscape:gap-x-4 landscape:gap-y-1.5 landscape:space-y-0 landscape:px-4">
           <div className="rounded-2xl border border-card-gold/40 bg-black/25 p-6 shadow-lg backdrop-blur-sm landscape:col-start-1 landscape:row-start-1 landscape:p-2">
@@ -329,11 +275,6 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
             <p className="mt-2 text-xs text-gray-400 landscape:mt-0.5 landscape:text-[10px]">Compartilhe este código para outros entrarem</p>
           </div>
 
-          {/* Sem `serverUrl` (servidor sem IP de LAN — ver lanBaseUrl em
-              server/lanAddress.ts), joinUrlFor cai em window.location.origin,
-              que dentro do APK é http://localhost: um QR que aponta pro
-              PRÓPRIO aparelho de quem escaneia e nunca conecta. Melhor
-              avisar do que desenhar um QR inútil. */}
           {qrUsable ? (
             <div className="flex flex-col items-center gap-2 landscape:col-start-1 landscape:row-start-2 landscape:gap-1">
               <div className="rounded-2xl bg-white p-3 shadow-lg landscape:p-1.5">
@@ -348,14 +289,6 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
             </p>
           )}
 
-          {/* Time = assento par/ímpar (0/2 = A, 1/3 = B — fixo no motor, ver
-              createGameState em engine/gameState.ts). "Nós"/"Eles" é
-              relativo ao SEU assento atual, igual à mesa de jogo
-              (OnlineGameBoard.tsx) — mesmas cores (dourado/magenta), pra
-              não reaprender um código de cor novo quando a partida começa.
-              Só calculável depois que `seat` chega (ver o bug corrigido em
-              onlineStore.ts: a mensagem 'lobby' agora informa o PRÓPRIO
-              assento de quem recebe, não só a lista geral). */}
           <div className="space-y-2 text-left landscape:col-start-2 landscape:row-start-1 landscape:space-y-1">
             {seat !== null && (
               <p className="text-xs text-gray-300 landscape:text-[10px]">
@@ -368,20 +301,10 @@ export default function OnlineLobby({ onBackToMenu, onGameStart }: OnlineLobbyPr
               const seatInfo = lobby.find((s) => s.index === i)
               const isYou = seat === i
               const isMyTeam = seat === null ? i === 0 : i % 2 === seat % 2
-              // "Escolher o lado que quer entrar": qualquer convidado (não
-              // o anfitrião, que trava a sala pra sempre se sair do
-              // assento 0 - ver rooms.ts) pode tocar em QUALQUER outro
-              // assento - vazio (assume o lugar) OU ocupado por outra
-              // pessoa (TROCAM de lugar na hora, sem confirmação) - antes
-              // da partida começar. O assento 0 (anfitrião) nunca é alvo,
-              // nem de quem toca nem de ninguém.
               const canMoveHere = !isYou && !isHost && i !== 0
               const teamBorder = isMyTeam ? 'border-card-gold/60' : 'border-fuchsia-400/40'
 
               if (isYou) {
-                // Sua própria linha é sempre "Nós" por definição (isMyTeam
-                // é trivialmente true quando i === seat) — sem prop de cor
-                // aqui; YourSeatRow já é dourado fixo.
                 return <YourSeatRow key={i} name={seatInfo?.name ?? label} onRename={renameSeat} />
               }
 
@@ -462,10 +385,6 @@ interface YourSeatRowProps {
   onRename: (name: string) => void
 }
 
-/** Sua própria linha na lista de assentos: nome + "(você)" e um lápis pra
- * editar — toca, digita, confirma (Enter ou ✓) ou cancela (Esc ou ✕). Vale
- * tanto pro anfitrião quanto pra convidados: renomear não tem a mesma
- * restrição de trocar de assento (ver rooms.ts `rename`). */
 function YourSeatRow({ name, onRename }: YourSeatRowProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(name)

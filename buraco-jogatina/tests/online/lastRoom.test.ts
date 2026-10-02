@@ -2,8 +2,6 @@ import { useOnlineStore } from '../../src/online/onlineStore'
 
 const LAST_ROOM_KEY = 'buraco-last-online-room'
 
-/** Mesmo FakeWebSocket controlável de reconnectLoop.test.ts, com um extra:
- * `simulateMessage` pra injetar mensagens do servidor (aqui, `joined`). */
 class FakeWebSocket {
   static instances: FakeWebSocket[] = []
   static readonly CONNECTING = 0
@@ -38,8 +36,6 @@ class FakeWebSocket {
   }
 }
 
-/** Simula o fluxo completo join() -> conexão abre -> servidor responde
- * `joined` — o ponto em que o store grava `lastRoom`. */
 function simulateSuccessfulJoin(code: string, name: string): FakeWebSocket {
   useOnlineStore.getState().join(code, name)
   const ws = FakeWebSocket.instances[FakeWebSocket.instances.length - 1]
@@ -74,18 +70,15 @@ describe('onlineStore: lastRoom (persistência pra "Reconectar à sala")', () =>
 
   test('reconnectToLastRoom() chama join com o código+nome persistidos', () => {
     simulateSuccessfulJoin('ABCDE', 'Alice')
-    useOnlineStore.getState().leave() // sai (limpa a CONEXÃO, mas não localStorage se simularmos reabrir)
+    useOnlineStore.getState().leave()
 
-    // Simula "reabrir o app": o módulo já rodou loadLastRoom() no boot, mas
-    // aqui simulamos o efeito direto - grava de volta no store como se
-    // fosse um boot novo que leu do localStorage.
     useOnlineStore.setState({ lastRoom: { code: 'ABCDE', name: 'Alice' } })
 
     useOnlineStore.getState().reconnectToLastRoom()
 
     expect(FakeWebSocket.instances.length).toBeGreaterThan(0)
     const last = FakeWebSocket.instances[FakeWebSocket.instances.length - 1]
-    expect(last.url).toBeDefined() // conexão foi de fato iniciada
+    expect(last.url).toBeDefined()
   })
 
   test('reconnectToLastRoom() é no-op sem nenhuma sala salva', () => {
@@ -105,7 +98,6 @@ describe('onlineStore: lastRoom (persistência pra "Reconectar à sala")', () =>
 
     expect(useOnlineStore.getState().lastRoom).toEqual({ code: 'ABCDE', name: 'Alice' })
     expect(JSON.parse(window.localStorage.getItem(LAST_ROOM_KEY)!)).toEqual({ code: 'ABCDE', name: 'Alice' })
-    // O resto do estado da conexão continua sendo limpo normalmente.
     expect(useOnlineStore.getState().code).toBeNull()
     expect(useOnlineStore.getState().connection).toBe('idle')
   })

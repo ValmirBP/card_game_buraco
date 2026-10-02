@@ -5,29 +5,11 @@ import { Game } from '../../src/engine/game'
 import { HumanPlayer } from '../../src/engine/player'
 import { AIPlayer } from '../../src/engine/ai'
 
-/**
- * Cobertura EXAUSTIVA das três formas de curinga num jogo baixado, motivada
- * pelo relato "não consegui baixar uma sequência junto com curinga de mesmo
- * naipe":
- *
- *   1. 2 do MESMO naipe da sequência  -> curinga que NÃO suja (salvo regra do 9)
- *   2. 2 de OUTRO naipe               -> curinga que suja
- *   3. Joker (carta sem naipe real)   -> curinga que suja
- *
- * Estes testes travam o comportamento verificado do motor: um curinga do
- * mesmo naipe é aceito exatamente onde um joker/2-de-outro-naipe é aceito.
- * (Confirmado por varredura de 2497 combinações: zero casos em que o 2 do
- * mesmo naipe é rejeitado injustamente.)
- */
-
 const SUITS: Suit[] = ['hearts', 'diamonds', 'clubs', 'spades']
 const C = (r: string, s: Suit = 'hearts') => new Card(s, r as Rank, false)
 const two = (s: Suit) => new Card(s, '2', false)
-/** O joker é sempre armazenado como 2 de copas com isWild=true (ver createDeck). */
 const joker = () => new Card('hearts', '2', true)
 
-/** Um jogo é válido se o motor consegue construir a Canasta E o validador
- * isValidCanasta concorda (as duas portas que Game.playCanasta atravessa). */
 function baixavel(cards: Card[]): boolean {
   let construiu = false
   try {
@@ -36,8 +18,6 @@ function baixavel(cards: Card[]): boolean {
   } catch {
     construiu = false
   }
-  // As duas checagens têm que concordar - senão a UI habilitaria o botão e o
-  // motor recusaria (ou vice-versa), que é a classe de bug que procuramos.
   expect(isValidCanasta(cards)).toBe(construiu)
   return construiu
 }
@@ -47,14 +27,6 @@ function analisar(cards: Card[]): { clean: boolean; kind: string } {
   return { clean: c.isClean, kind: c.kind }
 }
 
-/**
- * O menor jogo possível com curinga: 3 cartas = 2 reais + 1 curinga. É o
- * caso que o usuário relatou ("faça sequências de 3 cartas com curinga para
- * baixar o jogo"). Regra: um único curinga tapa NO MÁXIMO um buraco, então
- * as duas cartas reais precisam ser consecutivas (curinga na ponta) ou estar
- * a exatamente 1 de distância (curinga no meio). A 2+ de distância, recusa —
- * e isso vale IGUAL para os três tipos de curinga.
- */
 describe('trio de 3 cartas (2 reais + 1 curinga)', () => {
   const curingas: Array<[string, () => Card]> = [
     ['2 do mesmo naipe', () => two('hearts')],
@@ -92,12 +64,6 @@ describe('trio de 3 cartas (2 reais + 1 curinga)', () => {
   })
 })
 
-/**
- * Ponta a ponta pelo caminho REAL do jogo (Game.playCanasta, o que a interface
- * chama ao clicar em "Baixar"), não só a validação. Prova que dá pra baixar um
- * trio com curinga numa mão normal, e documenta a ÚNICA razão legítima de
- * recusa: baixar deixaria a mão com menos de 2 cartas sem poder bater.
- */
 describe('baixar um trio com curinga pelo caminho do jogo (Game.playCanasta)', () => {
   function jogoComMao(cartasNaMao: Card[]): { game: Game; jogar: (cs: Card[]) => boolean; naMao: () => number } {
     const game = new Game([
@@ -113,8 +79,6 @@ describe('baixar um trio com curinga pelo caminho do jogo (Game.playCanasta)', (
     return { game, jogar: cs => game.playCanasta(cs), naMao: () => p.hand.getCards().length }
   }
 
-  /** 8 cartas de enchimento que não formam jogo, pra mão ficar com 11 e o
-   * jogo de 3 não esvaziar a mão. */
   const enchimento = (): Card[] => [
     new Card('clubs', 'K', false), new Card('spades', '9', false),
     new Card('diamonds', '4', false), new Card('clubs', 'J', false),
@@ -136,27 +100,18 @@ describe('baixar um trio com curinga pelo caminho do jogo (Game.playCanasta)', (
   })
 
   it('recusa quando baixar deixaria menos de 2 cartas na mão sem poder bater (regra, não bug do curinga)', () => {
-    // mão só com o trio: baixar os 3 deixaria 0 cartas, e o time não pode
-    // fechar (não tem canastra limpa) -> recusado, com QUALQUER curinga.
     const trio = [C('5'), C('6'), two('hearts')]
     const { jogar, naMao } = jogoComMao([...trio])
     expect(jogar(trio)).toBe(false)
-    expect(naMao()).toBe(3) // nada foi removido
+    expect(naMao()).toBe(3)
   })
 
-  /**
-   * O caso EXATO relatado pelo usuário: 3, 5 e 2, todos do mesmo naipe. O 2
-   * (mesmo naipe) preenche o buraco do 4 -> sequência 3-4-5, canastra limpa.
-   * É um jogo válido; baixa numa mão normal. Só é recusado se a mão tiver
-   * 4 cartas ou menos (baixar deixaria <2 e o jogador não pode bater).
-   */
   describe('caso relatado: 3, 5 e 2 do mesmo naipe', () => {
     it('forma um jogo válido: 3-4(2)-5, canastra limpa', () => {
       const trio = [C('3'), C('5'), two('hearts')]
       expect(isValidCanasta(trio)).toBe(true)
       const c = new Canasta(trio)
       expect(c.isClean).toBe(true)
-      // o 2 representa o 4 (o buraco entre 3 e 5)
       const slotDo2 = c.layout.find(e => e.card.rank === '2')!.representsValue
       expect(slotDo2).toBe(4)
     })
@@ -173,10 +128,8 @@ describe('baixar um trio com curinga pelo caminho do jogo (Game.playCanasta)', (
 
     it('só é recusado com 4 cartas ou menos na mão (deixaria <2 sem poder bater)', () => {
       const trio = [C('3'), C('5'), two('hearts')]
-      // 4 cartas: baixar 3 deixaria 1 -> recusa
       const quase = jogoComMao([...trio, new Card('clubs', 'K', false)])
       expect(quase.jogar(trio)).toBe(false)
-      // 5 cartas: baixar 3 deixaria 2 -> permite
       const ok = jogoComMao([...trio, new Card('clubs', 'K', false), new Card('spades', '9', false)])
       expect(ok.jogar(trio)).toBe(true)
     })
@@ -209,7 +162,7 @@ describe('curinga = 2 do MESMO naipe', () => {
   })
 
   it('regra do 9: 2 do mesmo naipe como curinga numa sequência ALTA suja o jogo', () => {
-    const cards = [C('9'), C('10'), two('hearts')] // curinga vira J -> topo >= 9 -> suja
+    const cards = [C('9'), C('10'), two('hearts')]
     expect(baixavel(cards)).toBe(true)
     expect(analisar(cards).clean).toBe(false)
   })
@@ -256,7 +209,6 @@ describe('limite de 1 curinga por jogo', () => {
   })
 
   it('joker + 2 do mesmo naipe, quando exigiriam dois curingas, é recusado', () => {
-    // 5,6,9 + 2H + joker precisaria de DOIS curingas (7 e 8) -> inválido
     expect(baixavel([C('5'), C('6'), C('9'), two('hearts'), joker()])).toBe(false)
   })
 
@@ -267,7 +219,6 @@ describe('limite de 1 curinga por jogo', () => {
 
 describe('estender um jogo já baixado com um curinga', () => {
   it('estende uma sequência com 2 do mesmo naipe como curinga na ponta', () => {
-    // 5-6-7 na mesa + 2H -> 5-6-7-8(2H) ou 4(2H)-5-6-7
     expect(canExtendMeld([C('5'), C('6'), C('7')], [two('hearts')])).toBe(true)
   })
 
@@ -276,17 +227,10 @@ describe('estender um jogo já baixado com um curinga', () => {
   })
 
   it('não estende se isso exigiria um segundo curinga', () => {
-    // jogo já sujo (com joker) + outro curinga -> dois curingas -> inválido
     expect(canExtendMeld([C('5'), C('6'), C('8'), joker()], [two('spades')])).toBe(false)
   })
 })
 
-/**
- * A garantia central por trás do relato do usuário, afirmada diretamente:
- * para TODA sequência real onde um joker ou um 2 de outro naipe pode ser o
- * curinga, um 2 do MESMO naipe também pode. Ou seja, curinga de mesmo naipe
- * nunca é "menos aceito" que os outros.
- */
 describe('curinga de mesmo naipe nunca é mais restrito que os outros', () => {
   const RANKS: Rank[] = ['A', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
 

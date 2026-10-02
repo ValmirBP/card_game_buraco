@@ -21,7 +21,7 @@ describe('GameSession turn phase', () => {
     const result = session.applyIntent(0, { type: 'draw' })
     expect(result.ok).toBe(true)
     expect(session.phase).toBe('play')
-    expect(session.currentSeat).toBe(0) // still seat 0's turn
+    expect(session.currentSeat).toBe(0)
   })
 
   it('rejects discard while in draw phase', () => {
@@ -57,13 +57,10 @@ describe('GameSession turn phase', () => {
 
   it('takeDiscard is only valid in draw phase, also moves to play phase', () => {
     const session = new GameSession(allHumans())
-    // Nothing on the discard pile yet, so this fails, but importantly it's a
-    // draw-phase-only intent.
     const emptyPileResult = session.applyIntent(0, { type: 'takeDiscard' })
     expect(emptyPileResult.ok).toBe(false)
     expect(session.phase).toBe('draw')
 
-    // Put a card on the pile via a full turn, then verify seat 1 can take it.
     session.applyIntent(0, { type: 'draw' })
     session.applyIntent(0, { type: 'discard', cardIndex: 0 })
     expect(session.currentSeat).toBe(1)

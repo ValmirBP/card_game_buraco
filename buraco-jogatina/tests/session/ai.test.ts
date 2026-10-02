@@ -29,7 +29,6 @@ describe('GameSession.runAiTurns', () => {
 
   it('advances through consecutive AI seats and stops at the next human seat', () => {
     const session = new GameSession(humanThenThreeAi())
-    // Complete seat 0's (human) turn manually to hand control to seat 1 (AI).
     session.applyIntent(0, { type: 'draw' })
     session.applyIntent(0, { type: 'discard', cardIndex: 0 })
     expect(session.currentSeat).toBe(1)
@@ -37,7 +36,6 @@ describe('GameSession.runAiTurns', () => {
     const events = session.runAiTurns()
 
     expect(events.length).toBeGreaterThan(0)
-    // Either it looped back around to the human seat, or the round ended.
     expect(session.currentSeat === 0 || session.status === 'finished').toBe(true)
     if (session.status === 'playing') {
       expect(session.phase).toBe('draw')
@@ -52,8 +50,6 @@ describe('GameSession.runAiTurns', () => {
     session.runAiTurns()
 
     if (session.status === 'playing') {
-      // Back to the human seat in draw phase means every AI seat completed
-      // a full draw->...->discard cycle without getting stuck.
       expect(session.currentSeat).toBe(0)
       expect(session.phase).toBe('draw')
     }

@@ -274,7 +274,6 @@ describe('AIPlayer', () => {
       ])
       const moves = ai.getValidMoves(makeGameState(ai))
       expect(wildIndicesInMoves(ai, moves)).toHaveLength(0)
-      // ainda existe algum descarte (das cartas comuns)
       expect(moves.some(m => m.type === 'discard')).toBe(true)
     })
 
@@ -390,7 +389,7 @@ describe('AIPlayer', () => {
       const cards = [new Card('spades', '9', false), new Card('spades', 'J', false), wild]
       const ai = new AIPlayer('Bot', 'hard', cards)
       const teams = makeTeams()
-      teams[0].melds = [cleanCanastra('hearts')] // time ja tem canastra limpa
+      teams[0].melds = [cleanCanastra('hearts')]
       const gameState = makeGameState(ai, { teams })
 
       const moves = ai.getValidMoves(gameState)
@@ -407,17 +406,15 @@ describe('AIPlayer', () => {
     test('sem canastra limpa, com opcao limpa e opcao suja disponiveis, escolhe a limpa', () => {
       const wild = new Card('hearts', '2', true)
       const cards = [
-        // opcao limpa: 5,6,7 de copas (sem curinga)
         new Card('hearts', '5', false),
         new Card('hearts', '6', false),
         new Card('hearts', '7', false),
-        // opcao suja: 9, J de espadas + curinga preenchendo o 10
         new Card('spades', '9', false),
         new Card('spades', 'J', false),
         wild,
       ]
       const ai = new AIPlayer('Bot', 'hard', cards)
-      const teams = makeTeams() // nenhum time tem canastra limpa ainda
+      const teams = makeTeams()
       const gameState = makeGameState(ai, { teams })
 
       const move = ai.playTurn(gameState)
@@ -431,7 +428,7 @@ describe('AIPlayer', () => {
       const wild = new Card('hearts', '2', true)
       const ai = new AIPlayer('Bot', 'hard', [wild])
       const teams = makeTeams()
-      teams[0].melds = [cleanCanastra('hearts')] // limpa, 7 cartas, sem lacunas
+      teams[0].melds = [cleanCanastra('hearts')]
       const gameState = makeGameState(ai, { teams })
 
       const moves = ai.getValidMoves(gameState)
@@ -440,8 +437,6 @@ describe('AIPlayer', () => {
       )
       expect(dirtiesExisting).toBe(false)
 
-      // Sem outra jogada de mesa disponivel, a IA nao deve travar: cai para
-      // draw/discard normalmente.
       const move = ai.playTurn(gameState)
       expect(['draw', 'discard']).toContain(move.type)
     })
@@ -449,7 +444,7 @@ describe('AIPlayer', () => {
 
   describe('Bug 1: gate duro - nao propoe jogo sujo enquanto o time nao tem canastra limpa fechada', () => {
     test('sem canastra limpa fechada, unica opcao de mesa e suja (8-2-10-J) -> nao aparece em getValidMoves e a IA nao baixa', () => {
-      const twoOfSpades = new Card('spades', '2', false) // 2 do mesmo naipe, curinga fora de posicao (representa 9)
+      const twoOfSpades = new Card('spades', '2', false)
       const cards = [
         new Card('spades', '8', false),
         twoOfSpades,
@@ -457,7 +452,7 @@ describe('AIPlayer', () => {
         new Card('spades', 'J', false),
       ]
       const ai = new AIPlayer('Bot', 'hard', cards)
-      const teams = makeTeams() // nenhum time tem canastra limpa fechada
+      const teams = makeTeams()
       const gameState = makeGameState(ai, { teams })
 
       const moves = ai.getValidMoves(gameState)
@@ -471,7 +466,7 @@ describe('AIPlayer', () => {
     })
 
     test('com canastra limpa fechada, a jogada suja (8-2-10-J) fica disponivel e pode ser baixada', () => {
-      const twoOfSpades = new Card('diamonds', '2', false) // 2 do mesmo naipe do jogo sujo, diamonds
+      const twoOfSpades = new Card('diamonds', '2', false)
       const cards = [
         new Card('diamonds', '8', false),
         twoOfSpades,
@@ -480,7 +475,7 @@ describe('AIPlayer', () => {
       ]
       const ai = new AIPlayer('Bot', 'hard', cards)
       const teams = makeTeams()
-      teams[0].melds = [cleanCanastra('hearts')] // time ja tem canastra limpa fechada
+      teams[0].melds = [cleanCanastra('hearts')]
       const gameState = makeGameState(ai, { teams })
 
       const moves = ai.getValidMoves(gameState)

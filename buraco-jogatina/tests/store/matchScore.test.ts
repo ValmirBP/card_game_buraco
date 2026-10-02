@@ -3,24 +3,16 @@ import { Card } from '../../src/engine/card'
 import { Canasta } from '../../src/engine/canasta'
 import type { Team } from '../../src/engine/gameState'
 
-/** Builds a clean (no wilds) canastra of `length` cards, all hearts. */
 function cleanCanastra(length: number): Canasta {
   const ranks = ['4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'] as const
   const cards = ranks.slice(0, length).map(r => new Card('hearts', r, false))
   return new Canasta(cards)
 }
 
-/** Minimal fake Team for exercising accumulateMatchRound() in isolation from
- * the engine's actual scoring (which recomputes team.score from hand/melds
- * on finish() and can't be forced to an arbitrary value directly). */
 function fakeTeam(id: 'A' | 'B', score: number, melds: Canasta[] = []): Team {
   return { id, seats: id === 'A' ? [0, 2] : [1, 3], melds, score, hasTakenMorto: false }
 }
 
-/** Forces the round to end via the real discard flow: empties the current
- * player's hand down to 1 card, marks their team as morto-taken with a clean
- * canastra already on the table (so canClose is satisfied), then discards
- * the last card so the hand empties and the round finishes. */
 function forceRoundEnd(teamId: 'A' | 'B' = 'A') {
   const game = useGameStore.getState().game!
   const team = game.state.teams.find(t => t.id === teamId)!
@@ -150,8 +142,6 @@ describe('gameStore match integration (partida até 3000)', () => {
     const scoresAfterFirstFinish = { ...useGameStore.getState().matchScores }
     const canastrasAfterFirstFinish = JSON.parse(JSON.stringify(useGameStore.getState().matchCanastras))
 
-    // Actions on a finished game are no-ops (status !== 'playing'), but call
-    // a few of them anyway to make sure nothing double counts.
     useGameStore.getState().discard(0)
     useGameStore.getState().playCanasta([0, 1, 2])
     useGameStore.getState().aiTurn()
@@ -175,7 +165,6 @@ describe('gameStore match integration (partida até 3000)', () => {
     expect(state.round).toBe(2)
     expect(state.matchScores).toEqual(matchScoresBefore)
     expect(state.version).toBeGreaterThan(versionBefore)
-    // Fresh round: hands dealt again, same players/names carried over.
     state.game!.state.players.forEach(p => expect(p.hand.getSize()).toBe(11))
     expect(state.game!.state.players[0].name).toBe('Alice')
   })
@@ -195,6 +184,6 @@ describe('gameStore match integration (partida até 3000)', () => {
     useGameStore.getState().startNextRound()
 
     expect(useGameStore.getState().round).toBe(roundBefore)
-    expect(useGameStore.getState().game).toBe(gameBefore) // no new round created
+    expect(useGameStore.getState().game).toBe(gameBefore)
   })
 })

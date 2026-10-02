@@ -17,11 +17,6 @@ interface OnlineGameplayProps {
   onBackToMenu: () => void
 }
 
-/** Online equivalent of Gameplay.tsx: no local turn/AI-scheduling logic at
- * all (the server is authoritative and pushes a fresh `state` after every
- * change, including AI turns) — só renderiza a SeatView atual. Manipulação
- * direta (clicar no monte/descarte/mesa) substitui o antigo painel de
- * botões (OnlineActionPanel, removido), igual ao modo offline. */
 export default function OnlineGameplay({ onBackToMenu }: OnlineGameplayProps) {
   const view = useOnlineStore(s => s.view)
   const log = useOnlineStore(s => s.log)
@@ -33,9 +28,6 @@ export default function OnlineGameplay({ onBackToMenu }: OnlineGameplayProps) {
   const discardAnim = useOnlineStore(s => s.discardAnim)
   const tableAnim = useOnlineStore(s => s.tableAnim)
 
-  // Rodada terminou: segura 2s mostrando o banner "Fulano bateu!" sobre a
-  // mesa antes de trocar pro placar (igual ao Gameplay offline). Volta a
-  // false quando o host inicia a próxima rodada (status -> 'playing').
   const status = view?.status
   const [resultReady, setResultReady] = useState(false)
   useEffect(() => {
@@ -47,10 +39,6 @@ export default function OnlineGameplay({ onBackToMenu }: OnlineGameplayProps) {
     return () => clearTimeout(timeoutId)
   }, [status])
 
-  // Banner do MORTO (pega / vira monte) — mesma técnica do Gameplay offline:
-  // varre as linhas NOVAS do log a cada mudança e mostra um banner quando
-  // alguma anuncia o evento. Começa apontando pro fim do log ATUAL (não 0),
-  // senão reabriria a sala/reconectaria e mostraria de novo avisos antigos.
   const [mortoBanner, setMortoBanner] = useState<string | null>(null)
   const seenLogLenRef = useRef(log.length)
   const bannerTimeoutRef = useRef<number | null>(null)
@@ -70,8 +58,6 @@ export default function OnlineGameplay({ onBackToMenu }: OnlineGameplayProps) {
     return <OnlineResult view={view} onBackToMenu={onBackToMenu} />
   }
 
-  // Sair da partida em andamento (com confirmação — mesmo texto/mesma ação
-  // do voltar de hardware do Android pra este mesmo estado, ver App.tsx).
   const handleExit = () => {
     if (window.confirm('Sair da partida em andamento? Você será desconectado dos outros jogadores.')) {
       onBackToMenu()
@@ -82,27 +68,18 @@ export default function OnlineGameplay({ onBackToMenu }: OnlineGameplayProps) {
   const batidaBanner =
     view.status === 'finished' ? (closerName ? `🏆 ${closerName} bateu!` : '🏁 Fim da rodada!') : null
 
-  // Pausa: algum assento humano caiu (ver SeatView.paused/players[].connected
-  // - preenchido pelo servidor em server/protocol.ts broadcastState). O
-  // servidor já recusa qualquer intent enquanto isso, mas sem um aviso
-  // visível um toque na mesa parecia simplesmente "não fazer nada".
   const disconnectedNames = view.players.filter(p => p.kind === 'human' && !p.connected).map(p => p.name)
   const isPaused = view.paused && disconnectedNames.length > 0
 
   const lastLog = log[log.length - 1]
-  // "Nós"/"Eles" relativo ao próprio time, igual ao GameBoard online.
   const myTeamId: TeamId = view.players[view.seat]?.teamId ?? 'A'
   const sortedTeams = [...view.teams].sort((a, b) => (a.id === myTeamId ? -1 : 1) - (b.id === myTeamId ? -1 : 1))
-  // Parceiro (assento oposto, mesmo time) — mostrado no placar, entre os
-  // dois placares, só em paisagem (pedido do usuário, ver OnlineGameBoard.tsx
-  // que esconde o assento dele no tabuleiro nessa orientação).
   const partnerSeat = otherSeatsInOrder(view.seat)[1]
   const partner = view.players[partnerSeat]
   const partnerIsTurn = view.status === 'playing' && view.currentSeat === partnerSeat
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2 landscape:gap-0.5">
-      {/* Banner de BATIDA: 2s antes do placar (ver Gameplay offline) */}
       <AnimatePresence>
         {batidaBanner && (
           <motion.div
@@ -120,18 +97,11 @@ export default function OnlineGameplay({ onBackToMenu }: OnlineGameplayProps) {
         )}
       </AnimatePresence>
 
-      {/* Fantasmas de animação — mesmos componentes do offline
-          (DrawAnimation/CardFlyAnimation), disparados por OnlineGameBoard.tsx
-          e OnlineDiscardRow.tsx e lidos aqui via onlineStore. Sem o
-          equivalente de AiDrawAnimation: o servidor roda os turnos remotos
-          no seu próprio ritmo, sem um evento local pra ancorar esse
-          fantasma (ver comentário em onlineStore.ts). */}
       <DrawAnimation anim={drawAnim} />
       <CardFlyAnimation anim={pickupAnim} />
       <CardFlyAnimation anim={discardAnim} />
       <CardFlyAnimation anim={tableAnim} />
 
-      {/* Banner de destaque do morto (pega / virou monte) — ver Gameplay offline */}
       <AnimatePresence>
         {mortoBanner && (
           <motion.div
@@ -149,8 +119,6 @@ export default function OnlineGameplay({ onBackToMenu }: OnlineGameplayProps) {
         )}
       </AnimatePresence>
 
-      {/* Placar + saída — mesmo tratamento do modo offline (ver
-          Gameplay.tsx), pedido do usuário. */}
       <div className="flex shrink-0 items-start gap-2 landscape:gap-1.5">
         <ExitButton onClick={handleExit} />
         <div className="z-40 min-w-0 flex-1 rounded-xl border border-card-gold/30 bg-black/40 px-2 py-1 shadow-[0_4px_16px_rgba(0,0,0,0.35)] backdrop-blur-md landscape:rounded-md landscape:px-1.5 landscape:py-0">
@@ -182,10 +150,6 @@ export default function OnlineGameplay({ onBackToMenu }: OnlineGameplayProps) {
                     {team.hasTakenMorto ? '✓morto' : '✗morto'}
                   </span>
                 </div>
-                {/* Parceiro entre os dois placares, só em paisagem - pedido
-                    do usuário: "separa os scores no topo da tela, coloca o
-                    jogador entre eles" (ver o `landscape:hidden` no assento
-                    dele em OnlineGameBoard.tsx). */}
                 {i === 0 && partner && (
                   <div
                     data-seat-index={partnerSeat}
@@ -207,14 +171,6 @@ export default function OnlineGameplay({ onBackToMenu }: OnlineGameplayProps) {
         </div>
       </div>
 
-      {/* Diferente do banner de pausa (que avisa que OUTRO jogador caiu):
-          isto é pra quando a SUA PRÓPRIA conexão caiu - o app tenta
-          reconectar sozinho por alguns segundos (ver onlineStore.ts), mas
-          se demorar (ou o app tiver ficado em segundo plano), a mesa fica
-          congelada sem nenhum aviso do motivo. Sem isso, o único jeito de
-          sair era o botão "Sair" - que funciona, mas apagava o código da
-          sala (bug corrigido: "Sair" não limpa mais lastRoom, então o
-          botão "Reconectar à sala X" no menu volta a funcionar depois). */}
       {connection !== 'open' && (
         <p className="shrink-0 rounded-xl bg-amber-500/15 px-4 py-2 text-center text-sm text-amber-200 landscape:py-1 landscape:text-xs">
           {connection === 'connecting'
@@ -232,23 +188,15 @@ export default function OnlineGameplay({ onBackToMenu }: OnlineGameplayProps) {
         </p>
       )}
 
-      {/* Mesa + rodapé, dentro de um wrapper relativo pra poder cobrir os
-          dois com o overlay de pausa (abaixo) sem tapar o placar/botão de
-          sair no topo, que continuam tocáveis mesmo pausado. */}
       <div className="relative flex min-h-0 flex-1 flex-col gap-2 landscape:gap-0.5">
-        {/* Mesa — mesmo tratamento do GameBoard offline: ocupa o espaço
-            flexível do meio, sem rolar em paisagem. */}
         <div className="min-h-0 flex-1 overflow-y-auto landscape:overflow-hidden">
           <OnlineGameBoard view={view} />
         </div>
 
-        {/* Registro — escondido em paisagem, igual offline */}
         <div className="shrink-0 truncate rounded-lg border border-white/10 bg-black/25 px-3 py-1.5 text-center text-xs text-gray-300 landscape:hidden">
           <span className="text-card-gold">Registro:</span> {lastLog ?? 'Nenhuma ação ainda.'}
         </div>
 
-        {/* Rodapé: UM painel só com a Mão e o Descarte lado a lado ("em
-            paralelo") — igual ao Gameplay offline. */}
         <div className="flex shrink-0 items-stretch gap-2 rounded-xl border border-white/10 bg-black/25 px-3 py-1.5 shadow-lg backdrop-blur-sm landscape:gap-1.5 landscape:px-2 landscape:py-0.5">
           <div className="min-w-0 flex-[3]">
             <OnlinePlayerHand view={view} />
@@ -259,12 +207,6 @@ export default function OnlineGameplay({ onBackToMenu }: OnlineGameplayProps) {
           </div>
         </div>
 
-        {/* Overlay de pausa: alguém caiu no meio da partida — pedido do
-            usuário ("identificar quem saiu e mostrar na tela" + "pausar o
-            jogo"). Bloqueia toques na mesa/mão (pointer-events captura tudo
-            embaixo) até a reconexão (ver server/rooms.ts joinRoom, que já
-            aceita o mesmo nome de volta no meio da partida e devolve o
-            estado exato de onde parou). */}
         <AnimatePresence>
           {isPaused && (
             <motion.div

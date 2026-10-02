@@ -32,7 +32,6 @@ describe('createDeck', () => {
     const deck = createDeck()
     const nonWilds = deck.filter(c => !c.isWild)
     expect(nonWilds.length).toBe(104)
-    // Each card value appears twice (2 decks)
     const set = new Set(nonWilds.map(c => c.toString()))
     expect(set.size).toBe(52)
   })

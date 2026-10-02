@@ -2,19 +2,6 @@ interface ExitButtonProps {
   onClick: () => void
 }
 
-/**
- * Botão de saída visível DURANTE uma partida em andamento — offline e
- * online. Antes disso, o único jeito de sair no meio do jogo era o botão
- * voltar do Android, que nem sequer era tratado (o padrão do WebView é
- * minimizar o app inteiro). Agora os dois caminhos levam ao MESMO lugar: o
- * voltar por hardware do Android (ver o listener central em App.tsx) e este
- * botão disparam a mesma confirmação, então o comportamento é idêntico não
- * importa como o jogador tenta sair.
- *
- * Um único componente compartilhado entre Gameplay.tsx (offline) e
- * OnlineGameplay.tsx (online) garante que os dois modos fiquem visualmente
- * e funcionalmente iguais nesse ponto — pedido do usuário.
- */
 export default function ExitButton({ onClick }: ExitButtonProps) {
   return (
     <button

@@ -14,10 +14,6 @@ describe('resolveWsUrl', () => {
   })
 
   test('bare "host:port" stays ws: even when the page itself is https (APK/Capacitor case)', () => {
-    // Este é o caso real dentro do APK: a página é servida de
-    // https://localhost (Capacitor), e o usuário digita só o IP do PC. O
-    // servidor do jogo fala ws simples (sem TLS), então NUNCA deve virar
-    // wss: só porque a página do app está em https:.
     expect(resolveWsUrl('192.168.2.142:3001', 'https:', 'localhost')).toBe('ws://192.168.2.142:3001')
   })
 

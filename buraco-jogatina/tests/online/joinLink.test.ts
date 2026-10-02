@@ -37,9 +37,6 @@ describe('parseJoinLink', () => {
     })
   })
 
-  // localhost no QR apontaria pro PRÓPRIO aparelho de quem escaneia, nunca
-  // pro servidor - por isso vira "sem servidor" (o app mantém o endereço
-  // que já tiver configurado) em vez de quebrar a conexão.
   test('localhost/127.0.0.1 são descartados como servidor, mas o código é aproveitado', () => {
     expect(parseJoinLink('http://localhost:3001/?sala=ABCDE')).toEqual({
       serverAddress: '',

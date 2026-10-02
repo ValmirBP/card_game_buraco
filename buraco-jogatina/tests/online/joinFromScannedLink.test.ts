@@ -1,7 +1,5 @@
 import { useOnlineStore } from '../../src/online/onlineStore'
 
-/** WebSocket falso que registra a URL de cada conexão — é ela que prova que
- * o endereço veio do QR, e não do que estava configurado antes. */
 class FakeWebSocket {
   static instances: FakeWebSocket[] = []
   static readonly OPEN = 1
@@ -23,7 +21,6 @@ class FakeWebSocket {
 
   close(): void {}
 
-  /** Dispara o onopen, que é quando o store manda o `join` de verdade. */
   simulateOpen(): void {
     this.onopen?.()
   }
@@ -47,7 +44,6 @@ describe('joinFromScannedLink (conexão pelo QR)', () => {
   })
 
   test('QR completo: configura o servidor do link e conecta NELE (não no de antes)', () => {
-    // Cenário real: segundo celular, que nunca teve endereço configurado.
     const entered = useOnlineStore.getState().joinFromScannedLink(`http://${QR_HOST}/?sala=ABCDE`, 'Maria')
 
     expect(entered).toBe(true)
@@ -66,7 +62,7 @@ describe('joinFromScannedLink (conexão pelo QR)', () => {
   })
 
   test('o endereço do QR SOBRESCREVE um endereço antigo errado', () => {
-    useOnlineStore.getState().setServerAddress('10.0.0.99:3001') // sobra de outra rede
+    useOnlineStore.getState().setServerAddress('10.0.0.99:3001')
     useOnlineStore.getState().joinFromScannedLink(`http://${QR_HOST}/?sala=ABCDE`, 'Maria')
 
     expect(useOnlineStore.getState().serverAddress).toBe(QR_HOST)

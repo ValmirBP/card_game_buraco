@@ -6,10 +6,7 @@ interface SeatProps {
   cardCount: number
   isCurrentTurn: boolean
   teamId: TeamId
-  /** Seat 0 (the human) doesn't show a card-back fan here — their hand is
-   * rendered in full below the table, so the seat badge stays compact. */
   compact?: boolean
-  /** True once the game has ended, to freeze any "jogando…" language. */
   isThinking?: boolean
 }
 
@@ -23,8 +20,6 @@ const TEAM_AVATAR: Record<TeamId, string> = {
   B: 'bg-fuchsia-500/80 text-white',
 }
 
-/** One seat around the table: avatar, name, card-back fan (opponents/partner
- * only) and a gold highlight + "jogando…" pill while it's this seat's turn. */
 export default function Seat({ name, cardCount, isCurrentTurn, teamId, compact, isThinking }: SeatProps) {
   const fanSize = Math.min(cardCount, 7)
 
@@ -37,22 +32,13 @@ export default function Seat({ name, cardCount, isCurrentTurn, teamId, compact, 
       }`}
     >
       <div className="flex items-center gap-2 landscape:gap-1">
-        {/* landscape:h-4 landscape:w-4 landscape:text-[8px]: mesmo tamanho
-            do avatar do parceiro no placar (ver Scoreboard.tsx), pedido do
-            usuário ("deixo Ana e Carlos com o mesmo tamanho do Bruno"). */}
         <div
           className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full font-display text-xs sm:h-10 sm:w-10 sm:text-sm landscape:h-4 landscape:w-4 landscape:text-[8px] ${TEAM_AVATAR[teamId]}`}
         >
           {name.charAt(0).toUpperCase()}
         </div>
         <div className="min-w-0 text-left">
-          {/* landscape:text-[10px]: mesmo tamanho do nome do parceiro no
-              placar (ver Scoreboard.tsx TeamPill/badge do parceiro), pedido
-              do usuário. */}
           <div className="truncate text-xs font-bold sm:text-sm landscape:text-[10px] landscape:leading-tight">{name}</div>
-          {/* Em paisagem o "Sua vez" fica FORA do fluxo (absolute, logo abaixo
-              do assento): dentro do fluxo ele alargava a coluna da Ana/Carlos
-              a cada turno deles, e os jogos dos DOIS quadros reescalavam. */}
           {isCurrentTurn && (
             <span className="inline-block rounded-full bg-card-gold px-1.5 py-0.5 text-[9px] font-bold text-black sm:text-[10px] landscape:absolute landscape:left-1/2 landscape:top-full landscape:z-10 landscape:mt-0.5 landscape:-translate-x-1/2 landscape:whitespace-nowrap landscape:px-1.5 landscape:py-0 landscape:text-[9px]">
               {isThinking ? '🤖 jogando…' : 'Sua vez'}
@@ -61,9 +47,6 @@ export default function Seat({ name, cardCount, isCurrentTurn, teamId, compact, 
         </div>
       </div>
 
-      {/* Leque de versos: oculto em paisagem (economiza altura) — só o
-          avatar + contagem de cartas importam ali; a fileira completa
-          continua visível em retrato. */}
       {!compact && (
         <div className="flex -space-x-4 pt-1 sm:-space-x-5 landscape:hidden">
           {Array.from({ length: fanSize }).map((_, i) => (

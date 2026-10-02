@@ -1,7 +1,6 @@
 import { clampToViewport } from '../../../src/components/Gameplay/flightMath'
 
 describe('clampToViewport', () => {
-  // Viewport-baixo-em-paisagem típico usado nos testes de layout do jogo.
   const VIEWPORT_W = 800
   const VIEWPORT_H = 360
 
@@ -11,10 +10,7 @@ describe('clampToViewport', () => {
   })
 
   test('a point derived from a very wide source rect (e.g. #discard-pile, #player-hand-anchor) still lands inside the viewport', () => {
-    // Reproduz o bug A2: centro de uma fileira larga (ex.: 824px de largura,
-    // como o descarte/mão podiam medir) menos metade da largura de outra
-    // fileira larga - sem o clamp, isso caía bem fora da tela (x negativo).
-    const wideRowCenterMinusHalfWidth = 824 / 2 - 824 / 2 - 140 // reproduz um x negativo típico do bug antigo
+    const wideRowCenterMinusHalfWidth = 824 / 2 - 824 / 2 - 140
     const result = clampToViewport(wideRowCenterMinusHalfWidth, 40, VIEWPORT_W, VIEWPORT_H)
     expect(result.x).toBeGreaterThanOrEqual(0)
     expect(result.x).toBeLessThanOrEqual(VIEWPORT_W)

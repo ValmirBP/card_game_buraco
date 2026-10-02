@@ -10,17 +10,6 @@ import jsQR from 'jsqr'
 import { joinUrlFor } from '../../src/online/onlineStore'
 import { parseJoinLink } from '../../src/online/joinLink'
 
-/**
- * Ida e volta REAL do QR: gera a mesma imagem que a tela da sala gera
- * (mesma lib, mesmo conteúdo de joinUrlFor) e decodifica com o MESMO
- * decodificador de reserva que o app usa (jsQR), provando que o convite
- * sobrevive à viagem e produz os dados de conexão certos.
- *
- * Sem canvas: monta o RGBA na mão a partir da matriz de módulos do
- * `qrcode` (jsdom não tem canvas). Cada módulo vira um bloco de SCALE
- * pixels, com QUIET_ZONE de margem branca — sem a margem o jsQR não acha
- * os padrões de alinhamento.
- */
 const SCALE = 4
 const QUIET_ZONE = 4
 
@@ -50,7 +39,6 @@ function renderQrToImageData(text: string): { data: Uint8ClampedArray; width: nu
 
 describe('QR da sala: geração → leitura → dados de conexão', () => {
   test('o QR gerado pela tela da sala é legível e entrega servidor + código', () => {
-    // Exatamente o que OnlineLobby passa pro QRCode.toDataURL.
     const url = joinUrlFor('ABCDE', 'http://192.168.2.142:3001')
     expect(url).toBe('http://192.168.2.142:3001/?sala=ABCDE')
 
@@ -60,7 +48,6 @@ describe('QR da sala: geração → leitura → dados de conexão', () => {
     expect(decoded).not.toBeNull()
     expect(decoded!.data).toBe(url)
 
-    // E o que sai da leitura é o que o app precisa pra conectar.
     expect(parseJoinLink(decoded!.data)).toEqual({
       serverAddress: '192.168.2.142:3001',
       code: 'ABCDE',

@@ -82,7 +82,6 @@ describe('gamePersistence: serializeGame / deserializeGame round-trip', () => {
 
   test('blockedDiscardCard survives round-trip by reference (still blocks the same hand index)', () => {
     const game = freshGame()
-    // Simula um lixo de carta única pego pelo jogador da vez.
     game.state.discardPile = [new Card('clubs', '5', false)]
     const taken = game.takeDiscardPile()!
     const player = game.getCurrentPlayer()
@@ -94,7 +93,6 @@ describe('gamePersistence: serializeGame / deserializeGame round-trip', () => {
     const { game: restored } = deserializeGame(saved)
 
     expect(restored.isDiscardBlockedCard(blockedIndex)).toBe(true)
-    // Nenhum outro índice deveria estar bloqueado.
     expect(restored.isDiscardBlockedCard(0)).toBe(blockedIndex === 0)
   })
 
@@ -137,10 +135,10 @@ describe('gamePersistence: localStorage plumbing', () => {
 
   test('a corrupted entry is treated as "nothing to resume" and is wiped', () => {
     window.localStorage.setItem(STORAGE_KEY, '{ not valid json')
-    expect(hasSavedGame()).toBe(true) // presence check doesn't parse
+    expect(hasSavedGame()).toBe(true)
 
     expect(loadSavedGame()).toBeNull()
-    expect(hasSavedGame()).toBe(false) // loadSavedGame cleaned it up
+    expect(hasSavedGame()).toBe(false)
   })
 })
 
@@ -164,14 +162,6 @@ describe('gameStore.resumeSavedGame integration', () => {
     const handSize = before.getCurrentPlayer().hand.getSize()
     const gameLogBefore = useGameStore.getState().gameLog
 
-    // Não zeramos o store aqui pra simular "reabrir o app": um app novo é
-    // um contexto JS novo, então o listener do subscribe (que limpa o
-    // localStorage quando `game` vira null) nunca dispara nesse cenário
-    // real. Zerar o store manualmente NESTA sessão dispararia esse mesmo
-    // listener e apagaria o save que acabamos de fazer, invalidando o
-    // teste. resumeSavedGame() já sobrescreve `game`/`version`/etc. via
-    // set(), então basta chamá-lo direto contra o que está no
-    // localStorage.
     const resumed = useGameStore.getState().resumeSavedGame()
     expect(resumed).toBe(true)
 

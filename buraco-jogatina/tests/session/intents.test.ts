@@ -12,9 +12,6 @@ function allHumans(): SeatConfig[] {
   ]
 }
 
-/** White-box helper: reaches into the session's private engine Game to set
- * up deterministic scenarios, mirroring the pattern already used by
- * tests/store/gameStore.test.ts against the real engine. */
 function internalGame(session: GameSession): any {
   return (session as any).game
 }
@@ -29,7 +26,7 @@ describe('GameSession illegal intents are rejected without side effects', () => 
 
     expect(result.ok).toBe(false)
     expect(session.getViewFor(0).yourHand.length).toBe(handSizeBefore)
-    expect(session.phase).toBe('play') // still mid-turn, nothing consumed
+    expect(session.phase).toBe('play')
   })
 
   it('rejects extendMeld against a meld index that does not exist', () => {
@@ -71,20 +68,17 @@ describe('GameSession illegal intents are rejected without side effects', () => 
 
     const game = internalGame(session)
     const teamA = game.state.teams.find((t: any) => t.id === 'A')
-    teamA.hasTakenMorto = true // morto already taken -> can't fall back to taking it
+    teamA.hasTakenMorto = true
 
     const c5 = new Card('hearts', '5', false)
     const c6 = new Card('hearts', '6', false)
     const c7 = new Card('hearts', '7', false)
-    // Replace the hand entirely with exactly these 3 cards, so playing them
-    // as a canasta (a non-canastra meld, <7 cards) would empty the hand with
-    // no clean canastra on the table -> illegal per Game.wouldEmptyHandIllegally.
     game.getCurrentPlayer().hand = new Hand([c5, c6, c7])
 
     const result = session.applyIntent(0, { type: 'playCanasta', cardIndices: [0, 1, 2] })
 
     expect(result.ok).toBe(false)
-    expect(game.getCurrentPlayer().hand.getSize()).toBe(3) // untouched
+    expect(game.getCurrentPlayer().hand.getSize()).toBe(3)
   })
 
   it('A1: rejects discarding the last card without morto/close rights, with a SPECIFIC error message (not "indice invalido")', () => {
@@ -95,7 +89,6 @@ describe('GameSession illegal intents are rejected without side effects', () => 
     const teamA = game.state.teams.find((t: any) => t.id === 'A')
     teamA.hasTakenMorto = true
     game.state.mortos = []
-    // Sem canastra limpa -> canClose fica false.
     game.getCurrentPlayer().hand = new Hand([new Card('diamonds', 'Q', false)])
 
     const result = session.applyIntent(0, { type: 'discard', cardIndex: 0 })
@@ -103,7 +96,7 @@ describe('GameSession illegal intents are rejected without side effects', () => 
     expect(result.ok).toBe(false)
     expect(result.error).toMatch(/bater/i)
     expect(result.error).not.toMatch(/indice/i)
-    expect(game.getCurrentPlayer().hand.getSize()).toBe(1) // untouched
+    expect(game.getCurrentPlayer().hand.getSize()).toBe(1)
   })
 
   it('rejects takeDiscard when the discard pile is empty', () => {
