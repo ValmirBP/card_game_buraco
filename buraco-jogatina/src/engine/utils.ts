@@ -47,10 +47,6 @@ export function rankToNumber(rank: Rank): number {
   return isNaN(num) ? 0 : num
 }
 
-export function isConsecutive(r1: Rank, r2: Rank): boolean {
-  return Math.abs(rankToNumber(r1) - rankToNumber(r2)) === 1
-}
-
 type AceMode = 'low' | 'high'
 
 /**
@@ -126,7 +122,7 @@ export interface MeldAnalysis {
  */
 function analyzeAceTrio(others: Card[], twos: Card[], jokers: Card[]): MeldAnalysis | null {
   if (others.length === 0 || !others.every(c => c.rank === 'A')) return null
-  if (others.length < 2) return null
+  if (others.length < 2 || others.length > 4) return null
 
   const totalWild = jokers.length + twos.length
   if (totalWild > 1) return null

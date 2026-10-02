@@ -72,8 +72,8 @@ export default function RulesModal({ onClose }: RulesModalProps) {
               <h3 className="font-bold text-white">Preparação</h3>
               <p>
                 Cada jogador recebe {HAND_SIZE} cartas. O restante do baralho forma o monte de
-                compra (com 2 mortos reservados à parte — veja abaixo), e a primeira carta virada
-                inicia o descarte.
+                compra (com 2 mortos reservados à parte — veja abaixo). O descarte começa vazio:
+                quem joga primeiro só pode comprar do monte.
               </p>
             </div>
           </div>
@@ -108,7 +108,7 @@ export default function RulesModal({ onClose }: RulesModalProps) {
               <p>
                 1. Compre uma carta do monte (ou pegue a pilha de descarte inteira). 2. Baixe ou
                 estenda jogos (3 ou mais cartas em sequência do mesmo naipe, com no máximo 1
-                curinga; ou uma trinca de 2+ Áses). 3. Descarte uma carta para encerrar o turno.
+                curinga; ou uma trinca de 2 a 4 Áses). 3. Descarte uma carta para encerrar o turno.
                 Atenção: se o descarte tinha só 1 carta quando você o pegou, essa carta específica
                 não pode voltar pro descarte nesse mesmo turno.
               </p>

@@ -178,6 +178,20 @@ describe('Canasta', () => {
       expect(extended.type).toBe('aces')
     })
 
+    test('trinca de Ases nunca vira canastra: um 5o Ás não estende, e 4 Ases + curinga ficam com 5 cartas', () => {
+      const quatro = new Canasta([
+        real('A', 'hearts'),
+        real('A', 'diamonds'),
+        real('A', 'clubs'),
+        real('A', 'spades'),
+      ])
+      expect(() => quatro.withExtraCards([real('A', 'hearts')])).toThrow()
+      const comCuringa = quatro.withExtraCards([joker()])
+      expect(comCuringa.cards).toHaveLength(5)
+      expect(comCuringa.isCanastra).toBe(false)
+      expect(comCuringa.kind).toBe('simples')
+    })
+
     test('throws when the extension would be invalid', () => {
       const cards = [real('5'), real('6'), real('7')]
       const canasta = new Canasta(cards)

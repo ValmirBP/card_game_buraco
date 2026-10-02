@@ -183,6 +183,29 @@ describe('isValidCanasta', () => {
       expect(isValidCanasta(cards)).toBe(true)
     })
 
+    test('5+ Ases reais -> false (a trinca vai de 2 a 4 Ases)', () => {
+      const cinco = [
+        real('A', 'hearts'),
+        real('A', 'diamonds'),
+        real('A', 'clubs'),
+        real('A', 'spades'),
+        real('A', 'hearts'),
+      ]
+      expect(isValidCanasta(cinco)).toBe(false)
+      expect(isValidCanasta([...cinco, real('A', 'clubs'), real('A', 'diamonds'), real('A', 'spades')])).toBe(false)
+    })
+
+    test('4 Ases + 1 curinga -> true (5 cartas, nunca chega a canastra)', () => {
+      const cards = [
+        real('A', 'hearts'),
+        real('A', 'diamonds'),
+        real('A', 'clubs'),
+        real('A', 'spades'),
+        joker(),
+      ]
+      expect(isValidCanasta(cards)).toBe(true)
+    })
+
     test('[A♥,A♦,JOKER,JOKER] -> false (more than 1 wild never allowed)', () => {
       const cards = [real('A', 'hearts'), real('A', 'diamonds'), joker(), joker()]
       expect(isValidCanasta(cards)).toBe(false)
