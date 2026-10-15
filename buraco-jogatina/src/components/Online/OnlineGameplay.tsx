@@ -1,6 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import VuChip from '../Gameplay/VuChip'
-import EmotePicker from './EmotePicker'
 import EmoteLayer from './EmoteLayer'
 import { vuBannerText } from '../Gameplay/vulnerability'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -157,7 +156,6 @@ export default function OnlineGameplay({ onBackToMenu }: OnlineGameplayProps) {
 
       <div className="flex shrink-0 items-start gap-2 landscape:gap-1.5">
         <ExitButton onClick={handleExit} />
-        <EmotePicker />
         <div className="z-40 min-w-0 flex-1 rounded-xl border border-card-gold/30 bg-black/40 px-2 py-1 shadow-[0_4px_16px_rgba(0,0,0,0.35)] backdrop-blur-md landscape:rounded-md landscape:px-1.5 landscape:py-0">
         <div className="mx-auto flex max-w-7xl flex-nowrap items-center justify-center gap-2 landscape:gap-1.5">
           {sortedTeams.map((team, i) => {

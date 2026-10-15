@@ -1,5 +1,6 @@
 import { needsOpening } from '../Gameplay/vulnerability'
 import { useOnlineStore } from '../../online/onlineStore'
+import EmotePicker from './EmotePicker'
 import { CardComponent } from '../Card'
 import { asCard } from '../../online/cardAdapter'
 import type { PlainCard, SeatView } from '../../session/types'
@@ -61,10 +62,13 @@ export default function OnlinePlayerHand({ view }: OnlinePlayerHandProps) {
 
   return (
     <div className="flex h-full min-w-0 flex-col space-y-1 landscape:space-y-0">
-      <div className="flex flex-nowrap items-baseline justify-between gap-x-3">
-        <h3 className="shrink-0 font-display text-sm text-card-gold landscape:text-[10px]">
-          Sua Mão <span className="text-[10px] font-normal text-gray-400 landscape:text-[8px]">({hand.length})</span>
-        </h3>
+      <div className="flex flex-nowrap items-center justify-between gap-x-3">
+        <div className="flex shrink-0 items-center gap-1.5">
+          <h3 className="shrink-0 font-display text-sm text-card-gold landscape:text-[10px]">
+            Sua Mão <span className="text-[10px] font-normal text-gray-400 landscape:text-[8px]">({hand.length})</span>
+          </h3>
+          <EmotePicker />
+        </div>
         {hint && <span className="truncate text-[10px] text-gray-300 sm:text-xs landscape:text-[8px]">{hint}</span>}
       </div>
       <div

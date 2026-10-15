@@ -7,7 +7,7 @@ Jogo de cartas **Buraco Aberto** (estilo Jogatina) para 4 jogadores em duplas. R
 - **Contra a IA** (offline): você + parceiro IA contra duas IAs, em 3 dificuldades (fácil, médio, difícil). A partida pode ser retomada ("Continuar partida").
 - **Online**: salas com 4 lugares; lugares sem humano são preenchidos por IA. Um servidor Node (`server/`) ou **o próprio celular** (servidor WebSocket embutido no app Android) hospeda a sala. Entra-se por código, link ou QR.
   Quem cai no meio da partida volta para a mesma vaga com um **token de reconexão** (gerado pelo servidor e guardado só no aparelho do jogador); saber o código da sala e o nome não basta para assumir a vaga de outro.
-  Na partida online há **reações só com emojis** (botão 😊): 12 emojis fixos, sem texto livre; o servidor só aceita emojis da lista e limita a 1 reação a cada 1,5 s por jogador. O emoji aparece num balão sobre quem mandou, para toda a sala, e some em 3 s.
+  Na partida online há **reações só com emojis** (selo 💬 ao lado de "Sua Mão"; a paleta abre para cima): 12 emojis fixos, sem texto livre; o servidor só aceita emojis da lista e limita a 1 reação a cada 1,5 s por jogador. O emoji aparece num balão sobre quem mandou, para toda a sala, e some em 3 s.
 
 ## Stack
 

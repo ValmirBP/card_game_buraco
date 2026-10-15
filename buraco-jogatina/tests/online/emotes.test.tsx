@@ -4,6 +4,8 @@ import { EMOTES, EMOTE_COOLDOWN_MS, EMOTE_VISIBLE_MS, isEmote } from '../../src/
 import { useOnlineStore } from '../../src/online/onlineStore'
 import EmotePicker from '../../src/components/Online/EmotePicker'
 import EmoteLayer from '../../src/components/Online/EmoteLayer'
+import OnlinePlayerHand from '../../src/components/Online/OnlinePlayerHand'
+import { GameSession } from '../../src/session/GameSession'
 
 class FakeSocket {
   messages: ServerMessage[] = []
@@ -223,3 +225,16 @@ describe('interface das reações', () => {
     expect(container.querySelector('[data-emote-seat="2"]')!.textContent).toBe('🤔')
   })
 })
+
+describe('lugar do botão de reações', () => {
+  it('fica junto da mão do jogador e a paleta abre para cima', () => {
+    const session = new GameSession([0, 1, 2, 3].map(i => ({ kind: 'human' as const, name: `P${i}` })))
+    const view = JSON.parse(JSON.stringify(session.getViewFor(0)))
+    render(<OnlinePlayerHand view={view} />)
+    const button = screen.getByLabelText('Reações')
+    expect(button.closest('div')!.parentElement!.textContent).toContain('Sua Mão')
+    fireEvent.click(button)
+    expect(screen.getByRole('menu').className).toMatch(/bottom-full/)
+  })
+})
+
