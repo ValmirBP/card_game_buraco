@@ -7,6 +7,7 @@ Jogo de cartas **Buraco Aberto** (estilo Jogatina) para 4 jogadores em duplas. R
 - **Contra a IA** (offline): você + parceiro IA contra duas IAs, em 3 dificuldades (fácil, médio, difícil). A partida pode ser retomada ("Continuar partida").
 - **Online**: salas com 4 lugares; lugares sem humano são preenchidos por IA. Um servidor Node (`server/`) ou **o próprio celular** (servidor WebSocket embutido no app Android) hospeda a sala. Entra-se por código, link ou QR.
   Quem cai no meio da partida volta para a mesma vaga com um **token de reconexão** (gerado pelo servidor e guardado só no aparelho do jogador); saber o código da sala e o nome não basta para assumir a vaga de outro.
+  Na partida online há **reações só com emojis** (botão 😊): 12 emojis fixos, sem texto livre; o servidor só aceita emojis da lista e limita a 1 reação a cada 1,5 s por jogador. O emoji aparece num balão sobre quem mandou, para toda a sala, e some em 3 s.
 
 ## Stack
 
@@ -47,6 +48,7 @@ Veja [COMO-GERAR-APK-ANDROID.md](COMO-GERAR-APK-ANDROID.md). O app é travado em
 - **Penalidades do morto** (-100): a dupla nunca pegou um morto que ainda estava disponível, ou pegou e o jogador que o pegou nunca jogou com a mão nova.
 - Fim da rodada: alguém bate. A pontuação da rodada soma jogos + bônus de batida + penalidade do morto - cartas que sobraram nas mãos (jokers 20, Ás 15, 8 a K 10, 3 a 7 5, 2 10). Em empate de pontos da rodada, a dupla A é a vencedora da rodada.
 - **Partida**: soma as rodadas até **3000 pontos**.
+- **Vulnerável (VU)**: a dupla com **1500 pontos ou mais** na partida fica vulnerável nas rodadas seguintes: a primeira descida da rodada precisa somar **75 pontos** em cartas (mesmos valores da contagem: coringa 20, Ás 15, 2 e 8 a K 10, 3 a 7 5), podendo juntar vários jogos na mesma descida. Depois de abrir, a rodada segue normal. A condição é reavaliada a cada rodada pelo placar atual. Vale offline e online, inclusive para as IAs; o placar mostra o selo **VU** e um aviso aparece no início da rodada.
 
 ## Estrutura
 

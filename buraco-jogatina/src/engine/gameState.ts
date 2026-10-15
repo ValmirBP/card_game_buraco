@@ -14,6 +14,7 @@ export interface Team {
   hasTakenMorto: boolean
   mortoTakenBySeat?: number
   mortoUsed?: boolean
+  openingMinimum: number
 }
 
 export interface SeatHandPoints {
@@ -67,8 +68,8 @@ export function createGameState(players: Player[]): GameState {
   return {
     players,
     teams: [
-      { id: 'A', seats: [0, 2], melds: [], score: 0, hasTakenMorto: false },
-      { id: 'B', seats: [1, 3], melds: [], score: 0, hasTakenMorto: false },
+      { id: 'A', seats: [0, 2], melds: [], score: 0, hasTakenMorto: false, openingMinimum: 0 },
+      { id: 'B', seats: [1, 3], melds: [], score: 0, hasTakenMorto: false, openingMinimum: 0 },
     ],
     currentPlayerIndex: 0,
     deck: [],

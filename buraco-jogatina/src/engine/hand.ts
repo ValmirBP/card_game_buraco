@@ -12,7 +12,7 @@ export class Hand {
   }
 
   removeCard(index: number): Card | null {
-    if (index < 0 || index >= this.cards.length) return null
+    if (!Number.isInteger(index) || index < 0 || index >= this.cards.length) return null
     return this.cards.splice(index, 1)[0]
   }
 

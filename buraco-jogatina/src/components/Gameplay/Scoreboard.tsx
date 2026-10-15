@@ -1,4 +1,5 @@
 import { useGameStore } from '../../store/gameStore'
+import VuChip from './VuChip'
 import type { Team, TeamId } from '../../engine/gameState'
 
 const TEAM_LABEL: Record<TeamId, string> = { A: 'Nós', B: 'Eles' }
@@ -20,6 +21,7 @@ function TeamPill({ team, matchTotal, prev }: TeamPillProps) {
       <span className={`font-display text-xs ${team.id === 'A' ? 'text-card-gold' : 'text-fuchsia-300'}`}>
         {TEAM_LABEL[team.id]}
       </span>
+      <VuChip minimum={team.openingMinimum} opened={team.melds.length > 0} />
       <span className="text-base font-bold text-white" title="Pontos da partida atual">
         {matchTotal}
       </span>

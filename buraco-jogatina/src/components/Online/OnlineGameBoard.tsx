@@ -3,11 +3,15 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useOnlineStore } from '../../online/onlineStore'
 import { CardBack } from '../Card'
 import { canExtendMeld, isValidCanasta } from '../../engine/utils'
+import { Canasta } from '../../engine/canasta'
 import type { SeatView, PlainCard } from '../../session/types'
 import { otherSeatsInOrder } from '../../online/seatLayout'
 import { asCard, asCards } from '../../online/cardAdapter'
 import Seat from '../Gameplay/Seat'
 import MeldArea, { isWildStrip, meldSuitOf } from '../Gameplay/MeldArea'
+import VuChip from '../Gameplay/VuChip'
+import OpeningStaging from '../Gameplay/OpeningStaging'
+import { needsOpening, openingShortfallHint, stagedPoints } from '../Gameplay/vulnerability'
 
 const PILE_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-12 landscape:h-16'
 const MORTO_CARD_SIZE = PILE_CARD_SIZE
@@ -30,6 +34,7 @@ interface OnlineGameBoardProps {
 
 export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
   const selectedCardIndices = useOnlineStore(s => s.selectedCardIndices)
+  const stagedOpening = useOnlineStore(s => s.stagedOpening)
   const sendIntent = useOnlineStore(s => s.sendIntent)
   const [hint, setHint] = useState<string | null>(null)
 
@@ -63,6 +68,19 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
 
   const canClickDeck = isMyTurn && phase === 'draw'
   const canClickDropZone = isMyTurn && phase === 'play' && selectedCardIndices.length >= 3
+  const openingTeam = teams.find(t => t.id === myTeamId)
+  const selectionIsMeld =
+    selectedCardIndices.length >= 3 && isValidCanasta(asCards(selectedCardIndices.map(i => yourHand[i]).filter(Boolean)))
+  const pendingOpeningPoints = stagedPoints(
+    asCards(yourHand),
+    selectionIsMeld ? [...stagedOpening, selectedCardIndices] : stagedOpening
+  )
+  const dropLabel =
+    openingTeam && needsOpening(openingTeam)
+      ? pendingOpeningPoints < openingTeam.openingMinimum
+        ? `Reservar (${pendingOpeningPoints}/${openingTeam.openingMinimum})`
+        : `⬇ Abrir (${pendingOpeningPoints})`
+      : '⬇ Baixar jogo'
 
   const pendingDrawRef = useRef(false)
   const prevHandLenRef = useRef(yourHand.length)
@@ -108,6 +126,24 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
       return
     }
 
+    const myTeam = teams.find(t => t.id === myTeamId)
+    if (myTeam && needsOpening(myTeam)) {
+      const groups = [...stagedOpening, selectedCardIndices]
+      const points = stagedPoints(asCards(yourHand), groups)
+      if (points < myTeam.openingMinimum) {
+        useOnlineStore.getState().stageOpeningGroup(selectedCardIndices)
+        flashHint(openingShortfallHint(points, myTeam.openingMinimum))
+        return
+      }
+      sendOpening(groups)
+      return
+    }
+
+    if (wouldStrandHand([selectedCards])) {
+      flashHint('Você não pode baixar todas as cartas sem poder bater.')
+      return
+    }
+
     const fromRect = leftmostHandCardRect(selectedCardIndices)
     const toRect = document.getElementById('meld-drop-zone')?.getBoundingClientRect()
     if (fromRect && toRect) {
@@ -119,6 +155,69 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
       })
     }
     sendIntent({ type: 'playCanasta', cardIndices: selectedCardIndices })
+  }
+
+  const wouldStrandHand = (groups: PlainCard[][]): boolean => {
+    const removed = groups.reduce((n, g) => n + g.length, 0)
+    if (yourHand.length - removed >= 2) return false
+    const myTeam = teams.find(t => t.id === myTeamId)
+    if (!myTeam) return false
+    if (!myTeam.hasTakenMorto && mortos.length > 0) return false
+    const newClean = groups.some(g => {
+      try {
+        const c = new Canasta(asCards(g))
+        return c.isCanastra && c.isClean
+      } catch {
+        return false
+      }
+    })
+    return !(newClean || myTeam.melds.some(m => m.isCanastra && m.isClean))
+  }
+
+  const sendOpening = (groups: number[][]) => {
+    const cardGroups = groups.map(g => g.map(i => yourHand[i]).filter(Boolean))
+    if (wouldStrandHand(cardGroups)) {
+      flashHint('Você não pode baixar todas as cartas sem poder bater.')
+      return
+    }
+    setHint(null)
+    const all = groups.flat()
+    const fromRect = leftmostHandCardRect(all)
+    const toRect = document.getElementById('meld-drop-zone')?.getBoundingClientRect()
+    if (fromRect && toRect) {
+      useOnlineStore.getState().playTableAnim({
+        fromRect,
+        toRect,
+        cards: asCards(all.slice(0, 4).map(i => yourHand[i]).filter(Boolean)),
+        sizeClassName: GHOST_TABLE_SIZE,
+      })
+    }
+    sendIntent({ type: 'playMelds', groups })
+  }
+
+  const handleStagedGroupClick = (groupIndex: number, event: MouseEvent) => {
+    event.stopPropagation()
+    if (!isMyTurn || phase !== 'play') return
+    if (selectedCardIndices.length === 0) {
+      flashHint('Para mudar um jogo reservado, toque em Desfazer.')
+      return
+    }
+    const groupCards = asCards(stagedOpening[groupIndex].map(i => yourHand[i]).filter(Boolean))
+    const selectedCards = asCards(selectedCardIndices.map(i => yourHand[i]).filter(Boolean))
+    if (!canExtendMeld(groupCards, selectedCards)) {
+      flashHint('Essa seleção não aumenta esse jogo reservado.')
+      return
+    }
+    const myTeam = teams.find(t => t.id === myTeamId)
+    if (!myTeam) return
+    const groups = stagedOpening.map((g, i) => (i === groupIndex ? [...g, ...selectedCardIndices] : g))
+    const points = stagedPoints(asCards(yourHand), groups)
+    if (points >= myTeam.openingMinimum) {
+      sendOpening(groups)
+      return
+    }
+    useOnlineStore.getState().extendStagedGroup(groupIndex, selectedCardIndices)
+    flashHint(openingShortfallHint(points, myTeam.openingMinimum))
   }
 
   const handleMeldClick = (event: MouseEvent, teamId: 'A' | 'B', meldIndex: number, meldCards: PlainCard[]) => {
@@ -288,6 +387,11 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
               <div className="flex items-center justify-between gap-2 landscape:h-6 landscape:shrink-0 landscape:px-1">
                 <h4 className={`flex shrink-0 items-center font-display text-sm landscape:text-sm landscape:leading-none ${TEAM_TEXT_CLASS[team.id]}`}>
                   {TEAM_LABEL[team.id]}
+                  <VuChip
+                    minimum={team.openingMinimum ?? 0}
+                    opened={team.melds.length > 0}
+                    className={`ml-1.5 ${isDropTarget ? 'landscape:hidden' : ''}`}
+                  />
                   {isDropTarget && (
                     <button
                       type="button"
@@ -297,7 +401,7 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
                       }}
                       className="ml-2 shrink-0 animate-pulse whitespace-nowrap rounded-full bg-card-gold px-2.5 py-0.5 font-sans text-[11px] font-bold text-black shadow-[0_0_10px_rgba(212,175,55,0.6)] landscape:px-2 landscape:py-0.5 landscape:text-xs landscape:leading-none"
                     >
-                      ⬇ Baixar jogo
+                      {dropLabel}
                     </button>
                   )}
                 </h4>
@@ -306,9 +410,23 @@ export default function OnlineGameBoard({ view }: OnlineGameBoardProps) {
                   {team.hasTakenMorto ? ' · morto' : ''}
                 </span>
               </div>
-              {team.melds.length === 0 ? (
+              {team.id === myTeamId && needsOpening(team) ? (
+                <OpeningStaging
+                  hand={asCards(yourHand)}
+                  groups={stagedOpening}
+                  minimum={team.openingMinimum}
+                  isDropTarget={isDropTarget}
+                  pendingPoints={pendingOpeningPoints}
+                  onCancel={() => useOnlineStore.getState().cancelOpening()}
+                  onGroupClick={handleStagedGroupClick}
+                />
+              ) : team.melds.length === 0 ? (
                 <span className="text-sm text-gray-400 landscape:px-1 landscape:text-sm">
-                  {isDropTarget ? 'Clique aqui para baixar as cartas selecionadas' : 'Nenhum jogo baixado ainda'}
+                  {(team.openingMinimum ?? 0) > 0
+                    ? `Vulneráveis: a 1ª descida precisa somar ${team.openingMinimum} pontos`
+                    : isDropTarget
+                      ? 'Clique aqui para baixar as cartas selecionadas'
+                      : 'Nenhum jogo baixado ainda'}
                 </span>
               ) : (
                 <MeldArea

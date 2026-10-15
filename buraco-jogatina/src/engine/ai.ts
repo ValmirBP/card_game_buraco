@@ -3,7 +3,7 @@ import { Card, Suit } from './card'
 import { Hand } from './hand'
 import { Canasta } from './canasta'
 import { Team } from './gameState'
-import { isValidCanasta, canExtendMeld, rankToNumber } from './utils'
+import { isValidCanasta, canExtendMeld, rankToNumber, scoreCardValue } from './utils'
 
 export type AIDifficulty = 'easy' | 'medium' | 'hard'
 
@@ -271,58 +271,11 @@ export class AIPlayer implements Player {
   }
 
   private findCanastaMoves(): PlayerMove[] {
-    const moves: PlayerMove[] = []
-    const cards = this.hand.getCards()
-    const wilds = cards.filter(c => c.isWild)
+    return findMeldCandidates(this.hand.getCards()).map(cards => ({ type: 'play_canasta', cards }))
+  }
 
-    const bySuit = new Map<Suit, Card[]>()
-    for (const c of cards) {
-      if (c.isWild) continue
-      if (!bySuit.has(c.suit)) bySuit.set(c.suit, [])
-      bySuit.get(c.suit)!.push(c)
-    }
-
-    for (const suitCards of bySuit.values()) {
-      const byRank = new Map<number, Card>()
-      for (const c of suitCards) {
-        const r = rankToNumber(c.rank)
-        if (!byRank.has(r)) byRank.set(r, c)
-      }
-      const sorted = [...byRank.entries()].sort((a, b) => a[0] - b[0]).map(([, c]) => c)
-
-      for (let i = 0; i < sorted.length; i++) {
-        for (let j = i + 2; j < sorted.length; j++) {
-          const windowCards = sorted.slice(i, j + 1)
-          if (isValidCanasta(windowCards)) {
-            moves.push({ type: 'play_canasta', cards: windowCards })
-          } else if (wilds.length > 0) {
-            const withWild = [...windowCards, wilds[0]]
-            if (isValidCanasta(withWild)) {
-              moves.push({ type: 'play_canasta', cards: withWild })
-            }
-          }
-        }
-      }
-
-      if (wilds.length > 0) {
-        for (let i = 0; i < sorted.length - 1; i++) {
-          const windowCards = [sorted[i], sorted[i + 1]]
-          const withWild = [...windowCards, wilds[0]]
-          if (isValidCanasta(withWild)) {
-            moves.push({ type: 'play_canasta', cards: withWild })
-          }
-        }
-      }
-    }
-
-    const aces = cards.filter(c => !c.isWild && c.rank === 'A')
-    if (aces.length >= 3) {
-      moves.push({ type: 'play_canasta', cards: [...aces] })
-    } else if (aces.length === 2 && wilds.length > 0) {
-      moves.push({ type: 'play_canasta', cards: [...aces, wilds[0]] })
-    }
-
-    return moves
+  planOpening(minimum: number): Card[][][] {
+    return planOpeningMelds(this.hand.getCards(), minimum)
   }
 
   getDiscardedCards(): Set<string> {
@@ -341,4 +294,159 @@ export class AIPlayer implements Player {
     clone.discardedCards = new Set(this.discardedCards)
     return clone
   }
+}
+
+export function findMeldCandidates(cards: Card[]): Card[][] {
+  const melds: Card[][] = []
+  const wilds = cards.filter(c => c.isWild)
+
+  const bySuit = new Map<Suit, Card[]>()
+  for (const c of cards) {
+    if (c.isWild) continue
+    if (!bySuit.has(c.suit)) bySuit.set(c.suit, [])
+    bySuit.get(c.suit)!.push(c)
+  }
+
+  for (const suitCards of bySuit.values()) {
+    const byRank = new Map<number, Card>()
+    for (const c of suitCards) {
+      const r = rankToNumber(c.rank)
+      if (!byRank.has(r)) byRank.set(r, c)
+    }
+    const sorted = [...byRank.entries()].sort((a, b) => a[0] - b[0]).map(([, c]) => c)
+
+    for (let i = 0; i < sorted.length; i++) {
+      for (let j = i + 2; j < sorted.length; j++) {
+        const windowCards = sorted.slice(i, j + 1)
+        if (isValidCanasta(windowCards)) {
+          melds.push(windowCards)
+        } else if (wilds.length > 0) {
+          const withWild = [...windowCards, wilds[0]]
+          if (isValidCanasta(withWild)) melds.push(withWild)
+        }
+      }
+    }
+
+    if (wilds.length > 0) {
+      for (let i = 0; i < sorted.length - 1; i++) {
+        const withWild = [sorted[i], sorted[i + 1], wilds[0]]
+        if (isValidCanasta(withWild)) melds.push(withWild)
+      }
+    }
+  }
+
+  const aces = cards.filter(c => !c.isWild && c.rank === 'A')
+  if (aces.length >= 3) {
+    melds.push(aces.slice(0, 4))
+    if (aces.length > 3) melds.push(aces.slice(0, 3))
+  } else if (aces.length === 2 && wilds.length > 0) {
+    melds.push([...aces, wilds[0]])
+  }
+
+  return melds
+}
+
+const MAX_OPENING_CANDIDATES = 80
+const MAX_OPENING_PLANS = 5
+const MAX_SEARCH_NODES = 20000
+const MAX_WILD_VARIANTS = 4
+
+function groupPoints(group: Card[]): number {
+  return group.reduce((sum, c) => sum + scoreCardValue(c), 0)
+}
+
+export function findOpeningCandidates(cards: Card[]): Card[][] {
+  const wilds = [...cards.filter(c => c.isWild), ...cards.filter(c => !c.isWild && c.rank === '2')].slice(0, MAX_WILD_VARIANTS)
+  const out: Card[][] = []
+  const seen = new Set<string>()
+  const ids = new Map<Card, number>()
+  cards.forEach((c, i) => ids.set(c, i))
+  const add = (group: Card[]) => {
+    if (new Set(group).size !== group.length) return
+    if (!isValidCanasta(group)) return
+    const key = group.map(c => ids.get(c)).sort((a, b) => (a ?? 0) - (b ?? 0)).join(',')
+    if (seen.has(key)) return
+    seen.add(key)
+    out.push(group)
+  }
+
+  const bySuit = new Map<Suit, Card[]>()
+  for (const c of cards) {
+    if (c.isWild) continue
+    if (!bySuit.has(c.suit)) bySuit.set(c.suit, [])
+    bySuit.get(c.suit)!.push(c)
+  }
+
+  for (const suitCards of bySuit.values()) {
+    const copies = new Map<number, Card[]>()
+    for (const c of suitCards) {
+      const r = rankToNumber(c.rank)
+      if (!copies.has(r)) copies.set(r, [])
+      copies.get(r)!.push(c)
+    }
+    for (let layer = 0; layer < 2; layer++) {
+      const sorted = [...copies.entries()]
+        .filter(([, list]) => list.length > layer)
+        .sort((a, b) => a[0] - b[0])
+        .map(([, list]) => list[layer])
+      for (let i = 0; i < sorted.length; i++) {
+        for (let j = i + 1; j < sorted.length; j++) {
+          const window = sorted.slice(i, j + 1)
+          if (window.length >= 3) add(window)
+          for (const wild of wilds) add([...window, wild])
+        }
+      }
+    }
+  }
+
+  const aces = cards.filter(c => !c.isWild && c.rank === 'A')
+  for (let start = 0; start + 2 <= aces.length; start += 3) {
+    const chunk = aces.slice(start, start + 4)
+    if (chunk.length >= 3) add(chunk)
+    if (chunk.length >= 3) add(chunk.slice(0, 3))
+    for (const wild of wilds) add([...chunk.slice(0, Math.min(chunk.length, 3)), wild])
+  }
+
+  return out
+}
+
+export function planOpeningMelds(cards: Card[], minimum: number): Card[][][] {
+  const candidates = findOpeningCandidates(cards)
+    .map(group => ({ group, points: groupPoints(group) }))
+    .sort((a, b) => b.points - a.points || a.group.length - b.group.length)
+    .slice(0, MAX_OPENING_CANDIDATES)
+  const maxGroups = Math.max(1, Math.ceil(minimum / 15))
+
+  const plans: { groups: Card[][]; cards: number }[] = []
+  const used = new Set<Card>()
+  const chosen: Card[][] = []
+  let nodes = 0
+
+  const search = (from: number, points: number) => {
+    if (points >= minimum) {
+      plans.push({ groups: [...chosen], cards: chosen.reduce((n, g) => n + g.length, 0) })
+      return
+    }
+    const slots = maxGroups - chosen.length
+    if (slots <= 0) return
+    let bound = points
+    for (let k = from; k < Math.min(candidates.length, from + slots); k++) bound += candidates[k].points
+    if (bound < minimum) return
+    for (let i = from; i < candidates.length; i++) {
+      if (++nodes > MAX_SEARCH_NODES || plans.length >= 200) return
+      const { group, points: p } = candidates[i]
+      if (group.some(c => used.has(c))) continue
+      group.forEach(c => used.add(c))
+      chosen.push(group)
+      search(i + 1, points + p)
+      chosen.pop()
+      group.forEach(c => used.delete(c))
+    }
+  }
+  search(0, 0)
+
+  return plans
+    .sort((a, b) => a.cards - b.cards || a.groups.length - b.groups.length)
+    .slice(0, MAX_OPENING_PLANS)
+    .map(p => p.groups)
 }

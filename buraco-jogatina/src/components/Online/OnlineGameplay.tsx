@@ -1,4 +1,8 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
+import VuChip from '../Gameplay/VuChip'
+import EmotePicker from './EmotePicker'
+import EmoteLayer from './EmoteLayer'
+import { vuBannerText } from '../Gameplay/vulnerability'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useOnlineStore } from '../../online/onlineStore'
 import OnlineGameBoard from './OnlineGameBoard'
@@ -38,6 +42,22 @@ export default function OnlineGameplay({ onBackToMenu }: OnlineGameplayProps) {
     const timeoutId = window.setTimeout(() => setResultReady(true), 2000)
     return () => clearTimeout(timeoutId)
   }, [status])
+
+  const [vuBanner, setVuBanner] = useState<string | null>(null)
+  const round = view?.round
+  useEffect(() => {
+    const current = useOnlineStore.getState().view
+    if (!current || current.status !== 'playing') return
+    const myTeam = current.players[current.seat]?.teamId ?? 'A'
+    const text = vuBannerText(
+      current.teams.map(t => ({ id: t.id, openingMinimum: t.openingMinimum ?? 0, melds: t.melds })),
+      myTeam
+    )
+    if (!text) return
+    setVuBanner(text)
+    const id = window.setTimeout(() => setVuBanner(c => (c === text ? null : c)), 3500)
+    return () => window.clearTimeout(id)
+  }, [round])
 
   const [mortoBanner, setMortoBanner] = useState<string | null>(null)
   const seenLogLenRef = useRef(log.length)
@@ -97,12 +117,28 @@ export default function OnlineGameplay({ onBackToMenu }: OnlineGameplayProps) {
         )}
       </AnimatePresence>
 
+      <EmoteLayer mySeat={view.seat} />
       <DrawAnimation anim={drawAnim} />
       <CardFlyAnimation anim={pickupAnim} />
       <CardFlyAnimation anim={discardAnim} />
       <CardFlyAnimation anim={tableAnim} />
 
       <AnimatePresence>
+        {vuBanner && (
+          <motion.div
+            key={vuBanner}
+            initial={{ opacity: 0, scale: 0.7, y: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+            className="pointer-events-none fixed inset-x-0 top-1/4 z-[115] flex justify-center px-4"
+            data-vu-banner
+          >
+            <span className="rounded-2xl border-2 border-red-500 bg-black/85 px-5 py-2.5 text-center font-display text-base text-red-200 shadow-[0_0_30px_rgba(220,38,38,0.6)] backdrop-blur-sm sm:text-xl">
+              {vuBanner}
+            </span>
+          </motion.div>
+        )}
         {mortoBanner && (
           <motion.div
             key={mortoBanner}
@@ -121,11 +157,12 @@ export default function OnlineGameplay({ onBackToMenu }: OnlineGameplayProps) {
 
       <div className="flex shrink-0 items-start gap-2 landscape:gap-1.5">
         <ExitButton onClick={handleExit} />
+        <EmotePicker />
         <div className="z-40 min-w-0 flex-1 rounded-xl border border-card-gold/30 bg-black/40 px-2 py-1 shadow-[0_4px_16px_rgba(0,0,0,0.35)] backdrop-blur-md landscape:rounded-md landscape:px-1.5 landscape:py-0">
         <div className="mx-auto flex max-w-7xl flex-nowrap items-center justify-center gap-2 landscape:gap-1.5">
           {sortedTeams.map((team, i) => {
             const isMine = team.id === myTeamId
-            const matchTotal = view.matchScores[team.id] + team.score
+            const matchTotal = view.matchScores[team.id] + (view.status === 'finished' ? 0 : team.score)
             const canastraCount = team.melds.filter(m => m.isCanastra).length
             return (
               <Fragment key={team.id}>
@@ -137,6 +174,7 @@ export default function OnlineGameplay({ onBackToMenu }: OnlineGameplayProps) {
                   <span className={`font-display text-xs ${isMine ? 'text-card-gold' : 'text-fuchsia-300'}`}>
                     {TEAM_LABEL[isMine ? 'A' : 'B']}
                   </span>
+                  <VuChip minimum={team.openingMinimum ?? 0} opened={team.melds.length > 0} />
                   <span className="text-base font-bold text-white" title="Pontos da partida atual">
                     {matchTotal}
                   </span>

@@ -1,4 +1,4 @@
-import { Game } from '../engine/game'
+import { Game, openingPoints } from '../engine/game'
 import { HumanPlayer, Player } from '../engine/player'
 import { AIPlayer, GameStateForAI } from '../engine/ai'
 import { Card } from '../engine/card'
@@ -120,6 +120,17 @@ export class GameSession {
     this.matchTarget = matchTarget
     this.game = new Game(buildPlayers(seats))
     this.game.setup()
+    this.game.setOpeningMinimums(this.matchScores)
+  }
+
+  private logVulnerability(): void {
+    for (const team of this.game.state.teams) {
+      if (team.openingMinimum > 0) {
+        this.log.push(
+          `⚠️ Time ${team.id} está vulnerável (VU): a primeira descida da rodada precisa somar ${team.openingMinimum} pontos.`
+        )
+      }
+    }
   }
 
   get currentSeat(): number {
@@ -144,6 +155,8 @@ export class GameSession {
         return this.handleDiscard(seat, intent.cardIndex)
       case 'playCanasta':
         return this.handlePlayCanasta(seat, intent.cardIndices)
+      case 'playMelds':
+        return this.handlePlayMelds(seat, intent.groups)
       case 'extendMeld':
         return this.handleExtendMeld(seat, intent.meldIndex, intent.cardIndices)
       case 'nextRound':
@@ -209,7 +222,7 @@ export class GameSession {
     if (guardResult) return guardResult
 
     const player = this.game.getCurrentPlayer()
-    if (cardIndex < 0 || cardIndex >= player.hand.getSize()) return fail('indice de carta invalido')
+    if (!Number.isInteger(cardIndex) || cardIndex < 0 || cardIndex >= player.hand.getSize()) return fail('indice de carta invalido')
     if (this.game.wouldDiscardEmptyHandIllegally(cardIndex)) {
       return fail('voce nao pode descartar a ultima carta sem poder bater')
     }
@@ -243,6 +256,9 @@ export class GameSession {
     if (!cards) return fail('indices de carta invalidos')
     if (cards.length === 0) return fail('nenhuma carta selecionada')
     if (!isValidCanasta(cards)) return fail('conjunto de cartas nao forma uma canastra valida')
+    const shortfall = this.openingError(cards)
+    if (shortfall) return fail(shortfall)
+    if (this.game.wouldLeaveOnlyBlockedCard(cards)) return fail('voce ficaria so com a carta que pegou do lixo, e ela nao pode voltar para o descarte')
     if (this.game.wouldPlayCanastaEmptyHandIllegally(cards)) {
       return fail('essa jogada esvaziaria a mao sem poder bater')
     }
@@ -252,6 +268,54 @@ export class GameSession {
     if (!success) return fail('jogada invalida')
 
     this.log.push(`${player.name} baixou uma canastra!`)
+    this.checkMortoTransition(player, hadMorto)
+    if (this.checkGameOver()) {
+      this.finalizeRoundIfNeeded()
+    }
+    return ok()
+  }
+
+  private openingError(cards: Card[]): string | null {
+    const team = this.game.getTeamOfCurrentPlayer()
+    if (this.game.openingShortfall(cards, team) === 0) return null
+    return `vulneravel: a abertura precisa somar ${team.openingMinimum} pontos (estas cartas somam ${openingPoints(cards)})`
+  }
+
+  private handlePlayMelds(seat: number, groups: number[][]): IntentResult {
+    const guardResult = this.guardPlayPhase(seat)
+    if (guardResult) return guardResult
+    if (groups.length === 0) return fail('nenhuma carta selecionada')
+
+    const allIndices = groups.flat()
+    if (new Set(allIndices).size !== allIndices.length) return fail('indices de carta invalidos')
+
+    const player = this.game.getCurrentPlayer()
+    const cardGroups: Card[][] = []
+    for (const group of groups) {
+      const cards = this.resolveCards(player, group)
+      if (!cards) return fail('indices de carta invalidos')
+      if (!isValidCanasta(cards)) return fail('conjunto de cartas nao forma uma canastra valida')
+      cardGroups.push(cards)
+    }
+
+    const all = cardGroups.flat()
+    const team = this.game.getTeamOfCurrentPlayer()
+    const wasOpening = this.game.needsOpening(team)
+    const shortfall = this.openingError(all)
+    if (shortfall) return fail(shortfall)
+    if (this.game.wouldLeaveOnlyBlockedCard(all)) return fail('voce ficaria so com a carta que pegou do lixo, e ela nao pode voltar para o descarte')
+    if (this.game.wouldPlayMeldsEmptyHandIllegally(cardGroups)) {
+      return fail('essa jogada esvaziaria a mao sem poder bater')
+    }
+
+    const hadMorto = team.hasTakenMorto
+    if (!this.game.playMelds(cardGroups)) return fail('jogada invalida')
+
+    this.log.push(
+      wasOpening
+        ? `${player.name} abriu o jogo da dupla com ${openingPoints(all)} pontos (vulnerável).`
+        : `${player.name} baixou ${cardGroups.length} jogo(s)!`
+    )
     this.checkMortoTransition(player, hadMorto)
     if (this.checkGameOver()) {
       this.finalizeRoundIfNeeded()
@@ -272,6 +336,9 @@ export class GameSession {
     if (!cards) return fail('indices de carta invalidos')
     if (cards.length === 0) return fail('nenhuma carta selecionada')
     if (!canExtendMeld(meld.cards, cards)) return fail('extensao invalida')
+    if (this.game.wouldLeaveOnlyBlockedCard(cards)) {
+      return fail('voce ficaria so com a carta que pegou do lixo, e ela nao pode voltar para o descarte')
+    }
     if (this.game.wouldExtendMeldEmptyHandIllegally(meldIndex, cards)) {
       return fail('essa extensao esvaziaria a mao sem poder bater')
     }
@@ -294,10 +361,12 @@ export class GameSession {
 
     this.game = new Game(buildPlayers(this.seatsConfig))
     this.game.setup()
+    this.game.setOpeningMinimums(this.matchScores)
     this.round += 1
     this.turnPhase = 'draw'
     this.roundFinalized = false
     this.log.push(`Rodada ${this.round} iniciada.`)
+    this.logVulnerability()
     return ok()
   }
 
@@ -422,7 +491,17 @@ export class GameSession {
     this.turnPhase = 'play'
 
     let discarded = false
-    for (let iteration = 0; iteration < MAX_AI_MELD_ACTIONS_PER_TURN; iteration++) {
+    if (this.game.needsOpening()) {
+      const minimum = this.game.getTeamOfCurrentPlayer().openingMinimum
+      for (const plan of player.planOpening(minimum)) {
+        if (!this.game.playMelds(plan)) continue
+        this.log.push(`${player.name} abriu o jogo da dupla com ${openingPoints(plan.flat())} pontos (vulnerável).`)
+        hadMorto = this.checkMortoTransition(player, hadMorto)
+        if (this.checkGameOver()) gameEnded = true
+        break
+      }
+    }
+    for (let iteration = 0; !gameEnded && iteration < MAX_AI_MELD_ACTIONS_PER_TURN; iteration++) {
       const move = player.playTurn(this.buildAIState())
 
       if (move && move.type === 'play_canasta' && move.cards) {
@@ -464,6 +543,7 @@ export class GameSession {
 
     if (!gameEnded && !discarded) {
       discarded = this.discardLowestValueCard(player)
+      for (let i = 0; !discarded && i < player.hand.getSize(); i++) discarded = this.game.discard(i)
       if (discarded) {
         this.log.push(`${player.name} descartou uma carta.`)
         hadMorto = this.checkMortoTransition(player, hadMorto)
@@ -504,6 +584,7 @@ export class GameSession {
       score: team.score,
       hasTakenMorto: team.hasTakenMorto,
       melds: team.melds.map(mapMeld),
+      openingMinimum: team.openingMinimum,
     }))
 
     return {

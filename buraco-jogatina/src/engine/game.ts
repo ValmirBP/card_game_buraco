@@ -8,11 +8,30 @@ export const HAND_SIZE = 11
 export const MORTO_SIZE = 11
 const MORTO_COUNT = 2
 export const STALEMATE_RECYCLES = 12
+export const VU_THRESHOLD = 1500
+export const VU_OPENING_MINIMUM = 75
+
+export function isVulnerableScore(matchScore: number): boolean {
+  return matchScore >= VU_THRESHOLD
+}
+
+export function openingPoints(cards: Card[]): number {
+  return cards.reduce((sum, card) => sum + scoreCardValue(card), 0)
+}
 
 export class Game {
   state: GameState
   private lastMeldCardTotal = 0
   private recyclesAtLastMeldChange = 0
+
+  getStalemateTracking(): { lastMeldCardTotal: number; recyclesAtLastMeldChange: number } {
+    return { lastMeldCardTotal: this.lastMeldCardTotal, recyclesAtLastMeldChange: this.recyclesAtLastMeldChange }
+  }
+
+  restoreStalemateTracking(tracking: { lastMeldCardTotal: number; recyclesAtLastMeldChange: number }): void {
+    this.lastMeldCardTotal = tracking.lastMeldCardTotal
+    this.recyclesAtLastMeldChange = tracking.recyclesAtLastMeldChange
+  }
 
   constructor(players: Player[]) {
     if (players.length !== 4) {
@@ -83,7 +102,7 @@ export class Game {
 
   discard(cardIndex: number): boolean {
     const player = this.getCurrentPlayer()
-    if (cardIndex < 0 || cardIndex >= player.hand.getSize()) return false
+    if (!Number.isInteger(cardIndex) || cardIndex < 0 || cardIndex >= player.hand.getSize()) return false
 
     const team = this.getTeamOfCurrentPlayer()
     if (this.wouldLeaveTeamStuck(player, 1, 1, team, team.melds)) return false
@@ -111,34 +130,84 @@ export class Game {
   }
 
   playCanasta(cards: Card[]): boolean {
-    if (!isValidCanasta(cards)) {
-      return false
-    }
+    return this.playMelds([cards])
+  }
 
-    let canasta: Canasta
-    try {
-      canasta = new Canasta(cards)
-    } catch {
-      return false
+  setOpeningMinimums(matchScores: Record<TeamId, number>): void {
+    for (const team of this.state.teams) {
+      team.openingMinimum = isVulnerableScore(matchScores[team.id] ?? 0) ? VU_OPENING_MINIMUM : 0
     }
+  }
+
+  needsOpening(team: Team = this.getTeamOfCurrentPlayer()): boolean {
+    return team.openingMinimum > 0 && team.melds.length === 0
+  }
+
+  openingShortfall(cards: Card[], team: Team = this.getTeamOfCurrentPlayer()): number {
+    if (!this.needsOpening(team)) return 0
+    return Math.max(0, team.openingMinimum - openingPoints(cards))
+  }
+
+  private buildMelds(groups: Card[][]): Canasta[] | null {
+    if (groups.length === 0) return null
+    const melds: Canasta[] = []
+    for (const group of groups) {
+      if (!isValidCanasta(group)) return null
+      try {
+        melds.push(new Canasta(group))
+      } catch {
+        return null
+      }
+    }
+    return melds
+  }
+
+  playMelds(groups: Card[][]): boolean {
+    const melds = this.buildMelds(groups)
+    if (!melds) return false
+    const cards = groups.flat()
+
+    const team = this.getTeamOfCurrentPlayer()
+    if (this.openingShortfall(cards, team) > 0) return false
 
     const player = this.getCurrentPlayer()
     const indicesToRemove = this.findCardIndices(player, cards)
     if (indicesToRemove === null) return false
+    if (this.wouldLeaveOnlyBlockedCard(cards)) return false
 
-    const team = this.getTeamOfCurrentPlayer()
-    if (this.wouldEmptyHandIllegally(player, cards.length, team, [...team.melds, canasta])) return false
+    if (this.wouldEmptyHandIllegally(player, cards.length, team, [...team.melds, ...melds])) return false
 
     for (const idx of indicesToRemove) {
       player.hand.removeCard(idx)
     }
 
     this.markMortoUsedIfApplicable(team)
-    team.melds.push(canasta)
-    team.score += canasta.getScore()
+    for (const meld of melds) {
+      team.melds.push(meld)
+      team.score += meld.getScore()
+    }
 
     this.maybeAutoPickUpMorto()
     return true
+  }
+
+  wouldLeaveOnlyBlockedCard(cards: Card[]): boolean {
+    const blocked = this.state.blockedDiscardCard
+    if (!blocked) return false
+    const player = this.getCurrentPlayer()
+    const indices = this.findCardIndices(player, cards)
+    if (!indices) return false
+    const removed = new Set(indices)
+    const remaining = player.hand.getCards().filter((_, i) => !removed.has(i))
+    return remaining.length === 1 && remaining[0] === blocked
+  }
+
+  wouldPlayMeldsEmptyHandIllegally(groups: Card[][]): boolean {
+    const melds = this.buildMelds(groups)
+    if (!melds) return false
+    const player = this.getCurrentPlayer()
+    const team = this.getTeamOfCurrentPlayer()
+    return this.wouldEmptyHandIllegally(player, groups.flat().length, team, [...team.melds, ...melds])
   }
 
   extendMeld(meldIndex: number, cards: Card[]): boolean {
@@ -150,6 +219,7 @@ export class Game {
     const player = this.getCurrentPlayer()
     const indicesToRemove = this.findCardIndices(player, cards)
     if (indicesToRemove === null) return false
+    if (this.wouldLeaveOnlyBlockedCard(cards)) return false
 
     const extended = meld.withExtraCards(cards)
     const resultingMelds = team.melds.map((m, i) => (i === meldIndex ? extended : m))
@@ -272,7 +342,7 @@ export class Game {
 
   wouldDiscardEmptyHandIllegally(cardIndex: number): boolean {
     const player = this.getCurrentPlayer()
-    if (cardIndex < 0 || cardIndex >= player.hand.getSize()) return false
+    if (!Number.isInteger(cardIndex) || cardIndex < 0 || cardIndex >= player.hand.getSize()) return false
     const team = this.getTeamOfCurrentPlayer()
     return this.wouldLeaveTeamStuck(player, 1, 1, team, team.melds)
   }

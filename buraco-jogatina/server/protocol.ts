@@ -1,5 +1,6 @@
 import { RoomManager, Room, Difficulty, cleanName, MAX_TOKEN_LENGTH } from './rooms'
 import type { Intent, SeatView } from '../src/session/types'
+import { EMOTE_COOLDOWN_MS, isEmote, type Emote } from '../src/online/emotes'
 
 export interface ClientSocket {
   send(data: string): void
@@ -13,6 +14,7 @@ export type ClientMessage =
   | { type: 'nextRound' }
   | { type: 'chooseSeat'; seatIndex: number }
   | { type: 'rename'; name: string }
+  | { type: 'emote'; emoji: Emote }
 
 const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard']
 const MAX_CODE_LENGTH = 16
@@ -31,6 +33,15 @@ function isIndexList(value: unknown): value is number[] {
   )
 }
 
+const MAX_MELD_GROUPS = 8
+
+function isMeldGroups(value: unknown): value is number[][] {
+  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_MELD_GROUPS) return false
+  if (!value.every(group => isIndexList(group) && group.length >= 3)) return false
+  const all = value.flat()
+  return all.length <= MAX_CARD_INDICES && new Set(all).size === all.length
+}
+
 function isIntent(value: unknown): value is Intent {
   if (typeof value !== 'object' || value === null) return false
   const intent = value as Record<string, unknown>
@@ -45,6 +56,8 @@ function isIntent(value: unknown): value is Intent {
       return isIndexList(intent.cardIndices)
     case 'extendMeld':
       return isIndex(intent.meldIndex, 200) && isIndexList(intent.cardIndices)
+    case 'playMelds':
+      return isMeldGroups(intent.groups)
     default:
       return false
   }
@@ -72,6 +85,8 @@ export function isClientMessage(value: unknown): value is ClientMessage {
       return isIndex(msg.seatIndex, 4)
     case 'rename':
       return typeof msg.name === 'string'
+    case 'emote':
+      return isEmote(msg.emoji)
     default:
       return false
   }
@@ -91,6 +106,7 @@ export type ServerMessage =
   | { type: 'log'; lines: string[] }
   | { type: 'error'; message: string }
   | { type: 'roomClosed'; reason: string }
+  | { type: 'emote'; seat: number; emoji: Emote }
 
 interface ConnState {
   roomCode: string
@@ -106,17 +122,40 @@ export class ProtocolServer {
   private aiTurnDelayMs: number
   private aiLoops = new WeakSet<Room>()
   private serverUrl?: string
+  private lastEmoteAt = new Map<string, number>()
+  private now: () => number
 
-  constructor(opts?: { aiTurnDelayMs?: number; serverUrl?: string }) {
+  constructor(opts?: { aiTurnDelayMs?: number; serverUrl?: string; now?: () => number }) {
     this.aiTurnDelayMs = opts?.aiTurnDelayMs ?? DEFAULT_AI_TURN_DELAY_MS
     this.serverUrl = opts?.serverUrl
+    this.now = opts?.now ?? (() => Date.now())
   }
 
   registerConnection(connId: string, socket: ClientSocket): void {
     this.sockets.set(connId, socket)
   }
 
+  private handleEmote(connId: string, emoji: Emote): void {
+    const state = this.connStates.get(connId)
+    if (!state) {
+      this.sendError(connId, 'voce nao esta em nenhuma sala')
+      return
+    }
+    const room = this.rooms.getRoom(state.roomCode)
+    if (!room) return
+    const now = this.now()
+    const last = this.lastEmoteAt.get(connId)
+    if (last !== undefined && now - last < EMOTE_COOLDOWN_MS) return
+    this.lastEmoteAt.set(connId, now)
+    for (const seat of room.seats) {
+      if (seat.kind === 'human' && seat.connId) {
+        this.send(seat.connId, { type: 'emote', seat: state.seat, emoji })
+      }
+    }
+  }
+
   handleClose(connId: string): void {
+    this.lastEmoteAt.delete(connId)
     const state = this.connStates.get(connId)
 
     if (state?.seat === 0) {
@@ -254,6 +293,8 @@ export class ProtocolServer {
           return this.handleChooseSeat(connId, raw.seatIndex)
         case 'rename':
           return this.handleRename(connId, raw.name)
+        case 'emote':
+          return this.handleEmote(connId, raw.emoji)
       }
     } catch (err) {
       console.error('Erro ao tratar mensagem:', err)

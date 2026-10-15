@@ -1,6 +1,6 @@
 import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
-import { HAND_SIZE, MORTO_SIZE } from '../../engine/game'
+import { HAND_SIZE, MORTO_SIZE, VU_OPENING_MINIMUM, VU_THRESHOLD } from '../../engine/game'
 import { canastaPoints } from '../../engine/utils'
 import { MATCH_TARGET } from '../../store/gameStore'
 
@@ -21,6 +21,7 @@ const SECTION_ICONS = {
   turno: '🔄',
   canastras: '🏅',
   bater: '🏁',
+  vu: '⚠️',
 } as const
 
 export default function RulesModal({ onClose }: RulesModalProps) {
@@ -113,6 +114,20 @@ export default function RulesModal({ onClose }: RulesModalProps) {
                 Limpa (sem curinga): {CLEAN_POINTS} pontos. Suja (com 1 curinga): {DIRTY_POINTS}{' '}
                 pontos. Canastra de Quinhentos (13 cartas, 2 ao Ás, limpa): {QUINHENTOS_POINTS}{' '}
                 pontos. Canastra Real (14 cartas, Ás ao Ás, limpa): {REAL_POINTS} pontos.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3 rounded-xl border border-red-500/40 bg-red-500/10 p-3 landscape:gap-2 landscape:p-1.5">
+            <span className="text-2xl leading-none landscape:text-base">{SECTION_ICONS.vu}</span>
+            <div>
+              <h3 className="font-bold text-white">Vulnerável (VU)</h3>
+              <p>
+                Quando uma dupla chega a {VU_THRESHOLD} pontos na partida, ela fica vulnerável nas rodadas
+                seguintes: a primeira descida da rodada só vale se as cartas baixadas somarem pelo menos{' '}
+                {VU_OPENING_MINIMUM} pontos (coringa 20, Ás 15, 2 e de 8 a K 10, de 3 a 7 5). Dá para juntar
+                vários jogos na mesma descida para chegar aos {VU_OPENING_MINIMUM}. Depois de abrir, a rodada
+                segue normal. Se a pontuação da dupla cair abaixo de {VU_THRESHOLD}, ela deixa de ser
+                vulnerável.
               </p>
             </div>
           </div>

@@ -16,6 +16,7 @@ export type Intent =
   | { type: 'takeDiscard' }
   | { type: 'discard'; cardIndex: number }
   | { type: 'playCanasta'; cardIndices: number[] }
+  | { type: 'playMelds'; groups: number[][] }
   | { type: 'extendMeld'; meldIndex: number; cardIndices: number[] }
   | { type: 'nextRound' }
 
@@ -58,6 +59,7 @@ export interface SeatTeamView {
   score: number
   hasTakenMorto: boolean
   melds: MeldView[]
+  openingMinimum: number
 }
 
 export interface SeatView {

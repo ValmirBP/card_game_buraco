@@ -30,6 +30,7 @@ interface TeamJSON {
   hasTakenMorto: boolean
   mortoTakenBySeat?: number
   mortoUsed?: boolean
+  openingMinimum?: number
 }
 
 interface GameStateJSON {
@@ -46,6 +47,7 @@ interface GameStateJSON {
   closerSeat?: number
   discardRecycles: number
   blockedDiscardCardHandIndex: number | null
+  stalemate?: { lastMeldCardTotal: number; recyclesAtLastMeldChange: number }
 }
 
 export interface SavedGame {
@@ -104,6 +106,7 @@ function teamToJSON(team: Team): TeamJSON {
     hasTakenMorto: team.hasTakenMorto,
     mortoTakenBySeat: team.mortoTakenBySeat,
     mortoUsed: team.mortoUsed,
+    openingMinimum: team.openingMinimum,
   }
 }
 
@@ -116,6 +119,7 @@ function teamFromJSON(json: TeamJSON): Team {
     hasTakenMorto: json.hasTakenMorto,
     mortoTakenBySeat: json.mortoTakenBySeat,
     mortoUsed: json.mortoUsed,
+    openingMinimum: typeof json.openingMinimum === 'number' ? json.openingMinimum : 0,
   }
 }
 
@@ -143,6 +147,7 @@ export function serializeGame(game: Game, storeFields: SavedGame['store']): Save
       discardRecycles: state.discardRecycles,
       blockedDiscardCardHandIndex:
         blockedDiscardCardHandIndex >= 0 ? blockedDiscardCardHandIndex : null,
+      stalemate: game.getStalemateTracking(),
     },
     store: storeFields,
   }
@@ -183,6 +188,10 @@ export function deserializeGame(saved: SavedGame): { game: Game; store: SavedGam
   }
 
   game.state = state
+  const tracking = g.stalemate
+  if (tracking && Number.isFinite(tracking.lastMeldCardTotal) && Number.isFinite(tracking.recyclesAtLastMeldChange)) {
+    game.restoreStalemateTracking(tracking)
+  }
   return { game, store: saved.store }
 }
 

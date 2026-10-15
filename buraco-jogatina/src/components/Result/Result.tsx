@@ -1,4 +1,6 @@
 import { motion } from 'framer-motion'
+import { vuNextRoundNote } from '../Gameplay/vulnerability'
+import { VU_OPENING_MINIMUM } from '../../engine/game'
 import { useGameStore, MATCH_TARGET } from '../../store/gameStore'
 import type { TeamId, TeamScoreBreakdown } from '../../engine/gameState'
 
@@ -168,6 +170,15 @@ export default function Result({ onBackToMenu, onNextRound, onNewMatch }: Result
                   {matchCanastras[team.id].clean === 1 ? '' : 's'} limpa
                   {matchCanastras[team.id].clean === 1 ? '' : 's'}
                 </div>
+                {!matchWinner && vuNextRoundNote(matchScores[team.id]) && (
+                  <div
+                    data-vu-next
+                    title={`${vuNextRoundNote(matchScores[team.id])}: abertura mínima de ${VU_OPENING_MINIMUM} pontos`}
+                    className="mt-1 truncate whitespace-nowrap text-xs font-bold text-red-300 landscape:mt-0.5 landscape:text-[10px]"
+                  >
+                    ⚠️ VU na próxima rodada: abrir com {VU_OPENING_MINIMUM}+
+                  </div>
+                )}
               </div>
             </motion.div>
           )

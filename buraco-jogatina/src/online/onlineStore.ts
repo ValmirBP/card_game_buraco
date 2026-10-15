@@ -5,6 +5,7 @@ import { resolveWsUrl } from './wsUrl'
 import { parseJoinLink } from './joinLink'
 import type { DrawAnimState } from '../components/Gameplay/DrawAnimation'
 import type { FlyAnimState } from '../components/Gameplay/CardFlyAnimation'
+import { EMOTE_VISIBLE_MS, isEmote, type Emote } from './emotes'
 
 const SERVER_ADDRESS_STORAGE_KEY = 'buraco-server-address'
 const LAST_ROOM_STORAGE_KEY = 'buraco-last-online-room'
@@ -72,6 +73,7 @@ type ClientMessage =
   | { type: 'nextRound' }
   | { type: 'chooseSeat'; seatIndex: number }
   | { type: 'rename'; name: string }
+  | { type: 'emote'; emoji: Emote }
 
 type ServerMessage =
   | { type: 'joined'; code: string; seat: number; isHost: boolean; serverUrl?: string; token?: string }
@@ -80,6 +82,7 @@ type ServerMessage =
   | { type: 'log'; lines: string[] }
   | { type: 'error'; message: string }
   | { type: 'roomClosed'; reason: string }
+  | { type: 'emote'; seat: number; emoji: Emote }
 
 interface OnlineState {
   connection: ConnectionStatus
@@ -91,10 +94,12 @@ interface OnlineState {
   log: string[]
   errorMsg: string | null
   roomClosedReason: string | null
+  emotes: ActiveEmote[]
   serverUrl: string | null
   serverAddress: string
   lastRoom: LastRoomInfo | null
   selectedCardIndices: number[]
+  stagedOpening: number[][]
 
   drawAnim: DrawAnimState | null
   pickupAnim: FlyAnimState | null
@@ -112,9 +117,13 @@ interface OnlineState {
   start: () => void
   sendIntent: (intent: Intent) => void
   nextRound: () => void
+  sendEmote: (emoji: Emote) => void
   leave: () => void
   toggleCardSelection: (index: number) => void
   clearSelection: () => void
+  stageOpeningGroup: (cardIndices: number[]) => void
+  extendStagedGroup: (groupIndex: number, cardIndices: number[]) => void
+  cancelOpening: () => void
   clearError: () => void
   clearRoomClosedReason: () => void
   setServerAddress: (address: string) => void
@@ -128,6 +137,13 @@ export function joinUrlFor(code: string, serverUrl: string | null): string {
 }
 
 let socket: WebSocket | null = null
+let emoteSeq = 0
+
+export interface ActiveEmote {
+  id: number
+  seat: number
+  emoji: Emote
+}
 let lastJoin: { name: string; code?: string; difficulty?: AIDifficulty; token?: string } | null = null
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 let intentionalClose = false
@@ -258,7 +274,23 @@ function handleServerMessage(msg: ServerMessage): void {
       })
       break
     case 'state':
-      useOnlineStore.setState({ view: msg.view, selectedCardIndices: [] })
+      useOnlineStore.setState((s) => {
+        const prev = s.view
+        const handChanged =
+          !prev ||
+          prev.yourHand.length !== msg.view.yourHand.length ||
+          prev.currentSeat !== msg.view.currentSeat ||
+          prev.round !== msg.view.round ||
+          prev.yourHand.some((c, i) => {
+            const n = msg.view.yourHand[i]
+            return !n || n.suit !== c.suit || n.rank !== c.rank || n.isWild !== c.isWild
+          })
+        return {
+          view: msg.view,
+          selectedCardIndices: [],
+          stagedOpening: handChanged ? [] : s.stagedOpening,
+        }
+      })
       break
     case 'log':
       useOnlineStore.setState((s) => ({ log: [...s.log, ...msg.lines] }))
@@ -271,6 +303,15 @@ function handleServerMessage(msg: ServerMessage): void {
         useOnlineStore.setState({ errorMsg: msg.message })
       }
       break
+    case 'emote': {
+      if (!isEmote(msg.emoji) || !Number.isInteger(msg.seat)) break
+      const id = ++emoteSeq
+      useOnlineStore.setState((s) => ({ emotes: [...s.emotes.filter((e) => e.seat !== msg.seat), { id, seat: msg.seat, emoji: msg.emoji }] }))
+      setTimeout(() => {
+        useOnlineStore.setState((s) => ({ emotes: s.emotes.filter((e) => e.id !== id) }))
+      }, EMOTE_VISIBLE_MS)
+      break
+    }
     case 'roomClosed':
       teardownConnection()
       clearLastRoom()
@@ -285,6 +326,7 @@ function handleServerMessage(msg: ServerMessage): void {
         errorMsg: null,
         serverUrl: null,
         selectedCardIndices: [],
+        stagedOpening: [],
         drawAnim: null,
         pickupAnim: null,
         discardAnim: null,
@@ -306,10 +348,12 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
   log: [],
   errorMsg: null,
   roomClosedReason: null,
+  emotes: [],
   serverUrl: null,
   serverAddress: loadStoredServerAddress(),
   lastRoom: loadLastRoom(),
   selectedCardIndices: [],
+  stagedOpening: [],
   drawAnim: null,
   pickupAnim: null,
   discardAnim: null,
@@ -350,6 +394,10 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
 
   nextRound: () => send({ type: 'nextRound' }),
 
+  sendEmote: (emoji) => {
+    if (isEmote(emoji)) send({ type: 'emote', emoji })
+  },
+
   leave: () => {
     teardownConnection()
     set({
@@ -363,16 +411,37 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
       errorMsg: null,
       serverUrl: null,
       selectedCardIndices: [],
+      stagedOpening: [],
       drawAnim: null,
       pickupAnim: null,
       discardAnim: null,
       tableAnim: null,
       roomClosedReason: null,
+      emotes: [],
     })
   },
 
+  stageOpeningGroup: (cardIndices) =>
+    set((s) => {
+      const taken = new Set(s.stagedOpening.flat())
+      if (cardIndices.length === 0 || cardIndices.some((i) => taken.has(i))) return {}
+      return { stagedOpening: [...s.stagedOpening, [...cardIndices]], selectedCardIndices: [] }
+    }),
+
+  extendStagedGroup: (groupIndex, cardIndices) =>
+    set((s) => {
+      const taken = new Set(s.stagedOpening.flat())
+      if (!s.stagedOpening[groupIndex] || cardIndices.length === 0 || cardIndices.some((i) => taken.has(i))) return {}
+      return {
+        stagedOpening: s.stagedOpening.map((g, i) => (i === groupIndex ? [...g, ...cardIndices] : g)),
+        selectedCardIndices: [],
+      }
+    }),
+
+  cancelOpening: () => set({ stagedOpening: [], selectedCardIndices: [] }),
+
   toggleCardSelection: (index) =>
-    set((s) => ({
+    set((s) => s.stagedOpening.some((g) => g.includes(index)) ? {} : ({
       selectedCardIndices: s.selectedCardIndices.includes(index)
         ? s.selectedCardIndices.filter((i) => i !== index)
         : [...s.selectedCardIndices, index],

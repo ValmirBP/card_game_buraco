@@ -1,3 +1,4 @@
+import { needsOpening } from '../Gameplay/vulnerability'
 import { useOnlineStore } from '../../online/onlineStore'
 import { CardComponent } from '../Card'
 import { asCard } from '../../online/cardAdapter'
@@ -39,6 +40,9 @@ interface OnlinePlayerHandProps {
 export default function OnlinePlayerHand({ view }: OnlinePlayerHandProps) {
   const selectedCardIndices = useOnlineStore(s => s.selectedCardIndices)
   const toggleCardSelection = useOnlineStore(s => s.toggleCardSelection)
+  const stagedOpening = useOnlineStore(s => s.stagedOpening)
+  const reserved = new Set(stagedOpening.flat())
+  const myTeam = view.teams.find(t => t.id === view.players[view.seat]?.teamId)
 
   const isMyTurn = view.status === 'playing' && view.currentSeat === view.seat
   const hand = view.yourHand
@@ -49,6 +53,8 @@ export default function OnlinePlayerHand({ view }: OnlinePlayerHandProps) {
       ? 'Clique no monte para comprar (ou no descarte, se houver).'
       : selectedCardIndices.length === 1
         ? 'Selecione 1 carta e clique no descarte para descartar.'
+        : myTeam && needsOpening({ ...myTeam, openingMinimum: myTeam.openingMinimum ?? 0 })
+          ? `Vulneráveis (VU): a 1ª descida precisa somar ${myTeam.openingMinimum} pontos.`
         : selectedCardIndices.length >= 3
           ? 'Selecione cartas e clique na mesa para baixar, ou num jogo do time para estender.'
           : 'Selecione cartas: 1 para descartar, 3+ para baixar um jogo.'
@@ -69,13 +75,14 @@ export default function OnlinePlayerHand({ view }: OnlinePlayerHandProps) {
           <div
             key={`${card.suit}-${card.rank}-${index}`}
             data-hand-index={index}
-            className="relative flex-shrink-0 hover:z-30"
+            data-reserved={reserved.has(index) ? 'true' : undefined}
+            className={`relative flex-shrink-0 hover:z-30 ${reserved.has(index) ? 'cursor-not-allowed opacity-35' : ''}`}
           >
             <CardComponent
               card={asCard(card)}
               index={position}
               selected={selectedCardIndices.includes(index)}
-              onClick={isMyTurn ? () => toggleCardSelection(index) : undefined}
+              onClick={isMyTurn && !reserved.has(index) ? () => toggleCardSelection(index) : undefined}
               sizeClassName={HAND_CARD_SIZE}
               compactOnLandscape
               cornerClassName="text-sm font-normal sm:text-base landscape:text-lg landscape:leading-none"

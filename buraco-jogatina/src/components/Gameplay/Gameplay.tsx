@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { vuBannerText } from './vulnerability'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGameStore } from '../../store/gameStore'
 import GameBoard from './GameBoard'
@@ -59,6 +60,16 @@ export default function Gameplay({ onGameEnd, onExit }: GameplayProps) {
   const [aiTakeAnim, setAiTakeAnim] = useState<FlyAnimState | null>(null)
 
   const [mortoBanner, setMortoBanner] = useState<string | null>(null)
+  const [vuBanner, setVuBanner] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!game || game.state.status !== 'playing') return
+    const text = vuBannerText(game.state.teams, 'A')
+    if (!text) return
+    setVuBanner(text)
+    const id = window.setTimeout(() => setVuBanner(current => (current === text ? null : current)), 3500)
+    return () => window.clearTimeout(id)
+  }, [game])
 
   useEffect(() => {
     if (!game) return
@@ -225,6 +236,22 @@ export default function Gameplay({ onGameEnd, onExit }: GameplayProps) {
     }
   }
 
+  const handlePlayOpening = (groups: number[][]) => {
+    const all = groups.flat()
+    const fromRect = leftmostHandCardRect(all)
+    const toRect = document.getElementById('meld-drop-zone')?.getBoundingClientRect()
+    const hand = game.state.players[0].hand.getCards()
+    const cards = all.map(i => hand[i]).filter((c): c is NonNullable<typeof c> => Boolean(c))
+
+    if (!useGameStore.getState().playMelds(groups)) return
+
+    if (fromRect && toRect && cards.length > 0) {
+      const id = Date.now()
+      setTableAnim({ id, fromRect, toRect, cards: cards.slice(0, 4), sizeClassName: GHOST_TABLE_SIZE })
+      window.setTimeout(() => setTableAnim(current => (current?.id === id ? null : current)), FLY_ANIM_MS)
+    }
+  }
+
   const handleExtendMeld = (meldIndex: number, cardIndices: number[], targetRect: DOMRect) => {
     const fromRect = leftmostHandCardRect(cardIndices)
     const hand = game.state.players[0].hand.getCards()
@@ -255,6 +282,7 @@ export default function Gameplay({ onGameEnd, onExit }: GameplayProps) {
           phase={phase}
           onDraw={handleDraw}
           onPlayCanastaSelected={handlePlayCanasta}
+          onPlayOpening={handlePlayOpening}
           onExtendMeld={handleExtendMeld}
         />
       </div>
@@ -283,6 +311,21 @@ export default function Gameplay({ onGameEnd, onExit }: GameplayProps) {
       </AnimatePresence>
 
       <AnimatePresence>
+        {vuBanner && (
+          <motion.div
+            key={vuBanner}
+            initial={{ opacity: 0, scale: 0.7, y: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+            className="pointer-events-none fixed inset-x-0 top-1/4 z-[115] flex justify-center px-4"
+            data-vu-banner
+          >
+            <span className="rounded-2xl border-2 border-red-500 bg-black/85 px-5 py-2.5 text-center font-display text-base text-red-200 shadow-[0_0_30px_rgba(220,38,38,0.6)] backdrop-blur-sm sm:text-xl">
+              {vuBanner}
+            </span>
+          </motion.div>
+        )}
         {mortoBanner && (
           <motion.div
             key={mortoBanner}

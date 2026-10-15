@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { Game } from '../engine/game'
+import { Game, openingPoints } from '../engine/game'
 import { HumanPlayer, Player } from '../engine/player'
 import { AIPlayer, AIDifficulty, GameStateForAI } from '../engine/ai'
 import { Card } from '../engine/card'
@@ -64,6 +64,7 @@ export interface GameStore {
   game: Game | null
   version: number
   selectedCardIndices: number[]
+  stagedOpening: number[][]
   gameLog: string[]
 
   matchScores: Record<TeamId, number>
@@ -83,6 +84,10 @@ export interface GameStore {
   takeDiscardPile: () => void
   discard: (cardIndex: number) => void
   playCanasta: (cardIndices: number[]) => void
+  playMelds: (groups: number[][]) => boolean
+  stageOpeningGroup: (cardIndices: number[]) => void
+  extendStagedGroup: (groupIndex: number, cardIndices: number[]) => void
+  cancelOpening: () => void
   extendMeld: (meldIndex: number, cardIndices: number[]) => void
   aiTurn: () => void
   toggleCardSelection: (index: number) => void
@@ -102,11 +107,22 @@ function isWildCard(card: Card): boolean {
   return card.isWild || card.rank === '2'
 }
 
+export const TEAM_DISPLAY_NAME: Record<TeamId, string> = { A: 'Nós', B: 'Eles' }
+
+export function vulnerabilityLog(game: Game): string[] {
+  return game.state.teams
+    .filter(t => t.openingMinimum > 0)
+    .map(
+      t =>
+        `⚠️ Time ${t.id} (${TEAM_DISPLAY_NAME[t.id]}) está vulnerável (VU): a primeira descida da rodada precisa somar ${t.openingMinimum} pontos.`
+    )
+}
+
 function discardLowestValueCard(game: Game, player: Player): boolean {
   const cards = player.hand.getCards()
   if (cards.length === 0) return false
 
-  const hasNonWild = cards.some(c => !isWildCard(c))
+  const hasNonWild = cards.some((c, i) => !isWildCard(c) && !game.isDiscardBlockedCard(i))
   let lowestIndex = -1
   let lowestValue = Infinity
   for (let i = 0; i < cards.length; i++) {
@@ -171,6 +187,7 @@ export const useGameStore = create<GameStore>((set, get) => {
   game: null,
   version: 0,
   selectedCardIndices: [],
+  stagedOpening: [],
   gameLog: [],
   matchScores: { A: 0, B: 0 },
   matchCanastras: { A: { clean: 0, dirty: 0 }, B: { clean: 0, dirty: 0 } },
@@ -201,6 +218,7 @@ export const useGameStore = create<GameStore>((set, get) => {
       game,
       version: get().version + 1,
       selectedCardIndices: [],
+      stagedOpening: [],
       gameLog: [
         `Partida iniciada: ${playerName} e ${partnerName} (Time A) vs ${opponent1Name} e ${opponent2Name} (Time B), dificuldade ${label}.`,
       ],
@@ -289,6 +307,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     set({
       gameLog: log,
       selectedCardIndices: [],
+      stagedOpening: [],
       version: get().version + 1,
     })
   },
@@ -316,9 +335,66 @@ export const useGameStore = create<GameStore>((set, get) => {
     set({
       gameLog: log,
       selectedCardIndices: [],
+      stagedOpening: [],
       version: get().version + 1,
     })
   },
+
+  playMelds: (groups) => {
+    const { game, gameLog } = get()
+    if (!game || game.state.status !== 'playing') return false
+
+    const all = groups.flat()
+    if (groups.length === 0 || new Set(all).size !== all.length) return false
+    const player = game.getCurrentPlayer()
+    const handCards = player.hand.getCards()
+    const cardGroups = groups.map(g => g.map(i => handCards[i]))
+    if (cardGroups.some(g => g.some(c => !c))) return false
+
+    const team = game.getTeamOfCurrentPlayer()
+    const wasOpening = game.needsOpening(team)
+    const hadMorto = team.hasTakenMorto
+    if (!game.playMelds(cardGroups)) return false
+
+    const points = openingPoints(cardGroups.flat())
+    const log = [
+      ...gameLog,
+      wasOpening
+        ? `${player.name} abriu o jogo da dupla com ${points} pontos (vulnerável).`
+        : `${player.name} baixou ${cardGroups.length} jogo(s)!`,
+    ]
+    checkMortoTransition(game, player, log, hadMorto)
+    if (checkGameOver(game, log)) {
+      finalizeRoundIfNeeded(game, log)
+    }
+
+    set({
+      gameLog: log,
+      selectedCardIndices: [],
+      stagedOpening: [],
+      version: get().version + 1,
+    })
+    return true
+  },
+
+  stageOpeningGroup: (cardIndices) => {
+    const { stagedOpening } = get()
+    const taken = new Set(stagedOpening.flat())
+    if (cardIndices.length === 0 || cardIndices.some(i => taken.has(i))) return
+    set({ stagedOpening: [...stagedOpening, [...cardIndices]], selectedCardIndices: [] })
+  },
+
+  extendStagedGroup: (groupIndex, cardIndices) => {
+    const { stagedOpening } = get()
+    const taken = new Set(stagedOpening.flat())
+    if (!stagedOpening[groupIndex] || cardIndices.length === 0 || cardIndices.some(i => taken.has(i))) return
+    set({
+      stagedOpening: stagedOpening.map((g, i) => (i === groupIndex ? [...g, ...cardIndices] : g)),
+      selectedCardIndices: [],
+    })
+  },
+
+  cancelOpening: () => set({ stagedOpening: [], selectedCardIndices: [] }),
 
   extendMeld: (meldIndex, cardIndices) => {
     const { game, gameLog } = get()
@@ -343,6 +419,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     set({
       gameLog: log,
       selectedCardIndices: [],
+      stagedOpening: [],
       version: get().version + 1,
     })
   },
@@ -393,7 +470,17 @@ export const useGameStore = create<GameStore>((set, get) => {
     }
 
     let discarded = false
-    for (let iteration = 0; iteration < MAX_AI_MELD_ACTIONS_PER_TURN; iteration++) {
+    if (game.needsOpening()) {
+      const minimum = game.getTeamOfCurrentPlayer().openingMinimum
+      for (const plan of player.planOpening(minimum)) {
+        if (!game.playMelds(plan)) continue
+        log.push(`${player.name} abriu o jogo da dupla com ${openingPoints(plan.flat())} pontos (vulnerável).`)
+        hadMorto = checkMortoTransition(game, player, log, hadMorto)
+        if (checkGameOver(game, log)) gameEnded = true
+        break
+      }
+    }
+    for (let iteration = 0; !gameEnded && iteration < MAX_AI_MELD_ACTIONS_PER_TURN; iteration++) {
       const move = player.playTurn(buildAIState(game))
 
       if (move && move.type === 'play_canasta' && move.cards) {
@@ -435,6 +522,7 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     if (!gameEnded && !discarded) {
       discarded = discardLowestValueCard(game, player)
+      for (let i = 0; !discarded && i < player.hand.getSize(); i++) discarded = game.discard(i)
       if (discarded) {
         log.push(`${player.name} descartou uma carta.`)
         hadMorto = checkMortoTransition(game, player, log, hadMorto)
@@ -457,7 +545,8 @@ export const useGameStore = create<GameStore>((set, get) => {
   },
 
   toggleCardSelection: (index) => {
-    const { selectedCardIndices } = get()
+    const { selectedCardIndices, stagedOpening } = get()
+    if (stagedOpening.some(g => g.includes(index))) return
     set({
       selectedCardIndices: selectedCardIndices.includes(index)
         ? selectedCardIndices.filter(i => i !== index)
@@ -476,6 +565,7 @@ export const useGameStore = create<GameStore>((set, get) => {
       game: null,
       version: 0,
       selectedCardIndices: [],
+      stagedOpening: [],
       gameLog: [],
       matchScores: { A: 0, B: 0 },
       matchCanastras: { A: { clean: 0, dirty: 0 }, B: { clean: 0, dirty: 0 } },
@@ -502,13 +592,15 @@ export const useGameStore = create<GameStore>((set, get) => {
     const opponent2 = new AIPlayer(opponent2Name, matchConfig.aiDifficulty)
     const game = new Game([human, opponent1, partner, opponent2])
     game.setup()
+    game.setOpeningMinimums(get().matchScores)
 
     const nextRound = round + 1
     set({
       game,
       version: get().version + 1,
       selectedCardIndices: [],
-      gameLog: [...gameLog, `Rodada ${nextRound} iniciada.`],
+      stagedOpening: [],
+      gameLog: [...gameLog, `Rodada ${nextRound} iniciada.`, ...vulnerabilityLog(game)],
       round: nextRound,
       roundFinalized: false,
     })
@@ -518,10 +610,12 @@ export const useGameStore = create<GameStore>((set, get) => {
     const loaded = loadSavedGame()
     if (!loaded) return false
 
+    if (!loaded.store.roundFinalized) loaded.game.setOpeningMinimums(loaded.store.matchScores)
     set({
       game: loaded.game,
       version: get().version + 1,
       selectedCardIndices: [],
+      stagedOpening: [],
       matchScores: loaded.store.matchScores,
       matchCanastras: loaded.store.matchCanastras,
       round: loaded.store.round,

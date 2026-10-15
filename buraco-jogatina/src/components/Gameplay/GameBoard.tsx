@@ -6,12 +6,16 @@ import { teamIdOfSeat, type TeamId } from '../../engine/gameState'
 import { canExtendMeld, isValidCanasta } from '../../engine/utils'
 import Seat from './Seat'
 import MeldArea, { isWildStrip, meldSuitOf } from './MeldArea'
+import VuChip from './VuChip'
+import OpeningStaging from './OpeningStaging'
+import { openingShortfallHint, stagedPoints } from './vulnerability'
 import type { TurnPhase } from './Gameplay'
 
 interface GameBoardProps {
   phase: TurnPhase
   onDraw: () => void
   onPlayCanastaSelected: () => void
+  onPlayOpening: (groups: number[][]) => void
   onExtendMeld: (meldIndex: number, cardIndices: number[], targetRect: DOMRect) => void
 }
 
@@ -34,10 +38,11 @@ const MORTO_CARD_SIZE = PILE_CARD_SIZE
 const HAND_CARD_SIZE = 'w-16 h-24 sm:w-20 sm:h-28 landscape:w-14 landscape:h-[4.25rem]'
 const BIG_CORNER = 'text-sm font-normal sm:text-base landscape:text-lg landscape:leading-none'
 
-export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExtendMeld }: GameBoardProps) {
+export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onPlayOpening, onExtendMeld }: GameBoardProps) {
   useGameStore(s => s.version)
   const game = useGameStore(s => s.game)
   const selectedCardIndices = useGameStore(s => s.selectedCardIndices)
+  const stagedOpening = useGameStore(s => s.stagedOpening)
 
   const [hint, setHint] = useState<string | null>(null)
 
@@ -53,6 +58,19 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
 
   const canClickDeck = isHumanTurn && phase === 'draw'
   const canClickDropZone = isHumanTurn && phase === 'play' && selectedCardIndices.length >= 3
+  const openingTeam = teams.find(t => t.id === 'A')!
+  const handNow = players[0].hand.getCards()
+  const selectionIsMeld =
+    selectedCardIndices.length >= 3 && isValidCanasta(selectedCardIndices.map(i => handNow[i]).filter(Boolean))
+  const pendingOpeningPoints = stagedPoints(
+    handNow,
+    selectionIsMeld ? [...stagedOpening, selectedCardIndices] : stagedOpening
+  )
+  const dropLabel = game.needsOpening(openingTeam)
+    ? pendingOpeningPoints < openingTeam.openingMinimum
+      ? `Reservar (${pendingOpeningPoints}/${openingTeam.openingMinimum})`
+      : `⬇ Abrir (${pendingOpeningPoints})`
+    : '⬇ Baixar jogo'
 
   const handleDeckClick = () => {
     if (!isHumanTurn) return
@@ -78,12 +96,69 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
       return
     }
 
+    const myTeam = teams.find(t => t.id === 'A')!
+    if (game.needsOpening(myTeam)) {
+      const groups = [...stagedOpening, selectedCardIndices]
+      const cardGroups = groups.map(g => g.map(i => handCards[i]))
+      const points = stagedPoints(handCards, groups)
+      if (points < myTeam.openingMinimum) {
+        useGameStore.getState().stageOpeningGroup(selectedCardIndices)
+        flashHint(openingShortfallHint(points, myTeam.openingMinimum))
+        return
+      }
+      tryOpening(groups, cardGroups)
+      return
+    }
+
+    if (game.wouldLeaveOnlyBlockedCard(selectedCards)) {
+      flashHint('Você ficaria só com a carta que pegou do lixo, e ela não pode voltar para o descarte.')
+      return
+    }
     if (game.wouldPlayCanastaEmptyHandIllegally(selectedCards)) {
       flashHint('Você não pode baixar todas as cartas sem poder bater.')
       return
     }
 
+    setHint(null)
     onPlayCanastaSelected()
+  }
+
+  const tryOpening = (groups: number[][], cardGroups: import('../../engine/card').Card[][]) => {
+    if (game.wouldLeaveOnlyBlockedCard(cardGroups.flat())) {
+      flashHint('Você ficaria só com a carta que pegou do lixo, e ela não pode voltar para o descarte.')
+      return
+    }
+    if (game.wouldPlayMeldsEmptyHandIllegally(cardGroups)) {
+      flashHint('Você não pode baixar todas as cartas sem poder bater.')
+      return
+    }
+    setHint(null)
+    onPlayOpening(groups)
+  }
+
+  const handleStagedGroupClick = (groupIndex: number, event: MouseEvent) => {
+    event.stopPropagation()
+    if (!isHumanTurn || phase !== 'play') return
+    if (selectedCardIndices.length === 0) {
+      flashHint('Para mudar um jogo reservado, toque em Desfazer.')
+      return
+    }
+    const handCards = players[0].hand.getCards()
+    const groupCards = stagedOpening[groupIndex].map(i => handCards[i])
+    const selectedCards = selectedCardIndices.map(i => handCards[i]).filter(Boolean)
+    if (!canExtendMeld(groupCards, selectedCards)) {
+      flashHint('Essa seleção não aumenta esse jogo reservado.')
+      return
+    }
+    const myTeam = teams.find(t => t.id === 'A')!
+    const groups = stagedOpening.map((g, i) => (i === groupIndex ? [...g, ...selectedCardIndices] : g))
+    const points = stagedPoints(handCards, groups)
+    if (points >= myTeam.openingMinimum) {
+      tryOpening(groups, groups.map(g => g.map(i => handCards[i])))
+      return
+    }
+    useGameStore.getState().extendStagedGroup(groupIndex, selectedCardIndices)
+    flashHint(openingShortfallHint(points, myTeam.openingMinimum))
   }
 
   const handleMeldClick = (
@@ -104,11 +179,16 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
       return
     }
 
+    if (game.wouldLeaveOnlyBlockedCard(selectedCards)) {
+      flashHint('Você ficaria só com a carta que pegou do lixo, e ela não pode voltar para o descarte.')
+      return
+    }
     if (game.wouldExtendMeldEmptyHandIllegally(meldIndex, selectedCards)) {
       flashHint('Você não pode baixar todas as cartas sem poder bater.')
       return
     }
 
+    setHint(null)
     const targetRect = event.currentTarget.getBoundingClientRect()
     onExtendMeld(meldIndex, selectedCardIndices, targetRect)
   }
@@ -245,6 +325,11 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
               <div className="flex items-center justify-between gap-2 landscape:h-6 landscape:shrink-0 landscape:px-1">
                 <h4 className={`flex shrink-0 items-center font-display text-sm landscape:text-sm landscape:leading-none ${TEAM_TEXT_CLASS[team.id]}`}>
                   {TEAM_LABEL[team.id]}
+                  <VuChip
+                    minimum={team.openingMinimum}
+                    opened={team.melds.length > 0}
+                    className={`ml-1.5 ${isDropTarget ? 'landscape:hidden' : ''}`}
+                  />
                   {isDropTarget && (
                     <button
                       type="button"
@@ -254,7 +339,7 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
                       }}
                       className="ml-2 shrink-0 animate-pulse whitespace-nowrap rounded-full bg-card-gold px-2.5 py-0.5 font-sans text-[11px] font-bold text-black shadow-[0_0_10px_rgba(212,175,55,0.6)] landscape:px-2 landscape:py-0.5 landscape:text-xs landscape:leading-none"
                     >
-                      ⬇ Baixar jogo
+                      {dropLabel}
                     </button>
                   )}
                 </h4>
@@ -263,9 +348,23 @@ export default function GameBoard({ phase, onDraw, onPlayCanastaSelected, onExte
                   {team.hasTakenMorto ? ' · morto' : ''}
                 </span>
               </div>
-              {team.melds.length === 0 ? (
+              {team.melds.length === 0 && team.id === 'A' && game.needsOpening(team) ? (
+                <OpeningStaging
+                  hand={players[0].hand.getCards()}
+                  groups={stagedOpening}
+                  minimum={team.openingMinimum}
+                  isDropTarget={isDropTarget}
+                  pendingPoints={pendingOpeningPoints}
+                  onCancel={() => useGameStore.getState().cancelOpening()}
+                  onGroupClick={handleStagedGroupClick}
+                />
+              ) : team.melds.length === 0 ? (
                 <span className="text-sm text-gray-400 landscape:px-1 landscape:text-sm">
-                  {isDropTarget ? 'Clique aqui para baixar as cartas selecionadas' : 'Nenhum jogo baixado ainda'}
+                  {team.openingMinimum > 0
+                    ? `Vulneráveis: a 1ª descida precisa somar ${team.openingMinimum} pontos`
+                    : isDropTarget
+                      ? 'Clique aqui para baixar as cartas selecionadas'
+                      : 'Nenhum jogo baixado ainda'}
                 </span>
               ) : (
                 <MeldArea
