@@ -376,7 +376,7 @@ describe('ProtocolServer', () => {
 
       const guestBack = new FakeSocket()
       server.registerConnection('c2-new', guestBack)
-      await server.handleMessage('c2-new', { type: 'join', code, name: 'Bob' })
+      await server.handleMessage('c2-new', { type: 'join', code, name: 'Bob', token: (guest.ofType('joined')[0] as any).token })
 
       expect(guestBack.ofType('joined')).toHaveLength(1)
       expect(guestBack.ofType('state').length).toBeGreaterThanOrEqual(1)
@@ -389,12 +389,12 @@ describe('ProtocolServer', () => {
     })
 
     it('depois de reconectar, uma intent do assento que voltou funciona normalmente de novo', async () => {
-      const { server, host, code } = await setupStartedRoom()
+      const { server, host, guest, code } = await setupStartedRoom()
       server.handleClose('c2')
 
       const guestBack = new FakeSocket()
       server.registerConnection('c2-new', guestBack)
-      await server.handleMessage('c2-new', { type: 'join', code, name: 'Bob' })
+      await server.handleMessage('c2-new', { type: 'join', code, name: 'Bob', token: (guest.ofType('joined')[0] as any).token })
 
       await server.handleMessage('c1', { type: 'intent', intent: { type: 'draw' } })
       await server.handleMessage('c1', { type: 'intent', intent: { type: 'discard', cardIndex: 0 } })
@@ -402,6 +402,56 @@ describe('ProtocolServer', () => {
       const latest = host.ofType('state').at(-1) as any
       expect(latest.view.currentSeat).toBe(1)
       expect(latest.view.paused).toBe(false)
+    })
+  })
+
+  describe('token de reconexão', () => {
+    async function started() {
+      const server = makeServer()
+      const host = new FakeSocket()
+      const guest = new FakeSocket()
+      server.registerConnection('c1', host)
+      server.registerConnection('c2', guest)
+      await server.handleMessage('c1', { type: 'create', name: 'Host', difficulty: 'medium' })
+      const code = (host.ofType('joined')[0] as any).code
+      await server.handleMessage('c2', { type: 'join', code, name: 'Bob' })
+      await server.handleMessage('c1', { type: 'start' })
+      return { server, host, guest, code }
+    }
+
+    it('o token só vai para o dono, dentro de "joined", e nunca aparece nos outros envios', async () => {
+      const { host, guest } = await started()
+      const hostToken = (host.ofType('joined')[0] as any).token
+      const guestToken = (guest.ofType('joined')[0] as any).token
+      expect(hostToken).toMatch(/^[0-9a-f]{32}$/)
+      expect(guestToken).toMatch(/^[0-9a-f]{32}$/)
+      expect(guestToken).not.toBe(hostToken)
+      for (const sock of [host, guest]) {
+        for (const m of sock.messages.filter(m => m.type !== 'joined')) {
+          expect(JSON.stringify(m)).not.toContain(hostToken)
+          expect(JSON.stringify(m)).not.toContain(guestToken)
+        }
+      }
+    })
+
+    it('reconectar só com o nome (sem token) é recusado e a partida continua pausada', async () => {
+      const { server, host, code } = await started()
+      server.handleClose('c2')
+      const attacker = new FakeSocket()
+      server.registerConnection('evil', attacker)
+      await server.handleMessage('evil', { type: 'join', code, name: 'Bob' })
+      expect(attacker.ofType('joined')).toHaveLength(0)
+      expect((attacker.ofType('error').at(-1) as any).message).toMatch(/token/)
+      expect(attacker.ofType('state')).toHaveLength(0)
+      expect((host.ofType('state').at(-1) as any).view.paused).toBe(true)
+    })
+
+    it('token de tamanho absurdo é rejeitado como mensagem inválida', async () => {
+      const { server, code } = await started()
+      const s = new FakeSocket()
+      server.registerConnection('z', s)
+      await server.handleMessage('z', { type: 'join', code, name: 'Bob', token: 'x'.repeat(500) })
+      expect((s.ofType('error').at(-1) as any).message).toBe('mensagem invalida')
     })
   })
 })

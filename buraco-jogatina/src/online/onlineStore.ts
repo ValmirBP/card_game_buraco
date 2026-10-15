@@ -20,6 +20,7 @@ function loadStoredServerAddress(): string {
 export interface LastRoomInfo {
   code: string
   name: string
+  token?: string
 }
 
 function loadLastRoom(): LastRoomInfo | null {
@@ -28,7 +29,11 @@ function loadLastRoom(): LastRoomInfo | null {
     if (!raw) return null
     const parsed = JSON.parse(raw)
     if (typeof parsed?.code === 'string' && typeof parsed?.name === 'string' && parsed.code && parsed.name) {
-      return { code: parsed.code, name: parsed.name }
+      return {
+        code: parsed.code,
+        name: parsed.name,
+        token: typeof parsed.token === 'string' && parsed.token ? parsed.token : undefined,
+      }
     }
     return null
   } catch {
@@ -61,7 +66,7 @@ export interface LobbySeat {
 
 type ClientMessage =
   | { type: 'create'; name: string; difficulty: AIDifficulty }
-  | { type: 'join'; code: string; name: string }
+  | { type: 'join'; code: string; name: string; token?: string }
   | { type: 'start' }
   | { type: 'intent'; intent: Intent }
   | { type: 'nextRound' }
@@ -69,7 +74,7 @@ type ClientMessage =
   | { type: 'rename'; name: string }
 
 type ServerMessage =
-  | { type: 'joined'; code: string; seat: number; isHost: boolean; serverUrl?: string }
+  | { type: 'joined'; code: string; seat: number; isHost: boolean; serverUrl?: string; token?: string }
   | { type: 'lobby'; code: string; seat: number; seats: LobbySeat[]; isHost: boolean; serverUrl?: string }
   | { type: 'state'; view: SeatView }
   | { type: 'log'; lines: string[] }
@@ -101,7 +106,7 @@ interface OnlineState {
   playTableAnim: (anim: Omit<FlyAnimState, 'id'>) => void
 
   create: (name: string, difficulty: AIDifficulty) => void
-  join: (code: string, name: string) => void
+  join: (code: string, name: string, token?: string) => void
   joinFromScannedLink: (raw: string, name: string) => boolean
   reconnectToLastRoom: () => void
   start: () => void
@@ -123,7 +128,7 @@ export function joinUrlFor(code: string, serverUrl: string | null): string {
 }
 
 let socket: WebSocket | null = null
-let lastJoin: { name: string; code?: string; difficulty?: AIDifficulty } | null = null
+let lastJoin: { name: string; code?: string; difficulty?: AIDifficulty; token?: string } | null = null
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 let intentionalClose = false
 let reconnectAttempts = 0
@@ -211,7 +216,7 @@ function connect(onOpen: () => void): void {
       reconnectTimer = setTimeout(() => {
         connect(() => {
           if (lastJoin?.code) {
-            send({ type: 'join', code: lastJoin.code, name: lastJoin.name })
+            send({ type: 'join', code: lastJoin.code, name: lastJoin.name, token: lastJoin.token })
           }
         })
       }, 1500)
@@ -225,8 +230,13 @@ function connect(onOpen: () => void): void {
 function handleServerMessage(msg: ServerMessage): void {
   switch (msg.type) {
     case 'joined': {
-      lastJoin = { name: lastJoin?.name ?? '', code: msg.code, difficulty: lastJoin?.difficulty }
-      const lastRoom = lastJoin.name ? { code: msg.code, name: lastJoin.name } : null
+      lastJoin = {
+        name: lastJoin?.name ?? '',
+        code: msg.code,
+        difficulty: lastJoin?.difficulty,
+        token: msg.token ?? lastJoin?.token,
+      }
+      const lastRoom = lastJoin.name ? { code: msg.code, name: lastJoin.name, token: lastJoin.token } : null
       if (lastRoom) saveLastRoom(lastRoom)
       useOnlineStore.setState({
         code: msg.code,
@@ -311,10 +321,10 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
     connect(() => send({ type: 'create', name, difficulty }))
   },
 
-  join: (code, name) => {
+  join: (code, name, token) => {
     reconnectAttempts = 0
-    lastJoin = { name, code }
-    connect(() => send({ type: 'join', code, name }))
+    lastJoin = { name, code, token }
+    connect(() => send({ type: 'join', code, name, token }))
   },
 
   joinFromScannedLink: (raw, name) => {
@@ -328,7 +338,7 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
   reconnectToLastRoom: () => {
     const { lastRoom } = get()
     if (!lastRoom) return
-    get().join(lastRoom.code, lastRoom.name)
+    get().join(lastRoom.code, lastRoom.name, lastRoom.token)
   },
 
   start: () => send({ type: 'start' }),

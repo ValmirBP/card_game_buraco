@@ -9,6 +9,7 @@ export interface RoomSeat {
   kind: 'human' | 'ai'
   name: string
   connId?: string
+  token?: string
 }
 
 export interface Room {
@@ -22,6 +23,7 @@ export interface Room {
 
 export interface JoinOk {
   seat: number
+  token?: string
 }
 
 export interface ErrorResult {
@@ -45,6 +47,20 @@ function defaultAiName(seatIndex: number): string {
 }
 
 export const MAX_NAME_LENGTH = 24
+export const MAX_TOKEN_LENGTH = 64
+
+export function generateToken(): string {
+  const bytes = new Uint8Array(16)
+  globalThis.crypto.getRandomValues(bytes)
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+function sameToken(expected: string | undefined, given: string | undefined): boolean {
+  if (!expected || !given || expected.length !== given.length) return false
+  let diff = 0
+  for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ given.charCodeAt(i)
+  return diff === 0
+}
 
 export function cleanName(name: unknown): string {
   return typeof name === 'string' ? name.trim().slice(0, MAX_NAME_LENGTH) : ''
@@ -66,7 +82,7 @@ export class RoomManager {
     const seats: RoomSeat[] = []
     for (let i = 0; i < SEAT_COUNT; i++) {
       if (i === 0) {
-        seats.push({ index: 0, kind: 'human', name: cleanName(hostName), connId: hostConnId })
+        seats.push({ index: 0, kind: 'human', name: cleanName(hostName), connId: hostConnId, token: generateToken() })
       } else {
         seats.push({ index: i, kind: 'ai', name: defaultAiName(i) })
       }
@@ -93,18 +109,19 @@ export class RoomManager {
     return undefined
   }
 
-  joinRoom(code: string, connId: string, name: string): JoinOk | ErrorResult {
+  joinRoom(code: string, connId: string, name: string, token?: string): JoinOk | ErrorResult {
     const room = this.rooms.get(code)
     if (!room) return { error: 'room not found' }
 
-    const reconnectSeat = room.seats.find(
-      (s) => s.kind === 'human' && s.name === cleanName(name) && s.connId === undefined
-    )
+    const cleaned = cleanName(name)
+    const disconnected = room.seats.filter((s) => s.kind === 'human' && s.name === cleaned && s.connId === undefined)
+    const reconnectSeat = disconnected.find((s) => sameToken(s.token, token))
     if (reconnectSeat) {
       reconnectSeat.connId = connId
       if (reconnectSeat.index === 0) room.hostId = connId
-      return { seat: reconnectSeat.index }
+      return { seat: reconnectSeat.index, token: reconnectSeat.token }
     }
+    if (disconnected.length > 0) return { error: 'token de reconexao invalido' }
 
     if (room.started) return { error: 'room already started' }
 
@@ -114,7 +131,8 @@ export class RoomManager {
     freeSeat.kind = 'human'
     freeSeat.name = cleanName(name)
     freeSeat.connId = connId
-    return { seat: freeSeat.index }
+    freeSeat.token = generateToken()
+    return { seat: freeSeat.index, token: freeSeat.token }
   }
 
   chooseSeat(code: string, connId: string, targetIndex: number): JoinOk | ErrorResult {
@@ -133,22 +151,28 @@ export class RoomManager {
 
     if (target.kind === 'ai') {
       const myName = mySeat.name
+      const myToken = mySeat.token
       mySeat.kind = 'ai'
       mySeat.name = defaultAiName(mySeat.index)
       mySeat.connId = undefined
+      mySeat.token = undefined
       target.kind = 'human'
       target.name = myName
       target.connId = connId
-      return { seat: target.index }
+      target.token = myToken
+      return { seat: target.index, token: myToken }
     }
 
     const myName = mySeat.name
     const myConnId = mySeat.connId
+    const myToken = mySeat.token
     mySeat.name = target.name
     mySeat.connId = target.connId
+    mySeat.token = target.token
     target.name = myName
     target.connId = myConnId
-    return { seat: target.index }
+    target.token = myToken
+    return { seat: target.index, token: myToken }
   }
 
   rename(code: string, connId: string, name: string): JoinOk | ErrorResult {
@@ -174,6 +198,7 @@ export class RoomManager {
     if (!room.started && seat.index !== 0) {
       seat.kind = 'ai'
       seat.name = defaultAiName(seat.index)
+      seat.token = undefined
     }
   }
 

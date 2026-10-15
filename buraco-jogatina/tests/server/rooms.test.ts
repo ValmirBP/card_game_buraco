@@ -34,11 +34,11 @@ describe('RoomManager', () => {
     const rm = new RoomManager()
     const { code } = rm.createRoom('conn-host', 'Host', 'medium')
     const r1 = rm.joinRoom(code, 'conn-2', 'Bob')
-    expect(r1).toEqual({ seat: 1 })
+    expect(r1).toMatchObject({ seat: 1 })
     const r2 = rm.joinRoom(code, 'conn-3', 'Carol')
-    expect(r2).toEqual({ seat: 2 })
+    expect(r2).toMatchObject({ seat: 2 })
     const r3 = rm.joinRoom(code, 'conn-4', 'Dave')
-    expect(r3).toEqual({ seat: 3 })
+    expect(r3).toMatchObject({ seat: 3 })
   })
 
   it('rejects a 5th human when room is full', () => {
@@ -117,27 +117,28 @@ describe('RoomManager', () => {
     expect(rm.getRoom(code)!.seats[1].name).toBe('B'.repeat(24))
   })
 
-  it('reconnection by matching name reassumes the same seat', () => {
+  it('reconnection with the right name AND token reassumes the same seat', () => {
     const rm = new RoomManager()
     const { code } = rm.createRoom('conn-host', 'Host', 'medium')
-    rm.joinRoom(code, 'conn-2', 'Bob')
+    const first = rm.joinRoom(code, 'conn-2', 'Bob') as { seat: number; token: string }
+    rm.startRoom(code, 'conn-host')
     rm.leaveRoom('conn-2')
 
-    const rejoin = rm.joinRoom(code, 'conn-2-new', 'Bob')
-    expect(rejoin).toEqual({ seat: 1 })
+    const rejoin = rm.joinRoom(code, 'conn-2-new', 'Bob', first.token)
+    expect(rejoin).toMatchObject({ seat: 1, token: first.token })
     const room = rm.getRoom(code)!
     expect(room.seats[1].connId).toBe('conn-2-new')
   })
 
-  it('reconnection by matching name works MID-MATCH (room already started), not just in the lobby', () => {
+  it('reconnection with name AND token works MID-MATCH (room already started)', () => {
     const rm = new RoomManager()
     const { code } = rm.createRoom('conn-host', 'Host', 'medium')
-    rm.joinRoom(code, 'conn-2', 'Bob')
+    const first = rm.joinRoom(code, 'conn-2', 'Bob') as { seat: number; token: string }
     rm.startRoom(code, 'conn-host')
     rm.leaveRoom('conn-2')
 
-    const rejoin = rm.joinRoom(code, 'conn-2-new', 'Bob')
-    expect(rejoin).toEqual({ seat: 1 })
+    const rejoin = rm.joinRoom(code, 'conn-2-new', 'Bob', first.token)
+    expect(rejoin).toMatchObject({ seat: 1, token: first.token })
     const room = rm.getRoom(code)!
     expect(room.seats[1].connId).toBe('conn-2-new')
     expect(room.session).toBeDefined()
@@ -169,7 +170,7 @@ describe('RoomManager', () => {
       rm.joinRoom(code, 'conn-2', 'Bob')
 
       const result = rm.chooseSeat(code, 'conn-2', 3)
-      expect(result).toEqual({ seat: 3 })
+      expect(result).toMatchObject({ seat: 3 })
 
       const room = rm.getRoom(code)!
       expect(room.seats[3]).toMatchObject({ kind: 'human', name: 'Bob', connId: 'conn-2' })
@@ -180,7 +181,7 @@ describe('RoomManager', () => {
       const rm = new RoomManager()
       const { code } = rm.createRoom('conn-host', 'Host', 'medium')
       rm.joinRoom(code, 'conn-2', 'Bob')
-      expect(rm.chooseSeat(code, 'conn-2', 1)).toEqual({ seat: 1 })
+      expect(rm.chooseSeat(code, 'conn-2', 1)).toMatchObject({ seat: 1 })
       expect(rm.getRoom(code)!.seats[1]).toMatchObject({ kind: 'human', name: 'Bob' })
     })
 
@@ -191,7 +192,7 @@ describe('RoomManager', () => {
       rm.joinRoom(code, 'conn-3', 'Carol')
 
       const result = rm.chooseSeat(code, 'conn-2', 2)
-      expect(result).toEqual({ seat: 2 })
+      expect(result).toMatchObject({ seat: 2 })
 
       const room = rm.getRoom(code)!
       expect(room.seats[2]).toMatchObject({ kind: 'human', name: 'Bob', connId: 'conn-2' })
@@ -236,7 +237,7 @@ describe('RoomManager', () => {
       const rm = new RoomManager()
       const { code } = rm.createRoom('conn-host', 'Host', 'medium')
       rm.joinRoom(code, 'conn-2', 'Bob')
-      expect(rm.rename(code, 'conn-2', 'Roberto')).toEqual({ seat: 1 })
+      expect(rm.rename(code, 'conn-2', 'Roberto')).toMatchObject({ seat: 1 })
       expect(rm.getRoom(code)!.seats[1].name).toBe('Roberto')
     })
 
@@ -259,6 +260,71 @@ describe('RoomManager', () => {
       const { code } = rm.createRoom('conn-host', 'Host', 'medium')
       rm.startRoom(code, 'conn-host')
       expect(rm.rename(code, 'conn-host', 'Outro Nome')).toEqual({ error: expect.any(String) })
+    })
+  })
+  describe('token de reconexão', () => {
+    function started() {
+      const rm = new RoomManager()
+      const { code, room } = rm.createRoom('conn-host', 'Host', 'medium')
+      const bob = rm.joinRoom(code, 'conn-2', 'Bob') as { seat: number; token: string }
+      rm.startRoom(code, 'conn-host')
+      return { rm, code, room, bob }
+    }
+
+    it('cada humano recebe um token aleatório e diferente; IA não tem token', () => {
+      const rm = new RoomManager()
+      const { code, room } = rm.createRoom('conn-host', 'Host', 'medium')
+      const bob = rm.joinRoom(code, 'conn-2', 'Bob') as { token: string }
+      const carol = rm.joinRoom(code, 'conn-3', 'Carol') as { token: string }
+      const tokens = [room.seats[0].token, bob.token, carol.token]
+      expect(tokens.every(t => typeof t === 'string' && /^[0-9a-f]{32}$/.test(t))).toBe(true)
+      expect(new Set(tokens).size).toBe(3)
+      expect(room.seats[3].token).toBeUndefined()
+    })
+
+    it('quem sabe só o nome (sem token) NÃO assume a vaga de quem caiu', () => {
+      const { rm, code, room } = started()
+      rm.leaveRoom('conn-2')
+      const hijack = rm.joinRoom(code, 'conn-attacker', 'Bob')
+      expect(hijack).toEqual({ error: 'token de reconexao invalido' })
+      expect(room.seats[1].connId).toBeUndefined()
+    })
+
+    it('token errado também é recusado, e o certo ainda funciona depois', () => {
+      const { rm, code, room, bob } = started()
+      rm.leaveRoom('conn-2')
+      expect('error' in rm.joinRoom(code, 'conn-x', 'Bob', 'a'.repeat(32))).toBe(true)
+      expect('error' in rm.joinRoom(code, 'conn-x', 'Bob', bob.token.slice(0, 31))).toBe(true)
+      expect(rm.joinRoom(code, 'conn-ok', 'Bob', bob.token)).toMatchObject({ seat: 1 })
+      expect(room.seats[1].connId).toBe('conn-ok')
+    })
+
+    it('o token do humano conectado não serve para outra pessoa tomar o lugar', () => {
+      const { rm, code, bob } = started()
+      const attempt = rm.joinRoom(code, 'conn-y', 'Bob', bob.token)
+      expect('error' in attempt).toBe(true)
+    })
+
+    it('o token acompanha o jogador quando ele troca de assento no lobby', () => {
+      const rm = new RoomManager()
+      const { code, room } = rm.createRoom('conn-host', 'Host', 'medium')
+      const bob = rm.joinRoom(code, 'conn-2', 'Bob') as { token: string }
+      rm.chooseSeat(code, 'conn-2', 3)
+      expect(room.seats[3].name).toBe('Bob')
+      expect(room.seats[3].token).toBe(bob.token)
+      expect(room.seats[1].token).toBeUndefined()
+      const carol = rm.joinRoom(code, 'conn-3', 'Carol') as { token: string }
+      rm.chooseSeat(code, 'conn-3', 3)
+      expect(room.seats[3].token).toBe(carol.token)
+      expect(room.seats[room.seats.findIndex(s => s.name === 'Bob')].token).toBe(bob.token)
+    })
+
+    it('quem sai do lobby perde o token (a vaga volta a ser IA)', () => {
+      const rm = new RoomManager()
+      const { code, room } = rm.createRoom('conn-host', 'Host', 'medium')
+      rm.joinRoom(code, 'conn-2', 'Bob')
+      rm.leaveRoom('conn-2')
+      expect(room.seats[1].token).toBeUndefined()
     })
   })
 })

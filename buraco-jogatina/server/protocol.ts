@@ -1,4 +1,4 @@
-import { RoomManager, Room, Difficulty, cleanName } from './rooms'
+import { RoomManager, Room, Difficulty, cleanName, MAX_TOKEN_LENGTH } from './rooms'
 import type { Intent, SeatView } from '../src/session/types'
 
 export interface ClientSocket {
@@ -7,7 +7,7 @@ export interface ClientSocket {
 
 export type ClientMessage =
   | { type: 'create'; name: string; difficulty: Difficulty }
-  | { type: 'join'; code: string; name: string }
+  | { type: 'join'; code: string; name: string; token?: string }
   | { type: 'start' }
   | { type: 'intent'; intent: Intent }
   | { type: 'nextRound' }
@@ -57,7 +57,12 @@ export function isClientMessage(value: unknown): value is ClientMessage {
     case 'create':
       return typeof msg.name === 'string' && DIFFICULTIES.includes(msg.difficulty as Difficulty)
     case 'join':
-      return typeof msg.code === 'string' && msg.code.length <= MAX_CODE_LENGTH && typeof msg.name === 'string'
+      return (
+        typeof msg.code === 'string' &&
+        msg.code.length <= MAX_CODE_LENGTH &&
+        typeof msg.name === 'string' &&
+        (msg.token === undefined || (typeof msg.token === 'string' && msg.token.length <= MAX_TOKEN_LENGTH))
+      )
     case 'start':
     case 'nextRound':
       return true
@@ -80,7 +85,7 @@ export interface LobbySeatView {
 }
 
 export type ServerMessage =
-  | { type: 'joined'; code: string; seat: number; isHost: boolean; serverUrl?: string }
+  | { type: 'joined'; code: string; seat: number; isHost: boolean; serverUrl?: string; token?: string }
   | { type: 'lobby'; code: string; seat: number; seats: LobbySeatView[]; isHost: boolean; serverUrl?: string }
   | { type: 'state'; view: SeatView }
   | { type: 'log'; lines: string[] }
@@ -238,7 +243,7 @@ export class ProtocolServer {
         case 'create':
           return this.handleCreate(connId, raw.name, raw.difficulty)
         case 'join':
-          return this.handleJoin(connId, raw.code, raw.name)
+          return this.handleJoin(connId, raw.code, raw.name, raw.token)
         case 'start':
           return this.handleStart(connId)
         case 'intent':
@@ -297,18 +302,18 @@ export class ProtocolServer {
       this.sendError(connId, 'voce ja esta em uma sala')
       return
     }
-    const { code } = this.rooms.createRoom(connId, cleanName(name) || 'Jogador', difficulty)
+    const { code, room } = this.rooms.createRoom(connId, cleanName(name) || 'Jogador', difficulty)
     this.connStates.set(connId, { roomCode: code, seat: 0 })
-    this.send(connId, { type: 'joined', code, seat: 0, isHost: true, serverUrl: this.serverUrl })
+    this.send(connId, { type: 'joined', code, seat: 0, isHost: true, serverUrl: this.serverUrl, token: room.seats[0].token })
     this.broadcastLobby(code)
   }
 
-  private handleJoin(connId: string, code: string, name: string): void {
+  private handleJoin(connId: string, code: string, name: string, token?: string): void {
     if (this.connStates.has(connId)) {
       this.sendError(connId, 'voce ja esta em uma sala')
       return
     }
-    const result = this.rooms.joinRoom(code, connId, cleanName(name) || 'Jogador')
+    const result = this.rooms.joinRoom(code, connId, cleanName(name) || 'Jogador', token)
     if ('error' in result) {
       this.sendError(connId, result.error)
       return
@@ -320,6 +325,7 @@ export class ProtocolServer {
       seat: result.seat,
       isHost: result.seat === 0,
       serverUrl: this.serverUrl,
+      token: result.token,
     })
     this.broadcastLobby(code)
 
